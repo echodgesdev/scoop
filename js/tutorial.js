@@ -19,7 +19,8 @@ class TutorialBase {
   constructor() {
     this.active = false;
     this.powerLessonDone = false;
-    this._banked = false;  // banked-mode: has the player banked at least one?
+    this._banked = false;     // banked-mode: has the player banked at least one?
+    this._demoArmed = false;  // has the demo bubble been released (post first serve)?
   }
 
   /** @param {Game} game */
@@ -27,9 +28,7 @@ class TutorialBase {
     this.active = true;
     this.powerLessonDone = false;
     this._banked = false;
-    // Surface the first demo bubble quickly (one-time nudge; later spawns use
-    // the normal cadence, so nothing persists past the tutorial).
-    game.pickups.spawnTimer = 1.5;
+    this._demoArmed = false;
   }
 
   /** @param {number} dt @param {Game} game */
@@ -37,6 +36,12 @@ class TutorialBase {
     if (!this.active) return;
     // Wave 0 cleared (the director advanced) → onboarding is done.
     if (game.waves.wave !== 0) { this._finish(game); return; }
+    // Hold demo bubbles until the first order is served (Game._bubbleTypes gates
+    // the spawn); the moment it's served, surface the demo bubble promptly.
+    if (!this._demoArmed && game.waves.servedColors.size >= 1) {
+      this._demoArmed = true;
+      game.pickups.spawnTimer = Math.min(game.pickups.spawnTimer, 1.2);
+    }
     this._updatePowerLesson(game);
   }
 

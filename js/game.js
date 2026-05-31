@@ -611,13 +611,16 @@ export class Game {
 
   /**
    * Which bubble types the pickup field may spawn. During the tutorial we force
-   * a single demo type (feather / ⚡) so a power-up always appears to teach the
-   * catch verb — regardless of what's actually unlocked. Otherwise it's the
-   * player's unlocked set.
+   * a single demo type (feather / ⚡) so the power-up lesson always has
+   * something to catch — but only AFTER the player has served their first
+   * order, so the opening beat is purely "catch a scoop, serve a customer".
+   * Otherwise it's the player's unlocked set.
    * @returns {import('./types.js').PickupTypeName[]}
    */
   _bubbleTypes() {
-    if (this.tutorial.active) return [PICKUP_TYPE.FEATHER];
+    if (this.tutorial.active) {
+      return this.waves.servedColors.size >= 1 ? [PICKUP_TYPE.FEATHER] : [];
+    }
     return this.challenges.unlockedPowerupTypes();
   }
 
