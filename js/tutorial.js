@@ -113,9 +113,31 @@ export class Tutorial {
         break;
 
       case 'awaitShoot':
+        // A missed shot dropped a fresh ammo scoop in — let it plop, then hand
+        // movement back. Everything else pauses while it lands.
+        if (this.ghost) {
+          this.ghost.t += dt / PLOP_FALL_S;
+          if (this.ghost.t >= 1) {
+            game.player.push(this.ghost.color);
+            game.effects.burst(game.player.x, game.player.stackTopY(), [game.shop.hex(this.ghost.color), '#fff'], 8);
+            game.sound.catch_();
+            this.ghost = null;
+            game.player.frozen = false;
+          }
+          break;
+        }
         // Respawn the coin if it drifts past un-shot, so this can't soft-lock.
-        if (!this.coin) this._spawnCoin(game);
-        else this._moveCoin(dt, game);
+        if (!this.coin) { this._spawnCoin(game); break; }
+        this._moveCoin(dt, game);
+        // Missed-shot recovery: the player fired their only ammo, the coin
+        // survived, and no projectile is still flying → freeze the cone and drop
+        // a fresh scoop so they can line up another shot. (_moveCoin may have
+        // finished the tutorial on a hit, so re-check we're still shooting.)
+        if (this.active && this.phase === 'awaitShoot' &&
+            game.player.stack.length === 0 && game.projectiles.list.length === 0) {
+          game.player.frozen = true;
+          this.ghost = { color: this.ammoColor, t: 0 };
+        }
         break;
     }
   }
