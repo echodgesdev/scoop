@@ -85,6 +85,7 @@ export const HEAL_PER_SERVE = DAMAGE_PER_EXPIRE / 3;
 // clears the tray for a fresh start (health is NOT touched — it persists).
 export const COMBO_CASHOUT_PER = 25;        // points per combo point banked
 export const STACK_CASHOUT_PER_SCOOP = 10;  // points per leftover tray scoop
+export const BUBBLE_CASHOUT = STACK_CASHOUT_PER_SCOOP * 3;  // a banked bubble (Banked mode) is worth 3 scoops
 
 // === Between-wave store =======================================================
 // Score IS the currency — spending lowers your run total, so the high score
@@ -108,6 +109,12 @@ export const SPAWN_DEMAND_BIAS = 0.65;
 // needs that color) buys this much patience back. Encourages players to make
 // progress on hard orders even when they don't have the whole order yet.
 export const PARTIAL_SERVE_EXTEND_S = 1.2;
+
+// === Banked power-up inventory (Banked game mode) ============================
+// In Banked mode, catching a bubble adds it to a FIFO queue instead of firing
+// it; Shift spends the front. The cap prevents stockpiling — catching while
+// full evicts the oldest. (Auto mode ignores this — it fires on catch.)
+export const MAX_PU_INVENTORY = 3;
 
 // === Scene floor + actor embedding ===========================================
 // Sand floor lives at FLOOR_Y_RATIO of canvas height. Each actor positions

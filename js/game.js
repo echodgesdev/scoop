@@ -33,6 +33,8 @@ import { DebugPanel } from './debug.js';
 import { drawSkyAndSun, drawSand } from './scene.js';
 import { dayCycleState } from './dayCycle.js';
 import { PowerUps } from './powerups.js';
+import { AutoPowerupMode } from './auto-powerup-mode.js';
+import { BankedPowerupMode } from './banked-powerup-mode.js';
 import { PickupField, pickupCaught, PICKUP_ICONS, PICKUP_RING_COLOR } from './pickups.js';
 import { ProjectileField, projectileHits } from './projectiles.js';
 import { EventBus } from './events.js';
@@ -65,7 +67,7 @@ const PICKUP_TO_POWER = {
   [PICKUP_TYPE.RAINBOW]: POWERUP_TYPE.RAINBOW
 };
 
-class Game {
+export class Game {
   constructor() {
     this.canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
     this.ctx = /** @type {CanvasRenderingContext2D} */ (this.canvas.getContext('2d'));
@@ -144,6 +146,7 @@ class Game {
     this.input.onDeliver = () => this._deliver();
     this.input.onRotate = () => this._rotate();
     this.input.onUsePower = type => this._usePower(type);
+    this.input.onShift = () => this._useShift();
     this.input.onDebugDamage = () => this._debugDamage();
     this.input.onPause = () => this._togglePause();
 
@@ -175,9 +178,12 @@ class Game {
       showHitboxes: false, showFps: false
     };
     // Power-up handling mode (debug-switchable). 'auto' = fire on catch
-    // (replace-on-catch); 'banked' = the queue + Shift inventory. Banked is
-    // wired up in a later pass; for now only 'auto' is functional.
+    // (replace-on-catch); 'banked' = a FIFO queue spent with Shift. The active
+    // PowerupMode strategy is the single seam game.js delegates to (onCatch /
+    // step / drawQueueSlots / cashout / onLootboxSpend); _firePower and the
+    // active-slot visual stay shared here. Rebuilt each game start + on switch.
     this.gameMode = 'auto';
+    this.powerupMode = this._makePowerupMode();
     // Between-wave store (loot box) — off by default; toggled from the debug panel.
     this.storeEnabled = false;
     // Debug patience override (seconds). null = follow the wave ramp.
@@ -202,7 +208,13 @@ class Game {
       getBubbleWeights: () => this.pickups.weights,
       onTutorialFlag: v => this.setShowTutorial(v),
       getTutorialFlag: () => this.showTutorial,
-      onGameMode: name => { this.gameMode = name; },
+      onGameMode: name => {
+        this.gameMode = name;
+        // Swap the strategy live so testers can flip modes mid-run. The shared
+        // active bubble persists (it's Game-owned); only the queue resets.
+        this.powerupMode = this._makePowerupMode();
+        this.powerupMode.reset();
+      },
       getGameMode: () => this.gameMode,
       onStoreToggle: on => { this.storeEnabled = on; },
       getStoreEnabled: () => this.storeEnabled
@@ -428,6 +440,9 @@ class Game {
     this.inCashout = false;
     this.activeBubble = null;
     this.puLeaving.length = 0;
+    // Rebuild the power-up strategy for the current mode and clear its state.
+    this.powerupMode = this._makePowerupMode();
+    this.powerupMode.reset();
     this.lastTime = 0;
     this.accumulator = 0;
     this.banner = null;
@@ -550,6 +565,7 @@ class Game {
     if (this.tutorial.active) this.tutorial.update(dt, this);
 
     this._stepActive(dt);
+    this.powerupMode.step(dt);  // banked-queue animations (no-op in Auto)
 
     // Patience is frozen during the tutorial so the staged customer never bails.
     const patienceOn = this.flags.patternTimer && !this.powerups.pauseActive && !this.tutorial.active;
@@ -576,7 +592,25 @@ class Game {
     // projectile both route here).
     this.challenges.recordBubblePop(pickup.type);
     this.bus.emit('pickup', { pickup });  // white burst at the catch point
-    this._firePower(pickup.type, this.player.x, this.player.stackTopY());
+    // The mode decides fire-now (Auto) vs bank-for-later (Banked).
+    this.powerupMode.onCatch(pickup.type, this.player.x, this.player.stackTopY());
+  }
+
+  /** Build the PowerupMode strategy for the current this.gameMode. */
+  _makePowerupMode() {
+    return this.gameMode === 'banked'
+      ? new BankedPowerupMode(this)
+      : new AutoPowerupMode(this);
+  }
+
+  /**
+   * Shift: spend the front banked power-up. No-op in Auto mode (nothing is
+   * banked); empty queue in Banked mode gives a "nope" beep.
+   */
+  _useShift() {
+    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
+    if (this.powerupMode.queueEmpty()) { this.sound.bad(); return; }
+    this.powerupMode.onShift();
   }
 
   /**
@@ -865,20 +899,27 @@ class Game {
     setTimeout(() => this._cashoutStack(completedWave), 120);
   }
 
-  /** Cashout step 2: pop the active power-up bubble for show (no points), then finish. */
+  /**
+   * Cashout step 2: pop the active power-up bubble for show (no points), then
+   * let the mode cash out any banked queue (Banked mode), and finally open the
+   * wave-transition overlay. Auto mode's cashout is instant.
+   */
   _cashoutActive(completedWave) {
     if (!this.running) { this.inCashout = false; return; }
+    const finish = () => this.powerupMode.cashout(() => {
+      this.inCashout = false;
+      this._beginWaveTransition(completedWave);
+    });
     if (this.activeBubble) {
       const pos = this._activeSlotPos();
       this.effects.burst(pos.x, pos.y, [PICKUP_RING_COLOR[this.activeBubble.type], '#fff'], 22);
       this.sound.bubblePop();
       this.activeBubble = null;
       this.powerups.reset();
-      setTimeout(() => { this.inCashout = false; this._beginWaveTransition(completedWave); }, 220);
+      setTimeout(finish, 220);
       return;
     }
-    this.inCashout = false;
-    this._beginWaveTransition(completedWave);
+    finish();
   }
 
   /**
@@ -921,9 +962,8 @@ class Game {
   }
 
   /**
-   * Store: spend score for a random unlocked power-up. In Auto mode it fires
-   * immediately via _firePower; the banked-inventory mode (later pass) will
-   * route this through its queue instead.
+   * Store: spend score for a random unlocked power-up, handed to the active
+   * PowerupMode (Auto fires it now; Banked drops it into the queue).
    * @returns {{ ok: boolean, score: number, lootType?: string }}
    */
   _buyLootbox() {
@@ -932,7 +972,8 @@ class Game {
     if (!pool || pool.length === 0) pool = [PICKUP_TYPE.HEART];  // baseline before any unlocks
     const type = pool[Math.floor(Math.random() * pool.length)];
     this.shop.score -= LOOTBOX_COST;
-    this._firePower(type, this.player.x, this.player.stackTopY());
+    // Auto fires it now; Banked drops it into the queue.
+    this.powerupMode.onLootboxSpend(type, this.player.x, this.player.stackTopY());
     this.hud.setScore(this.shop.score);
     return { ok: true, score: this.shop.score, lootType: type };
   }
@@ -1047,7 +1088,9 @@ class Game {
     }
     ctx.restore();
 
-    // Active power-up: screen-fixed indicator at bottom-center (when one runs).
+    // Banked queue row (Banked mode only) + the active running-power-up
+    // indicator above it. Both screen-fixed.
+    this.powerupMode.drawQueueSlots(ctx, this.bounds);
     this._drawActivePowerup(ctx);
 
     // FPS overlay is screen-fixed (drawn after the shake transform is popped).
@@ -1139,11 +1182,13 @@ class Game {
   }
 
   /**
-   * The active power-up slot, centered along the bottom of the stage.
+   * The active power-up slot, centered along the bottom of the stage. In Banked
+   * mode it sits higher to leave room for the queue row beneath it.
    * @returns {{ x: number, y: number, r: number }}
    */
   _activeSlotPos() {
-    return { x: this.bounds.width / 2, y: this.bounds.height - 80, r: 40 };
+    const y = this.gameMode === 'banked' ? this.bounds.height - 118 : this.bounds.height - 80;
+    return { x: this.bounds.width / 2, y, r: 40 };
   }
 
   /**

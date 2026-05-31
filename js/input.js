@@ -20,6 +20,8 @@ export class Input {
     this.onRotate = () => {};
     /** @type {(type: PickupTypeName) => void} — debug Q/W/E/R synthesise a catch. */
     this.onUsePower = () => {};
+    /** @type {() => void} — Shift: spend the front banked power-up (Banked game mode only). */
+    this.onShift = () => {};
     /** @type {() => void} — debug: inflict damage on self (T). Game gates this on the cheat flag. */
     this.onDebugDamage = () => {};
     /** @type {() => void} — Esc toggles the pause menu. */
@@ -41,6 +43,10 @@ export class Input {
           break;
         case 'ArrowDown':
           if (!e.repeat) this.onRotate();
+          e.preventDefault();
+          break;
+        case 'Shift':
+          if (!e.repeat) this.onShift();
           e.preventDefault();
           break;
         case 'q': case 'Q': if (!e.repeat) this.onUsePower('heart');   break;
