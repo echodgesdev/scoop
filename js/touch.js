@@ -1,16 +1,20 @@
 // @ts-check
 /**
  * Native single-touch controls (Pointer Events — also covers mouse/pen, so it
- * works on desktop too). One active pointer at a time. The gesture vocabulary:
+ * works on desktop too). One active pointer at a time.
  *
- *   drag (horizontal)  → steer: cone chases the finger's x   (onMove / onMoveEnd)
- *   tap                → serve / tap the queue                (onTap)
- *   swipe up           → slingshot                            (onSwipeUp)
- *   swipe down         → rotate the tray                      (onSwipeDown)
+ * This layer is movement-scheme-AGNOSTIC: it just reports raw gesture events and
+ * lets the host decide what they mean. That lets Game switch steering schemes
+ * (absolute drag / relative drag / hold-zones) without touching this file.
  *
- * Keyboard stays fully intact alongside this. The host (Game) supplies a
- * screen→virtual mapper and the action callbacks, so this module stays free of
- * any game/layout knowledge.
+ *   onHold(vx)        pointer went down at virtual-x vx (hold-zones steer start)
+ *   onMove(vx, dvx)   drag update — absolute vx and the per-event virtual delta
+ *   onMoveEnd()       drag released
+ *   onHoldEnd()       pointer released (always — hold-zones steer stop)
+ *   onTap(vx, vy)     quick touch with no drag (serve / queue)
+ *   onSwipeUp()/onSwipeDown()   a fast vertical flick (slingshot / rotate)
+ *
+ * Keyboard stays fully intact alongside this.
  */
 
 const DRAG_START_PX = 8;    // movement beyond this promotes a touch to a drag
@@ -23,7 +27,9 @@ export class TouchControls {
    * @param {HTMLElement} target element to listen on (the canvas)
    * @param {{
    *   toVirtual: (clientX: number, clientY: number) => { x: number, y: number },
-   *   onMove: (vx: number) => void,
+   *   onHold: (vx: number) => void,
+   *   onHoldEnd: () => void,
+   *   onMove: (vx: number, dvx: number) => void,
    *   onMoveEnd: () => void,
    *   onTap: (vx: number, vy: number) => void,
    *   onSwipeUp: () => void,
@@ -37,6 +43,7 @@ export class TouchControls {
     this.startX = 0;
     this.startY = 0;
     this.startT = 0;
+    this.lastVX = 0;
     this.moved = false;
 
     target.addEventListener('pointerdown', e => this._down(target, e));
@@ -53,6 +60,8 @@ export class TouchControls {
     this.startY = e.clientY;
     this.startT = e.timeStamp;
     this.moved = false;
+    this.lastVX = this.opts.toVirtual(e.clientX, e.clientY).x;
+    this.opts.onHold(this.lastVX);
     try { target.setPointerCapture(e.pointerId); } catch {}
     e.preventDefault();
   }
@@ -63,7 +72,11 @@ export class TouchControls {
     if (!this.moved && Math.hypot(e.clientX - this.startX, e.clientY - this.startY) > DRAG_START_PX) {
       this.moved = true;
     }
-    if (this.moved) this.opts.onMove(this.opts.toVirtual(e.clientX, e.clientY).x);
+    if (this.moved) {
+      const vx = this.opts.toVirtual(e.clientX, e.clientY).x;
+      this.opts.onMove(vx, vx - this.lastVX);
+      this.lastVX = vx;
+    }
     e.preventDefault();
   }
 
@@ -76,12 +89,12 @@ export class TouchControls {
     const dt = e.timeStamp - this.startT;
     e.preventDefault();
 
+    this.opts.onHoldEnd();
     if (!this.moved) {
       const v = this.opts.toVirtual(e.clientX, e.clientY);
       this.opts.onTap(v.x, v.y);
       return;
     }
-    // It was a drag — stop steering, then check if the release was a flick.
     this.opts.onMoveEnd();
     const dist = Math.hypot(dx, dy);
     if (dist >= SWIPE_MIN_PX && dt <= SWIPE_MAX_MS && Math.abs(dy) > Math.abs(dx) * SWIPE_AXIS) {
@@ -93,6 +106,7 @@ export class TouchControls {
   _cancel(e) {
     if (e.pointerId !== this.activeId) return;
     this.activeId = null;
+    this.opts.onHoldEnd();
     if (this.moved) this.opts.onMoveEnd();
   }
 }

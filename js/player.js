@@ -132,14 +132,22 @@ export class Player {
     const maxV  = CONE_MAX_SPEED * speedMult;
     const halfW = CONE_WIDTH / 2;
 
-    // Touch steering: chase the dragged finger's x at up to the speed cap.
-    // Direct positioning feels right under a thumb; the cap keeps it from
-    // teleporting (and still benefits from the speed power-up via maxV).
+    // Absolute touch steering: chase the finger's x at up to the speed cap.
     if (input.moveTargetX != null) {
       const target = Math.max(halfW, Math.min(bounds.width - halfW, input.moveTargetX));
       const maxStep = maxV * dt;
       const dx = target - this.x;
       this.x += Math.abs(dx) <= maxStep ? dx : Math.sign(dx) * maxStep;
+      this.vx = 0;
+      return;
+    }
+
+    // Relative touch steering: apply the dragged delta directly (1:1 × gain),
+    // then consume it. Uncapped — small thumb travel moves the cone far, which
+    // is the whole point. Cleared each frame so a still finger holds position.
+    if (input.moveDelta !== 0) {
+      this.x = Math.max(halfW, Math.min(bounds.width - halfW, this.x + input.moveDelta));
+      input.moveDelta = 0;
       this.vx = 0;
       return;
     }

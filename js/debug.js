@@ -28,10 +28,12 @@ export class DebugPanel {
    *   onGameMode?: (name: string) => void,
    *   getGameMode?: () => string,
    *   onStoreToggle?: (on: boolean) => void,
-   *   getStoreEnabled?: () => boolean
+   *   getStoreEnabled?: () => boolean,
+   *   onTouchScheme?: (name: string) => void,
+   *   getTouchScheme?: () => string
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -53,6 +55,8 @@ export class DebugPanel {
     this.getGameMode = getGameMode || (() => 'auto');
     this.onStoreToggle = onStoreToggle || (() => {});
     this.getStoreEnabled = getStoreEnabled || (() => false);
+    this.onTouchScheme = onTouchScheme || (() => {});
+    this.getTouchScheme = getTouchScheme || (() => 'relative');
     this.open = false;
 
     this.button = /** @type {HTMLElement} */ (document.getElementById('debugBtn'));
@@ -60,6 +64,7 @@ export class DebugPanel {
     this._wireFlags();
     this._wireGameMode();
     this._wireStoreToggle();
+    this._wireTouchScheme();
     this._wireAspect();
     this._wireDemandBias();
     this._wirePatience();
@@ -103,6 +108,14 @@ export class DebugPanel {
     if (!cb) return;
     cb.checked = this.getStoreEnabled();
     cb.addEventListener('change', () => this.onStoreToggle(cb.checked));
+  }
+
+  /** Touch movement scheme: relative drag / absolute drag / hold zones. */
+  _wireTouchScheme() {
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugTouchScheme'));
+    if (!sel) return;
+    sel.value = this.getTouchScheme();
+    sel.addEventListener('change', () => this.onTouchScheme(sel.value));
   }
 
   /** Aspect-ratio selector: switches the locked virtual canvas (4:3 ⇄ 3:4). */
@@ -258,6 +271,8 @@ export class DebugPanel {
     if (modeSel) modeSel.value = this.getGameMode();
     const storeCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugStoreToggle'));
     if (storeCb) storeCb.checked = this.getStoreEnabled();
+    const touchSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugTouchScheme'));
+    if (touchSel) touchSel.value = this.getTouchScheme();
   }
 
   /** Sync the slider to the live wave fraction. Called when the panel opens. */

@@ -160,15 +160,45 @@ export class Game {
     this.input.onDebugDamage = () => this._debugDamage();
     this.input.onPause = () => this._togglePause();
 
-    // Native touch layer (also handles mouse/pen). Maps gestures to the same
-    // actions as the keyboard; keyboard stays fully live alongside it.
+    // Movement scheme for the touch layer (debug-switchable A/B). 'relative' is
+    // the default — small thumb travel moves the cone far (gain), least
+    // fatiguing. 'absolute' = cone tracks the finger; 'holdzones' = press the
+    // left/right edge thirds to drive. Discrete verbs (tap/swipe) are identical
+    // across all three; only steering differs.
+    this.touchScheme = 'relative';
+    this.touchGain = 2.0;
+
+    // Native touch layer (also handles mouse/pen). Reports raw gestures; the
+    // handlers below interpret them per touchScheme. Keyboard stays fully live.
     this.touch = new TouchControls(this.canvas, {
       toVirtual: (cx, cy) => this._toVirtual(cx, cy),
-      onMove: vx => { this.input.moveTargetX = vx; this.input.lastWasTouch = true; },
+      onHold: vx => {
+        this.input.lastWasTouch = true;
+        if (this.touchScheme === 'holdzones') {
+          const third = this.bounds.width / 3;
+          this.input.left = vx < third;
+          this.input.right = vx > this.bounds.width - third;
+        }
+      },
+      onHoldEnd: () => {
+        if (this.touchScheme === 'holdzones') { this.input.left = false; this.input.right = false; }
+      },
+      onMove: (vx, dvx) => {
+        if (this.touchScheme === 'relative') this.input.moveDelta += dvx * this.touchGain;
+        else if (this.touchScheme === 'absolute') this.input.moveTargetX = vx;
+        // holdzones: dragging doesn't steer (the edge-hold does)
+      },
       onMoveEnd: () => { this.input.moveTargetX = null; },
-      onTap: (vx, vy) => { this.input.lastWasTouch = true; this._onTouchTap(vx, vy); },
-      onSwipeUp: () => { this.input.lastWasTouch = true; this._pop(); },
-      onSwipeDown: () => { this.input.lastWasTouch = true; this._rotate(); }
+      onTap: (vx, vy) => {
+        // In hold-zones the edge thirds are move pads, so only middle taps serve.
+        if (this.touchScheme === 'holdzones') {
+          const third = this.bounds.width / 3;
+          if (vx < third || vx > this.bounds.width - third) return;
+        }
+        this._onTouchTap(vx, vy);
+      },
+      onSwipeUp: () => this._pop(),
+      onSwipeDown: () => this._rotate()
     });
 
     // Power-ups fire the instant a bubble is caught (no banking, no manual
@@ -236,7 +266,16 @@ export class Game {
       },
       getGameMode: () => this.gameMode,
       onStoreToggle: on => { this.storeEnabled = on; },
-      getStoreEnabled: () => this.storeEnabled
+      getStoreEnabled: () => this.storeEnabled,
+      onTouchScheme: name => {
+        this.touchScheme = name;
+        // Clear any in-flight steering state so schemes don't bleed together.
+        this.input.moveTargetX = null;
+        this.input.moveDelta = 0;
+        this.input.left = false;
+        this.input.right = false;
+      },
+      getTouchScheme: () => this.touchScheme
     });
 
     // Recipes unlocked / mastered during this play session — drained on
@@ -508,7 +547,8 @@ export class Game {
     this.inCashout = false;
     this.activeBubble = null;
     this.puLeaving.length = 0;
-    this.input.moveTargetX = null;  // drop any stale touch-steer target
+    this.input.moveTargetX = null;  // drop any stale touch-steer state
+    this.input.moveDelta = 0;
     // Rebuild the power-up strategy + tutorial for the current mode.
     this.powerupMode = this._makePowerupMode();
     this.powerupMode.reset();
