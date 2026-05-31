@@ -912,9 +912,9 @@ export class Game {
   _rotate() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
     if (this.player.locked) return;
-    // Tipping mode repurposes the "down" verb: discard the TOP scoop instead of
-    // rotating (the Swap/rotate verb is disabled in that mode).
-    if (this.gameMode === 'tipping') { this._discardTop(); return; }
+    // Tipping mode has no rotate/Swap verb; the "down" gesture does nothing
+    // (discard is the upward gesture — see _pop).
+    if (this.gameMode === 'tipping') return;
     if (this.player.rotateDown()) {
       // Light "whoosh" — reuse the catch chime so it sits in the same audio
       // family as the other tray-manipulation verbs.
@@ -946,8 +946,9 @@ export class Game {
   _pop() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
     if (this.player.locked) return;
-    // Slingshot is disabled in tipping mode (no bubbles to shoot).
-    if (this.gameMode === 'tipping') return;
+    // Tipping mode: the upward gesture (swipe up / Space) discards the top
+    // scoop — flicking it off the cone — instead of firing the slingshot.
+    if (this.gameMode === 'tipping') { this._discardTop(); return; }
     if (this.player.stack.length === 0) {
       this.sound.bad();
       return;
