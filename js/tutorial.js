@@ -1,326 +1,93 @@
 // @ts-check
-import {
-  COLOR_KEYS,
-  CONE_HEIGHT,
-  PICKUP_RADIUS,
-  PICKUP_BUBBLE_RADIUS_MULT
-} from './config.js';
-import { drawScoop } from './player.js';
-import { pickupCaught } from './pickups.js';
-import { projectileHits } from './projectiles.js';
-import { STATE } from './shop.js';
+import { CONE_HEIGHT, PICKUP_TYPE, POWERUP_TYPE } from './config.js';
 
-/** @typedef {import('./types.js').ScoopColor} ScoopColor */
-
-const COIN_SPEED = 70;        // px/s drift — slow so it lingers in reach
-const COIN_Y_RATIO = 0.34;    // sits in the sky, mostly shoot-only
-const PLOP_FALL_S = 0.5;      // per-scoop fade-in + drop
-const PLOP_GAP_S = 0.18;      // beat between plops
-const SHOOT_HINT_RANGE = 90;  // |coin.x - cone.x| under which "shoot" reads
-
-const easeIn = t => t * t;
+/** @typedef {import('./game.js').Game} Game */
 
 /**
- * Scripted onboarding. Drives a state machine that teaches the four verbs in
- * order: move + serve, then shoot + activate. Plays on a first-time flag at
- * wave 1, or on demand from the "How to Play" button. Reaches into `game`
- * directly — it's a coordinator, not a pure system.
+ * The tutorial is now a thin HINT OVERLAY on the real Wave 0 — it no longer
+ * freezes the player, stages customers, or suppresses the falling field. Wave 0
+ * (junior flavors only, one of each to clear) is a genuine playable wave; the
+ * tutorial just watches real game state and draws contextual prompts.
  *
- * Phases: intro → plopOrder → awaitServe → awaitShoot → done.
- *   intro        freeze, stage a customer, wait for its bubble
- *   plopOrder    drop 3 scoops in: the two wanted (A,B) with a blocker (X) in
- *                the middle, so reaching the second order scoop needs a rotate
- *   awaitServe   unlock move/serve/rotate (NOT shoot, so you can't strand
- *                yourself); serve the customer. The leftover X becomes ammo.
- *   awaitShoot   coin floats; shoot the leftover scoop at it → it pops for a
- *                bonus and the tutorial finishes (power-ups fire on contact, so
- *                there's nothing extra to "activate")
+ * It's swapped by game mode via createTutorial(): the only difference between
+ * the two is how the power-up lesson reads — Auto teaches "catching fires it",
+ * Banked teaches "catch banks → ⇧ Shift to spend". A feather (⚡) demo bubble is
+ * fed into the pickup field during the tutorial (see Game._bubbleTypes) so the
+ * lesson always has something to catch.
  */
-export class Tutorial {
+class TutorialBase {
   constructor() {
     this.active = false;
-    this.phase = 'done';
-    this.timer = 0;
-    /** @type {import('./types.js').Customer | null} */
-    this.customer = null;
-    /** @type {ScoopColor[]} colors still to drop into the tray */
-    this.plopQueue = [];
-    /** @type {{ color: ScoopColor, t: number } | null} */
-    this.ghost = null;
-    /** @type {{ x: number, y: number, vx: number, bob: number } | null} */
-    this.coin = null;
-    /** @type {ScoopColor} */
-    this.ammoColor = COLOR_KEYS[0];
+    this.powerLessonDone = false;
+    this._banked = false;  // banked-mode: has the player banked at least one?
   }
 
-  /** @param {import('./game.js').Game | any} game */
+  /** @param {Game} game */
   start(game) {
     this.active = true;
-    this.phase = 'intro';
-    this.timer = 0;
-    this.ghost = null;
-    this.coin = null;
-
-    // Three distinct colors: two the customer wants, one "ammo" to slingshot.
-    const keys = COLOR_KEYS.slice();
-    for (let i = keys.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [keys[i], keys[j]] = [keys[j], keys[i]];
-    }
-    const order = [keys[0], keys[1]];
-    this.ammoColor = keys[2];
-    // Tray bottom→top: A, X(blocker), B. Serving B then needing A forces a
-    // rotate past X. X is never wanted, so it survives as slingshot ammo.
-    this.plopQueue = [order[0], this.ammoColor, order[1]];
-
-    const slot = Math.random() < 0.5 ? 1 : 3;  // one step left/right of center
-    game.shop.scripted = true;
-    game.player.frozen = true;
-    this.customer = game.shop.spawnScripted(slot, order, 180, 1);
+    this.powerLessonDone = false;
+    this._banked = false;
+    // Surface the first demo bubble quickly (one-time nudge; later spawns use
+    // the normal cadence, so nothing persists past the tutorial).
+    game.pickups.spawnTimer = 1.5;
   }
 
-  /**
-   * @param {number} dt
-   * @param {import('./game.js').Game | any} game
-   */
+  /** @param {number} dt @param {Game} game */
   update(dt, game) {
     if (!this.active) return;
-    this.timer += dt;
-
-    switch (this.phase) {
-      case 'intro':
-        if (this.customer && this.customer.state === STATE.WAITING && this.timer > 0.5) {
-          this.phase = 'plopOrder';
-          this.timer = PLOP_GAP_S;
-        }
-        break;
-
-      case 'plopOrder':
-        if (this._advancePlop(dt, game)) {
-          this.phase = 'awaitServe';
-          game.player.frozen = false;  // hand over control to serve
-        }
-        break;
-
-      case 'awaitServe':
-        // During the tutorial nothing else can make the customer leave, so a
-        // LEAVING state means it was served. The leftover blocker scoop stays
-        // in the tray and becomes the slingshot ammo.
-        if (this.customer && this.customer.state === STATE.LEAVING) {
-          this._spawnCoin(game);
-          this.phase = 'awaitShoot';
-        }
-        break;
-
-      case 'awaitShoot':
-        // A missed shot dropped a fresh ammo scoop in — let it plop, then hand
-        // movement back. Everything else pauses while it lands.
-        if (this.ghost) {
-          this.ghost.t += dt / PLOP_FALL_S;
-          if (this.ghost.t >= 1) {
-            game.player.push(this.ghost.color);
-            game.effects.burst(game.player.x, game.player.stackTopY(), [game.shop.hex(this.ghost.color), '#fff'], 8);
-            game.sound.catch_();
-            this.ghost = null;
-            game.player.frozen = false;
-          }
-          break;
-        }
-        // Respawn the coin if it drifts past un-shot, so this can't soft-lock.
-        if (!this.coin) { this._spawnCoin(game); break; }
-        this._moveCoin(dt, game);
-        // Missed-shot recovery: the player fired their only ammo, the coin
-        // survived, and no projectile is still flying → freeze the cone and drop
-        // a fresh scoop so they can line up another shot. (_moveCoin may have
-        // finished the tutorial on a hit, so re-check we're still shooting.)
-        if (this.active && this.phase === 'awaitShoot' &&
-            game.player.stack.length === 0 && game.projectiles.list.length === 0) {
-          game.player.frozen = true;
-          this.ghost = { color: this.ammoColor, t: 0 };
-        }
-        break;
-    }
+    // Wave 0 cleared (the director advanced) → onboarding is done.
+    if (game.waves.wave !== 0) { this._finish(game); return; }
+    this._updatePowerLesson(game);
   }
 
-  /**
-   * Advance the current plop batch. Returns true once every queued scoop has
-   * been committed to the tray. The ghost tracks the live cone x so it still
-   * lands correctly if the (unfrozen) player is moving.
-   * @param {number} dt @param {any} game
-   */
-  _advancePlop(dt, game) {
-    if (this.ghost) {
-      this.ghost.t += dt / PLOP_FALL_S;
-      if (this.ghost.t >= 1) {
-        game.player.push(this.ghost.color);  // commit → land-squash "plop"
-        game.effects.burst(game.player.x, game.player.stackTopY(), [game.shop.hex(this.ghost.color), '#fff'], 8);
-        game.sound.catch_();
-        this.ghost = null;
-        this.timer = 0;
-      }
-      return false;
-    }
-    if (this.plopQueue.length === 0) return true;
-    if (this.timer >= PLOP_GAP_S) this.ghost = { color: /** @type {ScoopColor} */ (this.plopQueue.shift()), t: 0 };
-    return false;
-  }
-
-  /**
-   * The slingshot is blocked until the shoot step — otherwise the player can
-   * fire away the scoops they need to serve and strand themselves (the falling
-   * field is suppressed during the tutorial, so there's no recovery).
-   */
-  allowsShoot() {
-    return this.phase === 'awaitShoot';
-  }
-
-  /** @param {any} game */
-  _spawnCoin(game) {
-    const dir = Math.random() < 0.5 ? 1 : -1;
-    this.coin = {
-      x: dir > 0 ? -PICKUP_RADIUS * 2 : game.bounds.width + PICKUP_RADIUS * 2,
-      y: game.bounds.height * COIN_Y_RATIO,
-      vx: dir * COIN_SPEED,
-      bob: Math.random() * Math.PI * 2
-    };
-  }
-
-  /** @param {number} dt @param {any} game */
-  _moveCoin(dt, game) {
-    const coin = this.coin;
-    if (!coin) return;
-    coin.x += coin.vx * dt;
-    coin.bob += dt * 1.8;
-
-    // Caught by the cone/stack OR struck by a slingshot shot → pop it.
-    if (pickupCaught(coin, game.player.pickupHitbox())) { this._hitCoin(game); return; }
-    for (let i = game.projectiles.list.length - 1; i >= 0; i--) {
-      if (projectileHits(game.projectiles.list[i], coin)) {
-        game.projectiles.list.splice(i, 1);
-        this._hitCoin(game);
-        return;
-      }
-    }
-
-    const m = PICKUP_RADIUS * 3;
-    if (coin.x < -m || coin.x > game.bounds.width + m) this.coin = null;  // respawned next tick
-  }
-
-  /**
-   * Coin popped (caught or shot). Power-ups fire on contact, so the coin just
-   * awards a small score bonus on the spot and ends the tutorial — there's no
-   * separate "activate" step to teach.
-   * @param {any} game
-   */
-  _hitCoin(game) {
-    const { x, y } = this.coin || { x: game.player.x, y: 0 };
-    game.effects.burst(x, y, ['#ffd700', '#fff7c0', '#ffffff'], 18);
-    game.effects.popText(x, y - 10, '+5', { color: '#ffd700', size: 24 });
-    game.shop.addScore(5);
-    game.hud.setScore(game.shop.score);
-    game.sound.bubblePop();
-    this.coin = null;
-    this._finish(game);
-  }
-
-  /** @param {any} game */
+  /** @param {Game} game */
   _finish(game) {
     this.active = false;
-    this.phase = 'done';
-    this.coin = null;
-    this.ghost = null;
-    game.shop.scripted = false;   // hand the shop back to the wave director
-    game.player.frozen = false;
     game.markTutorialSeen();
   }
 
+  /** Mode-specific: advance the power-up lesson from real state. @param {Game} game */
+  _updatePowerLesson(game) {}
+
+  /** Mode-specific: the power-up prompt string, or null. @param {Game} game */
+  _powerHint(game) { return null; }
+
+  /** @param {Game} game */
+  _featherPresent(game) {
+    return game.pickups.items.some(p => p.type === PICKUP_TYPE.FEATHER);
+  }
+
   /**
-   * Draw the plopping scoop, the coin, and the contextual control hints. Called
-   * inside the world (shake) transform so positions line up with the actors.
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {any} game
+   * Core move/serve prompt, keyed off live game state.
+   * @param {Game} game @returns {{ text: string, x: number, y: number } | null}
    */
-  draw(ctx, game) {
-    if (!this.active) return;
-
-    if (this.ghost) {
-      const tgt = game.player.scoopPosition(game.player.stack.length);
-      const startY = tgt.y - 150;
-      const y = startY + (tgt.y - startY) * easeIn(this.ghost.t);
-      ctx.save();
-      ctx.globalAlpha = Math.min(1, this.ghost.t * 2);
-      drawScoop(ctx, game.player.x, y, this.ghost.color);
-      ctx.restore();
-    }
-
-    if (this.coin) this._drawCoin(ctx);
-
-    this._drawHints(ctx, game);
-  }
-
-  /** @param {CanvasRenderingContext2D} ctx */
-  _drawCoin(ctx) {
-    const coin = this.coin;
-    if (!coin) return;
-    const cy = coin.y + Math.sin(coin.bob) * 4;
-    const br = PICKUP_RADIUS * PICKUP_BUBBLE_RADIUS_MULT;
-    ctx.save();
-    // Bubble.
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
-    ctx.strokeStyle = '#ffd700';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(coin.x, cy, br, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    // Drawn coin disc (the emoji doesn't render reliably).
-    ctx.fillStyle = '#ffcf3a';
-    ctx.strokeStyle = '#b8860b';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(coin.x, cy, PICKUP_RADIUS * 0.7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#7a5500';
-    ctx.font = `bold ${Math.floor(PICKUP_RADIUS * 0.9)}px 'Comic Sans MS', sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('$', coin.x, cy + 1);
-    ctx.restore();
-  }
-
-  /** @param {CanvasRenderingContext2D} ctx @param {any} game */
-  _drawHints(ctx, game) {
+  _coreHint(game) {
     const px = game.player.x;
+    const stack = game.player.stack;
     const coneTop = game.player.coneTopY();
     const underCone = game.player.y + CONE_HEIGHT / 2 + 36;
 
-    if (this.phase === 'awaitServe') {
-      const inRange = game.shop.customerAt(px) >= 0;
-      const stack = game.player.stack;
-      const top = stack.length ? stack[stack.length - 1].color : null;
-      const wanted = this.customer ? this.customer.order.colors : [];
-      const topWanted = top != null && wanted.includes(top);
-      const buriedWanted = stack.slice(0, -1).some(s => wanted.includes(s.color));
-      if (!inRange) {
-        this._hint(ctx, px, underCone, '◀  Move  ▶');
-      } else if (topWanted) {
-        this._hint(ctx, px, coneTop - 28, '↑ / Enter — Serve');
-      } else if (buriedWanted) {
-        this._hint(ctx, px, coneTop - 28, '↓ — Rotate to dig it up');
-      } else {
-        this._hint(ctx, px, underCone, '◀  Move  ▶');
-      }
-    } else if (this.phase === 'awaitShoot') {
-      if (this.coin && Math.abs(this.coin.x - px) < SHOOT_HINT_RANGE) {
-        this._hint(ctx, px, coneTop - 40, 'Space — Shoot the coin!');
-      } else {
-        this._hint(ctx, px, underCone, '◀  Move under the coin  ▶');
-      }
+    if (stack.length === 0) return { text: 'Catch a falling scoop!', x: px, y: coneTop - 28 };
+
+    const idx = game.shop.customerAt(px);
+    if (idx < 0) return { text: '◀  Move to a customer  ▶', x: px, y: underCone };
+    if (game.shop.canServe(idx, game.player.colors(), false)) {
+      return { text: '↑ / Enter — Serve', x: px, y: coneTop - 28 };
     }
+    const customer = game.shop.list[idx];
+    const wanted = (customer && customer.order.colors) || [];
+    const buriedWanted = stack.slice(0, -1).some(s => wanted.includes(s.color));
+    if (buriedWanted) return { text: '↓ — Rotate to dig it up', x: px, y: coneTop - 28 };
+    return { text: 'Catch the flavor they want', x: px, y: underCone };
+  }
+
+  /** @param {CanvasRenderingContext2D} ctx @param {Game} game */
+  draw(ctx, game) {
+    if (!this.active) return;
+    const power = this._powerHint(game);
+    if (power) this._hint(ctx, game.bounds.width / 2, game.bounds.height * 0.18, power);
+    const core = this._coreHint(game);
+    if (core) this._hint(ctx, core.x, core.y, core.text);
   }
 
   /** Small dark pill with centered white text. @param {CanvasRenderingContext2D} ctx */
@@ -338,4 +105,49 @@ export class Tutorial {
     ctx.fillText(text, x, y);
     ctx.restore();
   }
+}
+
+/** Auto Trigger tutorial: catching a bubble fires it on the spot. */
+class AutoTutorial extends TutorialBase {
+  /** @param {Game} game */
+  _updatePowerLesson(game) {
+    if (!this.powerLessonDone && game.powerups.active(POWERUP_TYPE.SPEED)) {
+      this.powerLessonDone = true;
+    }
+  }
+
+  /** @param {Game} game */
+  _powerHint(game) {
+    if (this.powerLessonDone) return null;
+    if (this._featherPresent(game)) return 'Catch the ⚡ — power-ups fire instantly!';
+    return null;
+  }
+}
+
+/** Banked Inventory tutorial: catching banks the bubble; ⇧ Shift spends it. */
+class BankedTutorial extends TutorialBase {
+  /** @param {Game} game */
+  _updatePowerLesson(game) {
+    if (this.powerLessonDone) return;
+    if (!game.powerupMode.queueEmpty()) this._banked = true;
+    // Lesson lands once they've banked one and then spent it (speed running).
+    if (this._banked && game.powerups.active(POWERUP_TYPE.SPEED)) this.powerLessonDone = true;
+  }
+
+  /** @param {Game} game */
+  _powerHint(game) {
+    if (this.powerLessonDone) return null;
+    if (!game.powerupMode.queueEmpty()) return '⇧ Shift — use your banked power-up!';
+    if (!this._banked && this._featherPresent(game)) return 'Catch the ⚡ bubble to bank it';
+    return null;
+  }
+}
+
+/**
+ * Pick the tutorial that matches the active power-up mode.
+ * @param {string} mode 'auto' | 'banked'
+ * @returns {TutorialBase}
+ */
+export function createTutorial(mode) {
+  return mode === 'banked' ? new BankedTutorial() : new AutoTutorial();
 }

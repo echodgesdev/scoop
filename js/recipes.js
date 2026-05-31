@@ -178,7 +178,7 @@ export const ALL_RECIPES = generateActiveRecipes();
 const _CORE = ['JUNIOR_SCOOP', 'DAILY_DOUBLE', 'YIN_YANG', 'THREES_COMPANY', 'BEST_TWO_OF_THREE', 'HOLY_TRINITY'];
 /** @type {(string[] | null)[]} */
 const WAVE_GROUPS = [
-  null, // wave 0 unused
+  ['JUNIOR_SCOOP'], // wave 0 — the tutorial wave: single-color juniors only
   ['JUNIOR_SCOOP'],
   ['JUNIOR_SCOOP', 'DAILY_DOUBLE'],
   ['JUNIOR_SCOOP', 'DAILY_DOUBLE', 'YIN_YANG'],

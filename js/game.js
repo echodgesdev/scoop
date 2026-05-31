@@ -18,6 +18,8 @@ import {
   STACK_CASHOUT_PER_SCOOP,
   HEAL_COST,
   LOOTBOX_COST,
+  SPAWN_DEMAND_BIAS,
+  WAVE0_DEMAND_BIAS,
   coneYFor
 } from './config.js';
 import { Player } from './player.js';
@@ -41,7 +43,7 @@ import { EventBus } from './events.js';
 import { Recipes } from './recipes.js';
 import { Challenges } from './challenges.js';
 import { virtualDims, fitRect, DEFAULT_ASPECT } from './viewport.js';
-import { Tutorial } from './tutorial.js';
+import { createTutorial } from './tutorial.js';
 
 /** @typedef {import('./types.js').GameEventMap} GameEventMap */
 /** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
@@ -125,15 +127,20 @@ export class Game {
     /** @type {EventBus<GameEventMap>} */
     this.bus = new EventBus();
 
+    // Power-up handling mode (debug-switchable). 'auto' = fire on catch
+    // (replace-on-catch); 'banked' = a FIFO queue spent with Shift. Selected
+    // here so the tutorial + powerup strategies below can branch on it.
+    this.gameMode = 'auto';
+
     this.waves       = new Waves(() => this.challenges.unlockedSectionIds());
     this.powerups    = new PowerUps();
     this.player      = new Player(0, 0);
     this.field       = new ScoopField();
-    this.pickups     = new PickupField(() => this.challenges.unlockedPowerupTypes());
+    this.pickups     = new PickupField(() => this._bubbleTypes());
     this.projectiles = new ProjectileField();
     this.shop        = new Shop(this.waves);
     this.stations    = new Stations();
-    this.tutorial    = new Tutorial();
+    this.tutorial    = createTutorial(this.gameMode);
 
     // Couple supply to demand: the scoop field biases its incoming queue
     // toward colors the shop still needs.
@@ -160,8 +167,8 @@ export class Game {
     // Bubbles mid-slide-off to the left (a finished or just-replaced power-up).
     /** @type {{ type: PickupTypeName, x: number, y: number, r0: number, t: number }[]} */
     this.puLeaving = [];
-    // First-time onboarding flag (persisted). When true the scripted tutorial
-    // plays at the start of wave 1; the "How to Play" button forces it anytime.
+    // First-time onboarding flag (persisted). When true, hint overlays play
+    // over Wave 0; the "How to Play" button forces them anytime.
     this.showTutorial = this._loadShowTutorial();
     // Free-running clock (seconds) for HUD pulse/flash animations.
     this.clock = 0;
@@ -177,12 +184,10 @@ export class Game {
       patternTimer: true, invincible: false, pickupKeys: false,
       showHitboxes: false, showFps: false
     };
-    // Power-up handling mode (debug-switchable). 'auto' = fire on catch
-    // (replace-on-catch); 'banked' = a FIFO queue spent with Shift. The active
-    // PowerupMode strategy is the single seam game.js delegates to (onCatch /
-    // step / drawQueueSlots / cashout / onLootboxSpend); _firePower and the
-    // active-slot visual stay shared here. Rebuilt each game start + on switch.
-    this.gameMode = 'auto';
+    // The active PowerupMode strategy (built from this.gameMode above) is the
+    // single seam game.js delegates to (onCatch / step / drawQueueSlots /
+    // cashout / onLootboxSpend); _firePower and the active-slot visual stay
+    // shared here. Rebuilt each game start and on a mid-run mode switch.
     this.powerupMode = this._makePowerupMode();
     // Between-wave store (loot box) — off by default; toggled from the debug panel.
     this.storeEnabled = false;
@@ -284,6 +289,8 @@ export class Game {
     this.waves.jumpToWave(n);
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
     this.shop.setOrderTime(this.waves.tuning().patience);
+    // jumpToWave floors to wave ≥ 1, so leave the Wave 0 bias behind.
+    this.field.setDemandBias(SPAWN_DEMAND_BIAS);
   }
 
   /**
@@ -440,9 +447,12 @@ export class Game {
     this.inCashout = false;
     this.activeBubble = null;
     this.puLeaving.length = 0;
-    // Rebuild the power-up strategy for the current mode and clear its state.
+    // Rebuild the power-up strategy + tutorial for the current mode.
     this.powerupMode = this._makePowerupMode();
     this.powerupMode.reset();
+    this.tutorial = createTutorial(this.gameMode);
+    // Wave 0 (the opening tutorial wave) leans harder toward demanded colors.
+    this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
     this.lastTime = 0;
     this.accumulator = 0;
     this.banner = null;
@@ -456,9 +466,8 @@ export class Game {
     this.hud.setHealth(this.health / MAX_HEALTH);
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
 
-    // Scripted onboarding: freezes the player, stages a customer + order,
-    // floats the coin, then hands control over. Plays only the first time
-    // (persisted flag) or when forced via the "How to Play" button.
+    // Onboarding hints overlay the real Wave 0 (no freeze). Plays only the
+    // first time (persisted flag) or when forced via "How to Play".
     this.player.frozen = false;
     if (forceTutorial || this.showTutorial) this.tutorial.start(this);
 
@@ -529,28 +538,25 @@ export class Game {
     // bad scoops keep falling while you can't dodge.
     const locked = this.player.locked;
 
-    // The scripted intro suppresses the falling field and random bubbles — it
-    // stages its own customer, scoops, and coin. Projectiles still fly so the
-    // player can shoot the tutorial coin.
-    if (!this.tutorial.active) {
-      this.field.update(dt, this.bounds, tuning, missY, scoop => {
-        if (locked) return false;
-        if (!isCaught(scoop, hitbox)) return false;
-        const perfect = Math.abs(scoop.x - hitbox.x) <= PERFECT_CATCH_BAND;
-        this._onCatch(scoop, perfect);
-        return true;
-      });
+    // The falling field + bubbles run during the tutorial now — Wave 0 is a
+    // real, playable wave; the tutorial only overlays hints on top of it.
+    this.field.update(dt, this.bounds, tuning, missY, scoop => {
+      if (locked) return false;
+      if (!isCaught(scoop, hitbox)) return false;
+      const perfect = Math.abs(scoop.x - hitbox.x) <= PERFECT_CATCH_BAND;
+      this._onCatch(scoop, perfect);
+      return true;
+    });
 
-      // Pickup collision uses the *expanded* hitbox — cone + every scoop in
-      // the tray. Tall stack = more vertical reach for high-floating bubbles.
-      const pickupBox = this.player.pickupHitbox();
-      this.pickups.update(dt, this.bounds, pickup => {
-        if (locked) return false;
-        if (!pickupCaught(pickup, pickupBox)) return false;
-        this._onPickup(pickup);
-        return true;
-      });
-    }
+    // Pickup collision uses the *expanded* hitbox — cone + every scoop in
+    // the tray. Tall stack = more vertical reach for high-floating bubbles.
+    const pickupBox = this.player.pickupHitbox();
+    this.pickups.update(dt, this.bounds, pickup => {
+      if (locked) return false;
+      if (!pickupCaught(pickup, pickupBox)) return false;
+      this._onPickup(pickup);
+      return true;
+    });
 
     // Slingshot projectiles fly upward. Each one pops the first bubble it
     // touches (same _onPickup path as a normal catch) and is consumed by
@@ -601,6 +607,18 @@ export class Game {
     return this.gameMode === 'banked'
       ? new BankedPowerupMode(this)
       : new AutoPowerupMode(this);
+  }
+
+  /**
+   * Which bubble types the pickup field may spawn. During the tutorial we force
+   * a single demo type (feather / ⚡) so a power-up always appears to teach the
+   * catch verb — regardless of what's actually unlocked. Otherwise it's the
+   * player's unlocked set.
+   * @returns {import('./types.js').PickupTypeName[]}
+   */
+  _bubbleTypes() {
+    if (this.tutorial.active) return [PICKUP_TYPE.FEATHER];
+    return this.challenges.unlockedPowerupTypes();
   }
 
   /**
@@ -727,10 +745,6 @@ export class Game {
   _pop() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
     if (this.player.locked) return;
-    // During the tutorial the slingshot is gated to the shoot step so the
-    // player can't fire away scoops they still need to serve (no falling-field
-    // recovery while the tutorial is active).
-    if (this.tutorial.active && !this.tutorial.allowsShoot()) { this.sound.bad(); return; }
     if (this.player.stack.length === 0) {
       this.sound.bad();
       return;
@@ -848,6 +862,8 @@ export class Game {
       // (e.g. "pop X bubbles in one wave" starts over).
       this.challenges.recordWaveReached(this.waves.wave);
       this.challenges.recordWaveEnded();
+      // Leaving Wave 0 → restore the normal demand bias for the campaign proper.
+      if (this.waves.wave === 1) this.field.setDemandBias(SPAWN_DEMAND_BIAS);
       // The wave just completed is (waves.wave - 1) since waves.onServed
       // already incremented. Let the wave-up banner read, then run the
       // cashout animation, which opens the transition overlay when it ends.
@@ -1048,8 +1064,7 @@ export class Game {
       pausePatience,
       rainbow
     });
-    // Tutorial coin, plopping scoops, and control hints — over the scene but
-    // under the effect bursts so a coin-collect pop reads on top.
+    // Tutorial hint pills — over the scene but under the effect bursts.
     if (this.tutorial.active) this.tutorial.draw(ctx, this);
     this.effects.draw(ctx);
 

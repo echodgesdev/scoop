@@ -10,9 +10,15 @@ import {
   FALL_SPEED_MULT_END,
   PATTERN_TIME_START,
   PATTERN_TIME_END,
+  COLOR_KEYS,
   lerp
 } from './config.js';
 import { recipesForWave } from './recipes.js';
+
+// Wave 0 (the tutorial wave) clears once the player has served one of each of
+// the base colors — a fixed, count-based goal rather than the phase arithmetic
+// the campaign waves use.
+const WAVE0_GOAL = COLOR_KEYS.length;
 
 /** @typedef {import('./types.js').ScoopColor} ScoopColor */
 /** @typedef {import('./types.js').WaveEventName} WaveEventName */
@@ -41,15 +47,20 @@ export class Waves {
    */
   constructor(getUnlockedSections) {
     this.getUnlockedSections = getUnlockedSections || (() => null);
+    /** @type {Set<ScoopColor>} Colors served in Wave 0 (completion + no-repeat). */
+    this.servedColors = new Set();
     this.reset();
   }
 
   reset() {
-    this.wave = 1;
+    this.wave = 0;               // 0 = the tutorial wave; campaign proper is 1+
     this.phase = 1;              // 1-based, 1..PHASES_PER_WAVE
     this.servedInPhase = 0;
     this.completedPhases = 0;    // 0..PHASES_PER_WAVE — phases cleared this wave
     this.celebrating = 0;        // seconds left in the wave-up freeze
+    // Colors served so far in Wave 0 — drives completion (one of each) and the
+    // no-repeat-served-color spawn filter. Unused in waves 1+.
+    this.servedColors = new Set();
   }
 
   get activeCount()    { return PHASE_ACTIVE[this.phase - 1]; }
@@ -68,15 +79,32 @@ export class Waves {
    */
   get waveFraction() {
     if (this.celebrating > 0) return 1;
+    if (this.wave === 0) return Math.min(1, this.servedColors.size / WAVE0_GOAL);
     return Math.min(1, (this.completedPhases + this.phaseFraction) / PHASES_PER_WAVE);
   }
 
   /**
-   * Called by the shop after each successful serve.
+   * Called by the shop after each successful serve. `colors` is the completed
+   * order's color list (used by Wave 0 to track which flavors have been served).
+   * @param {ScoopColor[]} [colors]
    * @returns {WaveEventName | null}
    */
-  onServed() {
+  onServed(colors = []) {
     if (this.celebrating > 0) return null;
+
+    // Wave 0 (tutorial): no phase arithmetic — clear once one of each color has
+    // been served, then advance into Wave 1.
+    if (this.wave === 0) {
+      for (const c of colors) this.servedColors.add(c);
+      if (this.servedColors.size < WAVE0_GOAL) return null;
+      this.wave = 1;
+      this.phase = 1;
+      this.servedInPhase = 0;
+      this.completedPhases = 0;
+      this.celebrating = WAVE_CELEBRATE_S;
+      return WAVE_EVENT.WAVE_UP;
+    }
+
     this.servedInPhase += 1;
     if (this.servedInPhase < this.phaseGoal) return null;
 
@@ -142,7 +170,13 @@ export class Waves {
    */
   pickOrder() {
     const unlocked = this.getUnlockedSections() || undefined;
-    const pool = recipesForWave(this.wave, unlocked);
+    let pool = recipesForWave(/** @type {number} */ (this.wave), unlocked);
+    // Wave 0: never hand out a color the player has already served, so each of
+    // the five junior flavors comes up exactly once.
+    if (this.wave === 0 && this.servedColors.size > 0) {
+      const filtered = pool.filter(r => !r.colors.every(c => this.servedColors.has(c)));
+      if (filtered.length > 0) pool = filtered;
+    }
     if (pool.length === 0) {
       // Defensive fallback — at minimum the Junior Scoop section is always
       // unlocked, so this branch should only fire if WAVE_GROUPS is broken.

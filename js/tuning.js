@@ -100,6 +100,9 @@ export const LOOTBOX_COST = 250;    // one random unlocked power-up
 // customers still need (after subtracting tray inventory). The remaining
 // fraction stays uniform random so the queue never feels deterministic.
 export const SPAWN_DEMAND_BIAS = 0.65;
+// Wave 0 (the tutorial wave) leans harder toward what the lone customer needs,
+// so a new player reliably catches the flavor in front of them.
+export const WAVE0_DEMAND_BIAS = 0.75;
 
 // Per-recipe combo weight is now defined per-group in recipes.js — each
 // recipe inherits its weight from the group it belongs to.

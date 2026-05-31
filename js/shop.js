@@ -408,7 +408,7 @@ export class Shop {
     c.state = STATE.LEAVING;
     c.mood = 'happy';
 
-    const event = this.waves ? this.waves.onServed() : null;
+    const event = this.waves ? this.waves.onServed(colors) : null;
     this.respawnTimer = RESPAWN_DELAY;
 
     return { accepted: true, complete: true, gained, colors, event };

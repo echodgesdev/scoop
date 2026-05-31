@@ -36,14 +36,17 @@ const STORAGE_KEY = 'scoop.challenges';
 
 /** @type {ChallengeSet[]} */
 export const SETS = [
-  // Set 1 — foundational. No power-ups yet, so all challenges work without
-  // bubbles. Goal: get the player to grind a few serves and combos.
+  // Set 1 — foundational, sized to exactly match completing Wave 0 (serve one
+  // of each of the 5 junior flavors). All three targets are guaranteed by that
+  // playthrough — discover 5 + serve 5 land on the 5th serve, and reaching
+  // Wave 1 fires on the Wave 0→1 transition — so finishing the tutorial wave
+  // always unlocks the Heart (no fragile combo gate).
   {
     name: 'Getting Started',
     challenges: [
-      { id: 's1-discover',  type: 'discover_recipes', target: 3,  title: 'Discover 3 recipes' },
-      { id: 's1-combo',     type: 'combo_reach',      target: 3,  title: 'Reach a 3× combo' },
-      { id: 's1-serve',     type: 'serve_customers',  target: 10, title: 'Serve 10 customers' }
+      { id: 's1-discover',  type: 'discover_recipes', target: 5, title: 'Discover 5 flavors' },
+      { id: 's1-serve',     type: 'serve_customers',  target: 5, title: 'Serve 5 customers' },
+      { id: 's1-wave',      type: 'wave_reach',       target: 1, title: 'Reach Wave 1' }
     ],
     rewards: [
       { type: 'unlock_powerup', value: 'heart' }
@@ -204,7 +207,9 @@ export class Challenges {
         bubblesPoppedByType: { heart: 0, feather: 0, pause: 0, rainbow: 0 },
         bubblesPoppedTotal: 0,
         maxCombo: 0,
-        maxWave: 1
+        // The campaign now opens on Wave 0 (the tutorial wave), so a fresh save
+        // starts below Wave 1 — reaching Wave 1 is a real first milestone.
+        maxWave: 0
       },
       unlocks: {
         /** @type {Record<string, boolean>} */
