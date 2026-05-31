@@ -70,6 +70,44 @@ function lerpColor(a, b, t) {
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
+// Night cycle keyframes for the between-wave reset: dusk → midnight → pre-dawn.
+// The last frame leans toward the day cycle's Dawn so it blends into the next
+// wave's opening sky. `star` is the star-field opacity at that keyframe.
+const NIGHT_KEYFRAMES = [
+  { skyTop: '#241a44', skyBottom: '#7a3f48', floor: '#3a2b39', star: 0.25 }, // dusk
+  { skyTop: '#070a22', skyBottom: '#141d3e', floor: '#161d36', star: 1.00 }, // midnight
+  { skyTop: '#5a4f86', skyBottom: '#ffb487', floor: '#b78a5c', star: 0.10 }  // pre-dawn
+];
+
+/**
+ * Sped-up night cycle for the between-wave reset (fraction 0..1). The crescent
+ * moon arcs across like the sun does in the day cycle; the sky races through
+ * dusk → midnight → pre-dawn and the star field fades in at the midpoint.
+ * @returns {{ skyTop: string, skyBottom: string, floor: string, starAlpha: number, moonX: number, moonY: number, moonR: number }}
+ */
+export function nightCycleState(fraction, bounds) {
+  const t = Math.max(0, Math.min(1, fraction));
+  const seg = t * (NIGHT_KEYFRAMES.length - 1);
+  const i   = Math.min(NIGHT_KEYFRAMES.length - 2, Math.floor(seg));
+  const lt  = seg - i;
+  const A = NIGHT_KEYFRAMES[i];
+  const B = NIGHT_KEYFRAMES[i + 1];
+
+  const baseY     = groundYFor(bounds.height);
+  const peakY     = bounds.height * 0.08;
+  const arcHeight = baseY - peakY;
+
+  return {
+    skyTop:    lerpColor(A.skyTop, B.skyTop, lt),
+    skyBottom: lerpColor(A.skyBottom, B.skyBottom, lt),
+    floor:     lerpColor(A.floor, B.floor, lt),
+    starAlpha: lerp(A.star, B.star, lt),
+    moonX: lerp(bounds.width * 0.12, bounds.width * 0.88, t),
+    moonY: baseY - arcHeight * Math.sin(Math.PI * t),
+    moonR: 40
+  };
+}
+
 /**
  * Compute the cycle state for a given waveFraction (0..1) and viewport bounds.
  * @returns {{ skyTop: string, skyBottom: string, sunX: number, sunY: number, sunR: number, sunColor: string, sunGlow: number, floor: string }}

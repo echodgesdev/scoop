@@ -35,7 +35,7 @@ class TutorialBase {
   update(dt, game) {
     if (!this.active) return;
     // Wave 0 cleared (the director advanced) → onboarding is done.
-    if (game.waves.wave !== 0) { this._finish(game); return; }
+    if (game.waves.wave !== 0) { this._finish(); return; }
     // Hold demo bubbles until the first order is served (Game._bubbleTypes gates
     // the spawn); the moment it's served, surface the demo bubble promptly.
     if (!this._demoArmed && game.waves.servedColors.size >= 1) {
@@ -45,10 +45,12 @@ class TutorialBase {
     this._updatePowerLesson(game);
   }
 
-  /** @param {Game} game */
-  _finish(game) {
+  /**
+   * Hints are done (Wave 0 cleared). Whether the tutorial returns next run is
+   * decided by challenge progress in Game, so there's nothing to persist here.
+   */
+  _finish() {
     this.active = false;
-    game.markTutorialSeen();
   }
 
   /** Mode-specific: advance the power-up lesson from real state. @param {Game} game */

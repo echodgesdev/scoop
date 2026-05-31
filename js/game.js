@@ -32,8 +32,8 @@ import { Input } from './input.js';
 import { Sound } from './audio.js';
 import { Effects } from './effects.js';
 import { DebugPanel } from './debug.js';
-import { drawSkyAndSun, drawSand } from './scene.js';
-import { dayCycleState } from './dayCycle.js';
+import { drawSkyAndSun, drawNightSky, drawSand } from './scene.js';
+import { dayCycleState, nightCycleState } from './dayCycle.js';
 import { PowerUps } from './powerups.js';
 import { AutoPowerupMode } from './auto-powerup-mode.js';
 import { BankedPowerupMode } from './banked-powerup-mode.js';
@@ -54,6 +54,10 @@ import { TouchControls } from './touch.js';
 // stay variable-step.
 const FIXED_DT = 1 / 60;
 const MAX_FRAME = 0.25;
+
+// Between-wave reset beat: a sped-up night cycle (sunset→midnight→dawn, crescent
+// moon arcing across) that plays after the cashout and before the wave overlay.
+const NIGHT_CYCLE_S = 2.0;
 
 // Power-up indicator animation timings. Catching a timed bubble floats it UP
 // into the "active" slot at the bottom (where its countdown lives); when it
@@ -99,6 +103,10 @@ export class Game {
     // is frozen while this runs, but effects keep updating so the particles
     // animate. See _runWaveCashout.
     this.inCashout = false;
+    // Between-wave night-cycle reset (runs after the wave overlay is dismissed,
+    // right before the next wave). nightT drives the fast sky sweep + moon arc.
+    this.inNightCycle = false;
+    this.nightT = 0;
     // Dedicated "Esc" pause menu — separate from the debug-panel pause.
     this.inPauseMenu = false;
     this.hud = new Hud({
@@ -537,7 +545,11 @@ export class Game {
     this.effects.reset();
     this.stations.layout(this.bounds);
     this.shop.layout(this.bounds.width);
-    this.waves.reset();
+    // Wave 0 (the tutorial wave) only plays until the first challenge set is
+    // cleared — after that we jump straight to Wave 1. "How to Play" and the
+    // debug "force tutorial" flag override and replay it.
+    const playWave0 = forceTutorial || this.showTutorial || !this.challenges.firstSetCleared();
+    this.waves.reset(playWave0 ? 0 : 1);
     this.shop.setOrderTime(this.waves.tuning().patience);
     this.shop.reset();
     this.health = MAX_HEALTH;
@@ -545,6 +557,8 @@ export class Game {
     this.running = true;
     this.inWaveTransition = false;
     this.inCashout = false;
+    this.inNightCycle = false;
+    this.nightT = 0;
     this.activeBubble = null;
     this.puLeaving.length = 0;
     this.input.moveTargetX = null;  // drop any stale touch-steer state
@@ -568,27 +582,25 @@ export class Game {
     this.hud.setHealth(this.health / MAX_HEALTH);
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
 
-    // Onboarding hints overlay the real Wave 0 (no freeze). Plays only the
-    // first time (persisted flag) or when forced via "How to Play".
+    // Onboarding hints overlay the real Wave 0 (no freeze) — only when Wave 0
+    // is actually in play.
     this.player.frozen = false;
-    if (forceTutorial || this.showTutorial) this.tutorial.start(this);
+    if (playWave0) this.tutorial.start(this);
 
     requestAnimationFrame(t => this._loop(t));
   }
 
+  // Debug "force Wave 0 tutorial" override (persisted). Default OFF — whether
+  // the tutorial plays is normally decided by challenge progress
+  // (challenges.firstSetCleared); this flag just lets a tester force it.
   _loadShowTutorial() {
-    try { return localStorage.getItem('scoop.showTutorial') !== '0'; } catch { return true; }
+    try { return localStorage.getItem('scoop.showTutorial') === '1'; } catch { return false; }
   }
 
   /** @param {boolean} v */
   setShowTutorial(v) {
     this.showTutorial = v;
     try { localStorage.setItem('scoop.showTutorial', v ? '1' : '0'); } catch {}
-  }
-
-  /** Called by the tutorial on completion so it won't auto-play again. */
-  markTutorialSeen() {
-    this.setShowTutorial(false);
   }
 
   /** @param {DOMHighResTimeStamp} t */
@@ -601,7 +613,8 @@ export class Game {
     if (frame > 0) this.fps = this.fps * 0.9 + (1 / frame) * 0.1;
     this.clock += frame;
 
-    const stepping = this.running && !this.paused && !this.inWaveTransition && !this.inPauseMenu && !this.inCashout;
+    const stepping = this.running && !this.paused && !this.inWaveTransition &&
+      !this.inPauseMenu && !this.inCashout && !this.inNightCycle;
     if (stepping) {
       this.accumulator += frame;
       while (this.accumulator >= FIXED_DT) {
@@ -609,9 +622,19 @@ export class Game {
         this.accumulator -= FIXED_DT;
       }
     }
-    // Visual-only systems run variable-step — including during the cashout
-    // freeze, so its particle pops animate while gameplay is paused.
-    if (stepping || this.inCashout) this.effects.update(frame);
+    // Between-wave night cycle: a fast sunset→midnight→dawn sweep (moon arcs
+    // across) that plays after the overlay is dismissed; when it lands the
+    // freeze lifts and the next wave resumes.
+    if (this.inNightCycle) {
+      this.nightT += frame / NIGHT_CYCLE_S;
+      if (this.nightT >= 1) {
+        this.nightT = 1;
+        this.inNightCycle = false;
+      }
+    }
+    // Visual-only systems run variable-step — including during the cashout /
+    // night-cycle freezes, so particle pops keep animating while play is paused.
+    if (stepping || this.inCashout || this.inNightCycle) this.effects.update(frame);
     this._draw();
 
     if (this.running) requestAnimationFrame(nt => this._loop(nt));
@@ -988,6 +1011,10 @@ export class Game {
     if (!this.running) return;
     this.inCashout = true;
 
+    // Clear the board: pop every scoop still falling and every bubble drifting,
+    // so the wave ends on an empty field before the night-cycle reset.
+    this._clearFieldFx();
+
     // Combo bank.
     const combo = this.shop.bankCombo();
     if (combo > 0) {
@@ -1041,6 +1068,37 @@ export class Game {
       return;
     }
     finish();
+  }
+
+  /**
+   * Pop every falling scoop + drifting bubble for the wave-end board clear.
+   * Visual only (no points) — the cashout already paid out the tray/combo/queue.
+   */
+  _clearFieldFx() {
+    for (const s of this.field.scoops) {
+      if (s.dissolve !== undefined) continue;  // already fizzling out
+      this.effects.burst(s.x, s.y, [this.shop.hex(s.color), '#fff'], 10);
+    }
+    this.field.scoops.length = 0;
+    for (const p of this.pickups.items) {
+      this.effects.burst(p.x, p.y, [PICKUP_RING_COLOR[p.type], '#fff'], 12);
+    }
+    this.pickups.items.length = 0;
+    this.sound.bubblePop();
+  }
+
+  /**
+   * Between-wave reset: the night-cycle sweep that plays AFTER the wave overlay
+   * is dismissed (countdown done / Play pressed), right before the next wave
+   * resumes. The _loop advances nightT and lifts the freeze when it lands;
+   * endCelebration() makes the next wave open at dawn rather than the previous
+   * sunset.
+   */
+  _runNightCycle() {
+    if (!this.running) return;
+    this.waves.endCelebration();
+    this.nightT = 0;
+    this.inNightCycle = true;
   }
 
   /**
@@ -1100,12 +1158,13 @@ export class Game {
   }
 
   _endWaveTransition() {
-    // Animation has finished and either the countdown expired or the
-    // player hit Play — commit any earned-but-uncommitted challenges
-    // and resume the loop.
+    // The countdown expired or the player hit Play — commit any earned
+    // challenges, close the overlay, then run the night-cycle reset, which
+    // hands off to the next wave when it finishes.
     this.challenges.commitEarned();
     this.inWaveTransition = false;
     this.hud.hideWaveTransition();
+    this._runNightCycle();
   }
 
   _onExpire(count) {
@@ -1124,6 +1183,7 @@ export class Game {
     // happen, but defensive).
     this.inWaveTransition = false;
     this.inCashout = false;
+    this.inNightCycle = false;
     this.sound.gameOver();
     this.bus.emit('gameOver', /** @type {any} */ ({}));
     // Commit any earned-but-uncommitted challenges so the game-over screen
@@ -1148,13 +1208,19 @@ export class Game {
     ctx.translate(x, y);
 
     const rainbow = this.powerups.rainbowActive;
-    const dayState = dayCycleState(this.waves.waveFraction, this.bounds);
 
-    // Background: sky + sun, then sand on top of the sky. Everything after
-    // this point draws over the floor — actors stay fully visible even
-    // when their positions overlap the sand region.
-    drawSkyAndSun(ctx, this.bounds, dayState);
-    drawSand(ctx, this.bounds, dayState);
+    // Background: sky + sun (or the between-wave night cycle: moon + fast sky),
+    // then sand on top. Everything after this draws over the floor — actors stay
+    // visible even when their positions overlap the sand region.
+    if (this.inNightCycle) {
+      const nightState = nightCycleState(this.nightT, this.bounds);
+      drawNightSky(ctx, this.bounds, nightState);
+      drawSand(ctx, this.bounds, nightState);
+    } else {
+      const dayState = dayCycleState(this.waves.waveFraction, this.bounds);
+      drawSkyAndSun(ctx, this.bounds, dayState);
+      drawSand(ctx, this.bounds, dayState);
+    }
 
     this.field.draw(ctx, rainbow);
     this.pickups.draw(ctx);

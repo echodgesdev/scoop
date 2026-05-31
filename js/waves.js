@@ -52,8 +52,9 @@ export class Waves {
     this.reset();
   }
 
-  reset() {
-    this.wave = 0;               // 0 = the tutorial wave; campaign proper is 1+
+  /** @param {number} [startWave] 0 = tutorial wave; 1 = skip straight to the campaign. */
+  reset(startWave = 0) {
+    this.wave = startWave;       // 0 = the tutorial wave; campaign proper is 1+
     this.phase = 1;              // 1-based, 1..PHASES_PER_WAVE
     this.servedInPhase = 0;
     this.completedPhases = 0;    // 0..PHASES_PER_WAVE — phases cleared this wave
@@ -61,6 +62,16 @@ export class Waves {
     // Colors served so far in Wave 0 — drives completion (one of each) and the
     // no-repeat-served-color spawn filter. Unused in waves 1+.
     this.servedColors = new Set();
+  }
+
+  /**
+   * Force-end the wave-up celebration (used when the between-wave night cycle
+   * takes over the reset): drop the gauge back to the start of the new wave so
+   * it opens at dawn instead of holding on the previous sunset.
+   */
+  endCelebration() {
+    this.celebrating = 0;
+    this.completedPhases = 0;
   }
 
   get activeCount()    { return PHASE_ACTIVE[this.phase - 1]; }
@@ -155,7 +166,10 @@ export class Waves {
     this.celebrating = 0;
   }
 
-  /** Pips reset after the celebration window so the next wave starts fresh. */
+  /**
+   * Pips reset after the celebration window so the next wave starts fresh.
+   * @param {number} dt
+   */
   update(dt) {
     if (this.celebrating > 0) {
       this.celebrating = Math.max(0, this.celebrating - dt);

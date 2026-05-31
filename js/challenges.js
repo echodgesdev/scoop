@@ -285,6 +285,15 @@ export class Challenges {
     return set;
   }
 
+  /**
+   * True once the first challenge set (the Wave 0 tutorial goals) has been
+   * cleared — i.e. the player has advanced past Set 1. Used to skip the Wave 0
+   * tutorial on subsequent runs.
+   */
+  firstSetCleared() {
+    return this.state.currentSet >= 1;
+  }
+
   // === Event recording =======================================================
 
   /** @param {string} _id */
