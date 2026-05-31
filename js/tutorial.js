@@ -1,19 +1,21 @@
 // @ts-check
 import { CONE_HEIGHT, PICKUP_TYPE, POWERUP_TYPE } from './config.js';
+import { STATE } from './shop.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
 /**
- * The tutorial is now a thin HINT OVERLAY on the real Wave 0 — it no longer
- * freezes the player, stages customers, or suppresses the falling field. Wave 0
- * (junior flavors only, one of each to clear) is a genuine playable wave; the
- * tutorial just watches real game state and draws contextual prompts.
+ * The tutorial is a thin HINT OVERLAY on the real Wave 0 — it doesn't freeze the
+ * player, stage customers, or suppress the falling field. Wave 0 (junior flavors
+ * only, one of each to clear) is a genuine playable wave; the tutorial just
+ * watches real game state and draws contextual prompts.
  *
- * It's swapped by game mode via createTutorial(): the only difference between
- * the two is how the power-up lesson reads — Auto teaches "catching fires it",
- * Banked teaches "catch banks → ⇧ Shift to spend". A feather (⚡) demo bubble is
- * fed into the pickup field during the tutorial (see Game._bubbleTypes) so the
- * lesson always has something to catch.
+ * It's swapped by game mode via createTutorial(); the modes differ in how stack
+ * management + power-ups read:
+ *   Auto    — feather (⚡) demo bubble; catching fires it instantly. ↓ rotates.
+ *   Banked  — catch banks → ⇧ Shift to spend. ↓ rotates.
+ *   Tipping — no bubbles; power-ups come from customer tips. ↑/Space discards the
+ *             top scoop (no rotate); the buried-color fix is "toss the top".
  */
 class TutorialBase {
   constructor() {
@@ -85,16 +87,25 @@ class TutorialBase {
     if (idx < 0) {
       return { text: touch ? 'Drag to a customer' : '◀  Move to a customer  ▶', x: px, y: underCone };
     }
-    if (game.shop.canServe(idx, game.player.colors(), false)) {
+    if (game.shop.canServe(idx, game.player.colors(), false, game.deliveryMode)) {
       return { text: touch ? 'Tap to serve' : '↑ / Enter — Serve', x: px, y: coneTop - 28 };
     }
     const customer = game.shop.list[idx];
     const wanted = (customer && customer.order.colors) || [];
     const buriedWanted = stack.slice(0, -1).some(s => wanted.includes(s.color));
     if (buriedWanted) {
-      return { text: touch ? 'Swipe down to dig it up' : '↓ — Rotate to dig it up', x: px, y: coneTop - 28 };
+      return { text: this._buriedHint(touch), x: px, y: coneTop - 28 };
     }
     return { text: 'Catch the flavor they want', x: px, y: underCone };
+  }
+
+  /**
+   * Prompt for "the wanted color is buried under the top scoop". Base modes
+   * rotate the stack; Tipping discards the top instead (overridden).
+   * @param {boolean} touch
+   */
+  _buriedHint(touch) {
+    return touch ? 'Swipe down to dig it up' : '↓ — Rotate to dig it up';
   }
 
   /** @param {CanvasRenderingContext2D} ctx @param {Game} game */
@@ -169,10 +180,32 @@ class BankedTutorial extends TutorialBase {
 }
 
 /**
- * Pick the tutorial that matches the active power-up mode.
- * @param {string} mode 'auto' | 'banked'
+ * Tipping tutorial: no bubbles — power-ups arrive as customer tips, and the
+ * top scoop is discarded with the upward gesture (no rotate verb).
+ */
+class TippingTutorial extends TutorialBase {
+  /** Buried wanted color: toss the top off (upward) rather than rotate. */
+  _buriedHint(touch) {
+    return touch ? 'Swipe up to toss the top scoop' : 'Space — toss the top scoop';
+  }
+
+  /**
+   * Surface the tip concept whenever a waiting customer is carrying one.
+   * @param {Game} game
+   */
+  _powerHint(game) {
+    const tipped = game.shop.list.some(c => c.state === STATE.WAITING && c.tip);
+    return tipped ? 'Finish a customer with a token — they tip you a reward!' : null;
+  }
+}
+
+/**
+ * Pick the tutorial that matches the active game mode.
+ * @param {string} mode 'auto' | 'banked' | 'tipping'
  * @returns {TutorialBase}
  */
 export function createTutorial(mode) {
-  return mode === 'banked' ? new BankedTutorial() : new AutoTutorial();
+  if (mode === 'banked') return new BankedTutorial();
+  if (mode === 'tipping') return new TippingTutorial();
+  return new AutoTutorial();
 }

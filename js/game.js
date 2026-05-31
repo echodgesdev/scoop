@@ -4,6 +4,7 @@ import {
   DAMAGE_PER_EXPIRE,
   HEAL_PER_SERVE,
   MAX_STACK,
+  MAX_LIVE_SCOOPS,
   PERFECT_CATCH_BAND,
   PERFECT_CATCH_BONUS,
   HEART_HEAL_AMOUNT,
@@ -64,6 +65,10 @@ const NIGHT_CYCLE_S = 2.0;
 // points a coin tip awards.
 const TIP_COIN_WEIGHT = 0.4;
 const TIP_COIN_POINTS = 50;
+// Tipping plays tighter than the bubble modes — fewer scoops in the air and a
+// shorter cone — so reading the board + stack stays simple. (Debug-tunable.)
+const TIPPING_MAX_STACK = 4;
+const TIPPING_MAX_LIVE = 4;
 
 // Power-up indicator animation timings. Catching a timed bubble floats it UP
 // into the "active" slot at the bottom (where its countdown lives); when it
@@ -146,9 +151,9 @@ export class Game {
 
     // Power-up handling mode (debug-switchable). 'auto' = fire on catch
     // (replace-on-catch); 'banked' = a FIFO queue spent with Shift; 'tipping' =
-    // no bubbles, power-ups come from customer tips. Selected here so the
-    // tutorial + powerup strategies below can branch on it.
-    this.gameMode = 'auto';
+    // no bubbles, power-ups come from customer tips (the current default).
+    // Selected here so the tutorial + powerup strategies below can branch on it.
+    this.gameMode = 'tipping';
     // Delivery method (debug-switchable, all modes): how a tray serves an order.
     // 'any' = top scoop fills any remaining color (default); 'sequential' = top
     // must be the next color in order; 'whole' = the whole tray must equal the
@@ -290,6 +295,7 @@ export class Game {
         // active bubble persists (it's Game-owned); only the queue resets.
         this.powerupMode = this._makePowerupMode();
         this.powerupMode.reset();
+        this._applyModeDefaults();  // re-apply per-mode board size
       },
       getGameMode: () => this.gameMode,
       onStoreToggle: on => { this.storeEnabled = on; },
@@ -598,6 +604,7 @@ export class Game {
     this.powerupMode = this._makePowerupMode();
     this.powerupMode.reset();
     this.tutorial = createTutorial(this.gameMode);
+    this._applyModeDefaults();  // per-mode board size (tipping = 4/4)
     // Wave 0 (the opening tutorial wave) leans harder toward demanded colors.
     this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
     this.lastTime = 0;
@@ -764,6 +771,21 @@ export class Game {
     return this.gameMode === 'banked'
       ? new BankedPowerupMode(this)
       : new AutoPowerupMode(this);
+  }
+
+  /**
+   * Per-mode default tuning (debug sliders can still override afterward).
+   * Tipping plays with a smaller board (4 falling / 4 on the cone); the bubble
+   * modes use the standard caps.
+   */
+  _applyModeDefaults() {
+    if (this.gameMode === 'tipping') {
+      this.maxStack = TIPPING_MAX_STACK;
+      this.field.setMaxLive(TIPPING_MAX_LIVE);
+    } else {
+      this.maxStack = MAX_STACK;
+      this.field.setMaxLive(MAX_LIVE_SCOOPS);
+    }
   }
 
   /**
