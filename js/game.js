@@ -164,11 +164,11 @@ export class Game {
     // actions as the keyboard; keyboard stays fully live alongside it.
     this.touch = new TouchControls(this.canvas, {
       toVirtual: (cx, cy) => this._toVirtual(cx, cy),
-      onMove: vx => { this.input.moveTargetX = vx; },
+      onMove: vx => { this.input.moveTargetX = vx; this.input.lastWasTouch = true; },
       onMoveEnd: () => { this.input.moveTargetX = null; },
-      onTap: (vx, vy) => this._onTouchTap(vx, vy),
-      onSwipeUp: () => this._pop(),
-      onSwipeDown: () => this._rotate()
+      onTap: (vx, vy) => { this.input.lastWasTouch = true; this._onTouchTap(vx, vy); },
+      onSwipeUp: () => { this.input.lastWasTouch = true; this._pop(); },
+      onSwipeDown: () => { this.input.lastWasTouch = true; this._rotate(); }
     });
 
     // Power-ups fire the instant a bubble is caught (no banking, no manual

@@ -16,6 +16,9 @@ export class Input {
     // to its max speed (set by TouchControls). null = keyboard accel is in play.
     /** @type {number | null} */
     this.moveTargetX = null;
+    // Which input was used most recently — drives input-aware tutorial wording
+    // (tap/swipe vs key names). Set true by the touch layer, false on keydown.
+    this.lastWasTouch = false;
     /** @type {() => void} */
     this.onPop = () => {};
     /** @type {() => void} */
@@ -32,6 +35,7 @@ export class Input {
     this.onPause = () => {};
 
     window.addEventListener('keydown', e => {
+      this.lastWasTouch = false;  // a keypress means we're on keyboard now
       switch (e.key) {
         case 'ArrowLeft':  this.left = true;  e.preventDefault(); break;
         case 'ArrowRight': this.right = true; e.preventDefault(); break;

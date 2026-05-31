@@ -62,8 +62,12 @@ class TutorialBase {
     return game.pickups.items.some(p => p.type === PICKUP_TYPE.FEATHER);
   }
 
+  /** True when the player is currently driving with touch (vs keyboard). */
+  _touch(game) { return game.input.lastWasTouch; }
+
   /**
-   * Core move/serve prompt, keyed off live game state.
+   * Core move/serve prompt, keyed off live game state and the active input
+   * (gesture wording on touch, key names on keyboard).
    * @param {Game} game @returns {{ text: string, x: number, y: number } | null}
    */
   _coreHint(game) {
@@ -71,18 +75,23 @@ class TutorialBase {
     const stack = game.player.stack;
     const coneTop = game.player.coneTopY();
     const underCone = game.player.y + CONE_HEIGHT / 2 + 36;
+    const touch = this._touch(game);
 
     if (stack.length === 0) return { text: 'Catch a falling scoop!', x: px, y: coneTop - 28 };
 
     const idx = game.shop.customerAt(px);
-    if (idx < 0) return { text: '◀  Move to a customer  ▶', x: px, y: underCone };
+    if (idx < 0) {
+      return { text: touch ? 'Drag to a customer' : '◀  Move to a customer  ▶', x: px, y: underCone };
+    }
     if (game.shop.canServe(idx, game.player.colors(), false)) {
-      return { text: '↑ / Enter — Serve', x: px, y: coneTop - 28 };
+      return { text: touch ? 'Tap to serve' : '↑ / Enter — Serve', x: px, y: coneTop - 28 };
     }
     const customer = game.shop.list[idx];
     const wanted = (customer && customer.order.colors) || [];
     const buriedWanted = stack.slice(0, -1).some(s => wanted.includes(s.color));
-    if (buriedWanted) return { text: '↓ — Rotate to dig it up', x: px, y: coneTop - 28 };
+    if (buriedWanted) {
+      return { text: touch ? 'Swipe down to dig it up' : '↓ — Rotate to dig it up', x: px, y: coneTop - 28 };
+    }
     return { text: 'Catch the flavor they want', x: px, y: underCone };
   }
 
@@ -124,7 +133,11 @@ class AutoTutorial extends TutorialBase {
   /** @param {Game} game */
   _powerHint(game) {
     if (this.powerLessonDone) return null;
-    if (this._featherPresent(game)) return 'Catch the ⚡ — power-ups fire instantly!';
+    if (this._featherPresent(game)) {
+      return this._touch(game)
+        ? 'Swipe up to pop the ⚡ — it fires instantly!'
+        : 'Space to pop the ⚡ — it fires instantly!';
+    }
     return null;
   }
 }
@@ -142,8 +155,13 @@ class BankedTutorial extends TutorialBase {
   /** @param {Game} game */
   _powerHint(game) {
     if (this.powerLessonDone) return null;
-    if (!game.powerupMode.queueEmpty()) return '⇧ Shift — use your banked power-up!';
-    if (!this._banked && this._featherPresent(game)) return 'Catch the ⚡ bubble to bank it';
+    const touch = this._touch(game);
+    if (!game.powerupMode.queueEmpty()) {
+      return touch ? 'Tap the queue to use your power-up!' : '⇧ Shift — use your banked power-up!';
+    }
+    if (!this._banked && this._featherPresent(game)) {
+      return touch ? 'Swipe up to pop the ⚡ and bank it!' : 'Space to pop the ⚡ and bank it!';
+    }
     return null;
   }
 }
