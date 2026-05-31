@@ -42,8 +42,9 @@ import { ProjectileField, projectileHits } from './projectiles.js';
 import { EventBus } from './events.js';
 import { Recipes } from './recipes.js';
 import { Challenges } from './challenges.js';
-import { virtualDims, fitRect, DEFAULT_ASPECT } from './viewport.js';
+import { virtualDims, responsiveDims, fitRect } from './viewport.js';
 import { createTutorial } from './tutorial.js';
+import { TouchControls } from './touch.js';
 
 /** @typedef {import('./types.js').GameEventMap} GameEventMap */
 /** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
@@ -73,12 +74,14 @@ export class Game {
   constructor() {
     this.canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
     this.ctx = /** @type {CanvasRenderingContext2D} */ (this.canvas.getContext('2d'));
-    // #stage is the letterbox container the canvas + HUD live in. Its on-screen
-    // rect is recomputed in _resize; the canvas backing store stays at the
-    // fixed virtual resolution of the chosen aspect.
+    // #stage is the container the canvas + HUD live in; its on-screen rect is
+    // recomputed in _resize. In 'auto' mode (the default) the virtual canvas
+    // matches the viewport aspect so it fills the screen on mobile; a forced
+    // aspect (debug) locks a fixed preset and letterboxes instead.
     this.stage = document.getElementById('stage');
-    this.aspect = DEFAULT_ASPECT;
-    const _d = virtualDims(this.aspect);
+    this.autoAspect = true;
+    this.aspect = 'auto';
+    const _d = responsiveDims(window.innerWidth, window.innerHeight);
     /** @type {{ width: number, height: number }} Virtual (logical) play area. */
     this.bounds = { width: _d.width, height: _d.height };
     // Smoothed frames-per-second for the debug overlay.
@@ -156,6 +159,17 @@ export class Game {
     this.input.onShift = () => this._useShift();
     this.input.onDebugDamage = () => this._debugDamage();
     this.input.onPause = () => this._togglePause();
+
+    // Native touch layer (also handles mouse/pen). Maps gestures to the same
+    // actions as the keyboard; keyboard stays fully live alongside it.
+    this.touch = new TouchControls(this.canvas, {
+      toVirtual: (cx, cy) => this._toVirtual(cx, cy),
+      onMove: vx => { this.input.moveTargetX = vx; },
+      onMoveEnd: () => { this.input.moveTargetX = null; },
+      onTap: (vx, vy) => this._onTouchTap(vx, vy),
+      onSwipeUp: () => this._pop(),
+      onSwipeDown: () => this._rotate()
+    });
 
     // Power-ups fire the instant a bubble is caught (no banking, no manual
     // spend). Heart heals on the spot; the three timed power-ups
@@ -257,15 +271,48 @@ export class Game {
   }
 
   /**
-   * Debug: switch the locked aspect ratio live (4:3 ⇄ 3:4).
+   * Debug: switch aspect. 'auto' (default) tracks the viewport so the canvas
+   * fills the screen; any other name locks that fixed preset (letterboxed).
    * @param {string} name
    */
   _setAspect(name) {
-    const d = virtualDims(name);
     this.aspect = name;
+    this.autoAspect = name === 'auto';
+    const d = this.autoAspect
+      ? responsiveDims(window.innerWidth, window.innerHeight)
+      : virtualDims(name);
     this.bounds.width = d.width;
     this.bounds.height = d.height;
     this._applyAspect();
+  }
+
+  /**
+   * Map a screen-space point (clientX/Y) into virtual canvas coordinates,
+   * via the live #stage rect. Used by the touch layer to steer the cone.
+   * @param {number} clientX @param {number} clientY
+   * @returns {{ x: number, y: number }}
+   */
+  _toVirtual(clientX, clientY) {
+    const rect = this.stage.getBoundingClientRect();
+    const w = rect.width || 1;
+    const h = rect.height || 1;
+    return {
+      x: (clientX - rect.left) / w * this.bounds.width,
+      y: (clientY - rect.top) / h * this.bounds.height
+    };
+  }
+
+  /**
+   * Touch tap → serve, except a tap on the banked queue strip (Banked mode,
+   * non-empty) spends the front power-up instead.
+   * @param {number} vx @param {number} vy
+   */
+  _onTouchTap(vx, vy) {
+    if (this.gameMode === 'banked' && !this.powerupMode.queueEmpty() && vy > this.bounds.height - 90) {
+      this._useShift();
+      return;
+    }
+    this._deliver();
   }
 
   _toggleFullscreen() {
@@ -410,13 +457,27 @@ export class Game {
   }
 
   /**
-   * Letterbox: fit the fixed-aspect virtual canvas inside the current viewport,
-   * centered, and position #stage over that rect. The backing-store size and
-   * all actor positions are untouched — only the CSS display rect changes — so
-   * gameplay is byte-identical at any window size.
+   * Position #stage over the viewport. In 'auto' mode the virtual canvas is
+   * re-derived from the viewport aspect (so it fills the screen edge-to-edge on
+   * mobile); when the dims change the backing store is resized and actors are
+   * repositioned. A forced aspect just letterboxes the fixed preset. fitRect
+   * with a matching aspect yields a full-bleed rect; with a portrait cap on a
+   * wide desktop it centers the column.
    */
   _resize() {
     if (!this.stage) return;
+    if (this.autoAspect) {
+      const d = responsiveDims(window.innerWidth, window.innerHeight);
+      if (d.width !== this.bounds.width || d.height !== this.bounds.height) {
+        this.bounds.width = d.width;
+        this.bounds.height = d.height;
+        this.canvas.width = d.width;
+        this.canvas.height = d.height;
+        this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+        this.stations.layout(this.bounds);
+        this.shop.layout(this.bounds.width);
+      }
+    }
     const r = fitRect(window.innerWidth, window.innerHeight, this.bounds.width, this.bounds.height);
     this.stage.style.left = `${r.left}px`;
     this.stage.style.top = `${r.top}px`;
@@ -447,6 +508,7 @@ export class Game {
     this.inCashout = false;
     this.activeBubble = null;
     this.puLeaving.length = 0;
+    this.input.moveTargetX = null;  // drop any stale touch-steer target
     // Rebuild the power-up strategy + tutorial for the current mode.
     this.powerupMode = this._makePowerupMode();
     this.powerupMode.reset();

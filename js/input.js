@@ -12,6 +12,10 @@ export class Input {
   constructor() {
     this.left = false;
     this.right = false;
+    // Touch drag steering: when non-null, the cone chases this virtual-x at up
+    // to its max speed (set by TouchControls). null = keyboard accel is in play.
+    /** @type {number | null} */
+    this.moveTargetX = null;
     /** @type {() => void} */
     this.onPop = () => {};
     /** @type {() => void} */

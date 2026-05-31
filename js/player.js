@@ -130,7 +130,21 @@ export class Player {
     }
 
     const maxV  = CONE_MAX_SPEED * speedMult;
-    const accel = CONE_ACCEL     * speedMult;
+    const halfW = CONE_WIDTH / 2;
+
+    // Touch steering: chase the dragged finger's x at up to the speed cap.
+    // Direct positioning feels right under a thumb; the cap keeps it from
+    // teleporting (and still benefits from the speed power-up via maxV).
+    if (input.moveTargetX != null) {
+      const target = Math.max(halfW, Math.min(bounds.width - halfW, input.moveTargetX));
+      const maxStep = maxV * dt;
+      const dx = target - this.x;
+      this.x += Math.abs(dx) <= maxStep ? dx : Math.sign(dx) * maxStep;
+      this.vx = 0;
+      return;
+    }
+
+    const accel = CONE_ACCEL * speedMult;
     const dir = (input.left ? -1 : 0) + (input.right ? 1 : 0);
     if (dir !== 0) {
       // Hold longer -> ramp up toward the speed cap.
@@ -143,7 +157,6 @@ export class Player {
     }
 
     this.x += this.vx * dt;
-    const halfW = CONE_WIDTH / 2;
     if (this.x < halfW) { this.x = halfW; this.vx = 0; }
     if (this.x > bounds.width - halfW) { this.x = bounds.width - halfW; this.vx = 0; }
   }
