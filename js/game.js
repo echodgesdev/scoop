@@ -180,6 +180,7 @@ export class Game {
     // Tipping mode: some customers arrive with a tip (power-up or coin); the
     // roller decides per spawn. No-op in other modes.
     this.shop.setTipRoller(() => this._rollTip());
+    this._applyModeDefaults();  // per-mode board size (default tipping = 4/4)
 
     /** @type {{ text: string, t: number } | null} */
     this.banner = null;
