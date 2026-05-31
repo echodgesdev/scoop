@@ -1,0 +1,1506 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  /* Letterbox bars: the viewport outside the fixed-aspect #stage is black. */
+  background: #0b0b0f;
+  font-family: 'Comic Sans MS', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* The locked-aspect play area. JS sizes + centers this rect each resize; the
+   canvas fills it and every overlay positions relative to it (so the HUD and
+   menus stay glued to the game, not the viewport corners). */
+#stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  background: #0b0b0f;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+}
+
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 20px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.55);
+  border: 3px solid rgba(60, 60, 60, 0.55);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-size: 22px;
+  font-weight: bold;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
+}
+
+.stack-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+#combo {
+  font-size: 20px;
+  font-weight: bold;
+  color: #d62828;
+  text-shadow: 0 1px 0 #fff, 0 0 8px rgba(255, 200, 0, 0.6);
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.12s, transform 0.12s;
+}
+
+#combo.show {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.combo-decay {
+  margin-top: 3px;
+  width: 120px;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.combo-decay-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #ffd166, #ff6fa3);
+  transition: width 0.1s linear;
+}
+
+/* ===== Wave gauge ======================================================== */
+.gauge-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+#gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  user-select: none;
+}
+
+#gauge {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  pointer-events: none;
+}
+
+#gauge svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg); /* fill starts at 12 o'clock */
+}
+
+.ring-bg {
+  fill: rgba(255, 255, 255, 0.55);
+  stroke: rgba(60, 60, 60, 0.55);
+  stroke-width: 3;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: #ffb703;
+  stroke-width: 8;
+  stroke-linecap: round;
+  /* pathLength=100 in markup, so dasharray of 100 covers the full ring and the
+     visible arc is controlled entirely via stroke-dashoffset (0..100). */
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transition: stroke-dashoffset 0.18s ease-out, stroke 0.2s ease;
+}
+
+.ring-fill.phase-up {
+  animation: ring-pulse 0.55s ease;
+}
+
+@keyframes ring-pulse {
+  0%   { stroke: #ffb703;  stroke-width: 8;  filter: none; }
+  40%  { stroke: #ffec5c; stroke-width: 12; filter: drop-shadow(0 0 10px rgba(255, 236, 92, 0.9)); }
+  100% { stroke: #ffb703;  stroke-width: 8;  filter: none; }
+}
+
+#gauge.celebrate .ring-fill {
+  stroke: #ffec5c;
+  stroke-width: 12;
+  filter: drop-shadow(0 0 14px rgba(255, 236, 92, 0.9));
+}
+
+.wave-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: bold;
+  color: #c1121f;
+  text-shadow: 0 1px 0 #fff;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.wave-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+#gauge.wave-up .wave-num {
+  animation: wave-bump 0.7s ease;
+}
+
+@keyframes wave-bump {
+  0%   { transform: scale(1);   color: #c1121f; }
+  40%  { transform: scale(1.7); color: #ffd166; text-shadow: 0 0 16px rgba(255, 209, 102, 0.9); }
+  100% { transform: scale(1);   color: #c1121f; }
+}
+
+/* ===== Screen flash (wave-up) ============================================= */
+#screen-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+#screen-flash.go {
+  animation: screen-flash 0.55s ease-out;
+}
+
+@keyframes screen-flash {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0;    }
+}
+
+#overlay .record {
+  font-size: 30px;
+  color: #ffd166;
+  text-shadow: 0 0 12px rgba(255, 200, 0, 0.7);
+  margin: 4px 0;
+}
+
+#title-best {
+  font-size: 26px;
+  font-weight: bold;
+  color: #ffd166;
+}
+
+#health-panel {
+  /* Two-row layout: health bar on top, score below — they share one panel
+     box so the player's status info reads as a single unit. */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 200px;
+  gap: 8px;
+}
+
+#health-track {
+  width: 100%;
+  height: 18px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  border: 2px solid #444;
+}
+
+#score {
+  /* Right-aligned to the health bar's right edge — the panel is pinned to the
+     top-right corner, so the score reads as anchored to that edge. */
+  text-align: right;
+  font-size: 22px;
+  font-weight: bold;
+  color: #3a2a1a;
+  line-height: 1;
+}
+
+#health-fill {
+  height: 100%;
+  width: 100%;
+  background: hsl(120, 75%, 48%);
+  border-radius: 9px;
+  transition: width 0.15s ease, background 0.15s ease;
+}
+
+.swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #333;
+}
+
+#game {
+  display: block;
+  /* Backing store is the fixed virtual resolution; CSS stretches it to fill
+     #stage, which already preserves the aspect ratio (so no distortion). */
+  width: 100%;
+  height: 100%;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  text-align: center;
+}
+
+#overlay h1 {
+  font-size: 64px;
+  margin: 0;
+}
+
+#overlay p {
+  font-size: 22px;
+  max-width: 600px;
+}
+
+#overlay button {
+  margin-top: 20px;
+  font-size: 28px;
+  padding: 12px 32px;
+  border-radius: 12px;
+  border: none;
+  background: #ffb703;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+}
+
+#overlay {
+  /* Cross-fades with the HUD when transitioning between menu and gameplay. */
+  transition: opacity 0.45s ease;
+  opacity: 1;
+}
+#overlay.hidden {
+  /* Faded out but still in the layout — pointer-events keeps it from
+     intercepting clicks. Avoids the hard cut that `display: none` would
+     give us. */
+  opacity: 0;
+  pointer-events: none;
+}
+
+#hud {
+  /* Mirror of #overlay's fade so the two cross-dissolve. The HUD is hidden
+     while menus are up because none of its readouts are meaningful then. */
+  transition: opacity 0.45s ease;
+  opacity: 1;
+}
+body.menu-visible #hud {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#debugBtn {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 30;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 8px 14px;
+  border: 3px solid #444;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+#debugBtn.active {
+  background: #ffd166;
+}
+
+#debugPanel {
+  position: absolute;
+  bottom: 64px;
+  left: 16px;
+  z-index: 30;
+  width: 200px;
+  padding: 14px 16px;
+  border: 3px solid #444;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.15);
+  font-size: 16px;
+}
+
+#debugPanel.hidden {
+  display: none;
+}
+
+#debugPanel h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.debug-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.debug-row input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+#debugResume {
+  margin-top: 12px;
+  width: 100%;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 8px;
+  border: none;
+  border-radius: 10px;
+  background: #06d6a0;
+  cursor: pointer;
+}
+
+/* === Start / Game-over menu buttons ======================================== */
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 18px auto;
+  align-items: center;
+}
+.menu-buttons button {
+  min-width: 220px;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: bold;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #06d6a0;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+}
+.menu-buttons button:hover {
+  filter: brightness(1.05);
+}
+.menu-buttons button.secondary {
+  background: #fff;
+  color: #333;
+  border: 2px solid #888;
+}
+
+#howToPlay {
+  margin: 8px auto 0;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+  max-width: 720px;
+  text-align: left;
+}
+#howToPlay.hidden { display: none; }
+
+/* === Recipe book modal ===================================================== */
+#recipesOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#recipesOverlay.hidden { display: none; }
+
+.recipes-modal {
+  background: #fff3c0;
+  border: 4px solid #b85;
+  border-radius: 14px;
+  padding: 22px;
+  max-width: 580px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.recipes-modal h2 {
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+.recipes-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+  margin: 6px 0 14px 0;
+}
+.recipe-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: bold;
+  margin: 12px 0 4px 0;
+  color: #6a4a2a;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+  padding-bottom: 4px;
+}
+.recipe-section-header:first-child { margin-top: 0; }
+.recipe-section-total {
+  font-size: 12px;
+  color: #8a6a4a;
+  font-weight: bold;
+}
+
+.recipe-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.recipe-row.locked {
+  opacity: 0.55;
+  font-style: italic;
+}
+.recipe-row.mastered {
+  background: rgba(255, 215, 0, 0.35);
+  border: 2px solid #ffb703;
+}
+
+.recipe-colors {
+  display: flex;
+  gap: 4px;
+  min-width: 120px;
+}
+.recipe-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #333;
+  background: #ddd;
+}
+.recipe-swatch.locked {
+  background: repeating-linear-gradient(
+    45deg,
+    #aaa, #aaa 4px,
+    #ccc 4px, #ccc 8px
+  );
+  border-color: #888;
+}
+
+.recipe-name {
+  flex: 1;
+  font-weight: bold;
+  font-size: 14px;
+  color: #333;
+}
+
+.recipe-progress {
+  position: relative;
+  width: 96px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+.recipe-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #06d6a0, #43aa8b);
+  border-radius: 9px;
+  transition: width 0.3s ease;
+}
+.recipe-progress-text {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: bold;
+  color: #222;
+}
+
+#closeRecipesBtn {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: #b85;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* === Game-over celebrations ================================================ */
+.celebration {
+  font-size: 18px;
+  font-weight: bold;
+  text-align: center;
+  margin: 6px 0;
+  animation: celebrate-pulse 1.4s ease-in-out infinite;
+}
+.celebration.unlock { color: #ff6fa3; }
+.celebration.master { color: #ffb703; }
+@keyframes celebrate-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+/* CTA flash on the Recipes button when there's something new to see. */
+button.flash {
+  animation: button-flash 0.7s ease-in-out infinite alternate;
+}
+@keyframes button-flash {
+  from { box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 0 4px #ffb703; }
+  to   { box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 0 24px #ffb703, 0 0 12px #ff6fa3; }
+}
+
+/* === Debug wave-jump ======================================================= */
+.debug-wave {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+}
+.debug-wave input {
+  width: 60px;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #888;
+}
+.debug-wave button {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #06d6a0;
+  color: #fff;
+  cursor: pointer;
+}
+
+.debug-time {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+}
+.debug-time label {
+  display: flex;
+  justify-content: space-between;
+}
+#debugTimeLabel {
+  font-weight: bold;
+  color: #555;
+}
+#debugTimeSlider {
+  width: 100%;
+  /* gradient track that mirrors the day-cycle: dawn → noon → sunset */
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #ff9b6b 0%,
+    #7fc8f0 25%,
+    #4fb6f0 50%,
+    #9d8ec4 75%,
+    #ff7a3a 100%
+  );
+  outline: none;
+}
+#debugTimeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #444;
+  cursor: pointer;
+}
+#debugTimeSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #444;
+  cursor: pointer;
+}
+
+/* === Challenges modal ====================================================== */
+#challengesOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#challengesOverlay.hidden { display: none; }
+
+.challenges-modal {
+  background: #fff3c0;
+  border: 4px solid #b85;
+  border-radius: 14px;
+  padding: 22px;
+  max-width: 620px;
+  width: 92%;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.challenges-modal h2 {
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+.challenges-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+  margin: 6px 0 14px 0;
+}
+
+.challenge-set {
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 2px solid transparent;
+}
+.challenge-set.completed { opacity: 0.6; }
+.challenge-set.current   { border-color: #ffb703; background: rgba(255, 215, 0, 0.2); }
+.challenge-set.locked    { opacity: 0.45; font-style: italic; }
+
+.challenge-set-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.set-name {
+  font-weight: bold;
+  color: #6a4a2a;
+}
+.set-badge {
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+.set-badge.done    { background: #06d6a0; color: #fff; }
+.set-badge.current { background: #ffb703; color: #fff; }
+.set-badge.locked  { background: #999;    color: #fff; }
+
+.challenge-set-rewards {
+  font-size: 12px;
+  color: #8a6a4a;
+  margin-bottom: 8px;
+}
+
+.challenge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.challenge-row.completed {
+  background: rgba(6, 214, 160, 0.25);
+}
+.challenge-row.completed .challenge-title {
+  text-decoration: line-through;
+  color: #5a5a5a;
+}
+.challenge-check {
+  color: #06d6a0;
+  font-weight: bold;
+  font-size: 16px;
+}
+.challenge-title {
+  flex: 1;
+  font-weight: bold;
+}
+.challenge-progress {
+  position: relative;
+  width: 90px;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+.challenge-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #06d6a0, #43aa8b);
+  border-radius: 8px;
+  transition: width 0.3s ease;
+}
+.challenge-progress-text {
+  position: absolute;
+  inset: 0;
+  text-align: center;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: bold;
+  color: #222;
+}
+
+#closeChallengesBtn {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: #b85;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* Inline challenges block on the game-over screen */
+.gameover-challenges {
+  margin: 12px auto;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+  max-width: 480px;
+  text-align: left;
+}
+.gameover-challenges h3 {
+  margin: 0 0 8px 0;
+  text-align: center;
+  color: #6a4a2a;
+}
+.challenges-inline .challenge-row {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* =========================================================================
+   Game-over card — single panel containing stats + active challenges.
+   No dramatic title; the overlay's appearance is the "you died" signal.
+   ========================================================================= */
+.gameover-card {
+  background: linear-gradient(180deg, #fff8d6 0%, #fff3c0 100%);
+  border: 4px solid #b85;
+  border-radius: 16px;
+  padding: 22px 26px;
+  max-width: 540px;
+  width: 92%;
+  margin: 0 auto;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  color: #3a2a1a;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  text-align: center;
+}
+.stats-row .stat {
+  padding: 10px 6px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+}
+.stat-label {
+  font-size: 12px;
+  font-weight: bold;
+  color: #8a6a4a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #3a2a1a;
+  line-height: 1.1;
+  margin-top: 4px;
+}
+.record-pill {
+  display: inline-block;
+  font-size: 11px;
+  background: #ffb703;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 8px;
+  vertical-align: middle;
+  margin-left: 4px;
+  letter-spacing: 1px;
+}
+.best-line {
+  text-align: center;
+  font-size: 14px;
+  color: #6a4a2a;
+  margin-top: 10px;
+}
+.best-line strong {
+  color: #c1121f;
+  font-size: 16px;
+}
+
+.card-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 14px -8px;
+}
+
+.gameover-challenges-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.set-tag {
+  background: #ffb703;
+  color: #fff;
+  font-weight: bold;
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 3px 9px;
+  border-radius: 8px;
+}
+.set-tag-name {
+  font-weight: bold;
+  color: #6a4a2a;
+  font-size: 14px;
+}
+.gameover-challenges-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Three-up button row: Recipes (left) | Play Again (centre, primary) | Challenges (right). */
+.menu-buttons.gameover-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 10px;
+  max-width: 540px;
+  margin: 14px auto 0;
+  flex-direction: row;       /* override the column default from .menu-buttons */
+  align-items: stretch;
+}
+.menu-buttons.gameover-buttons button {
+  min-width: 0;              /* allow grid to shrink the buttons */
+  font-size: 16px;
+  padding: 12px 8px;
+}
+.menu-buttons.gameover-buttons #startBtn {
+  font-size: 18px;
+}
+
+/* =========================================================================
+   Polished challenge rows — used in the game-over card AND the master modal.
+   Icon | title + progress bar | count.
+   ========================================================================= */
+.challenge-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 60px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 10px;
+  font-size: 13px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.challenge-row.completed {
+  background: rgba(6, 214, 160, 0.18);
+  border-color: rgba(6, 214, 160, 0.4);
+}
+.challenge-row.completed .challenge-title {
+  text-decoration: line-through;
+  color: #6a6a6a;
+}
+.challenge-icon {
+  font-size: 18px;
+  text-align: center;
+  line-height: 1;
+}
+.challenge-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.challenge-title {
+  font-weight: bold;
+  color: #3a2a1a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.challenge-row .challenge-progress {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+  border: none;
+}
+.challenge-row .challenge-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #06d6a0, #43aa8b);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.challenge-row .challenge-progress-text { display: none; } /* old layout — count moved out */
+.challenge-count {
+  font-size: 12px;
+  font-weight: bold;
+  color: #6a4a2a;
+  text-align: right;
+}
+.challenge-row.completed .challenge-count {
+  color: #06d6a0;
+  font-size: 18px;
+}
+
+/* =========================================================================
+   Settings button — bottom-right cog, only visible while a menu is up.
+   Mirrors the debug button on the left so the two utility controls bookend
+   the screen. Hidden during gameplay via the body.menu-visible gate.
+   ========================================================================= */
+#settingsBtn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 30;
+  font-family: inherit;
+  font-size: 20px;
+  padding: 6px 12px;
+  border: 3px solid #444;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+}
+body.menu-visible #settingsBtn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Fullscreen toggle — bottom-right, left of the cog. Unlike settings it stays
+   available during gameplay so the player can scale up the letterboxed stage
+   at any time. */
+#fullscreenBtn {
+  position: absolute;
+  bottom: 16px;
+  right: 70px;
+  z-index: 30;
+  font-family: inherit;
+  font-size: 20px;
+  padding: 6px 12px;
+  border: 3px solid #444;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+#fullscreenBtn:hover { opacity: 1; }
+
+.debug-aspect {
+  margin-top: 10px;
+  font-size: 15px;
+}
+.debug-aspect select {
+  font-family: inherit;
+  font-size: 15px;
+  margin-left: 4px;
+  padding: 2px 4px;
+}
+
+.debug-bias,
+.debug-patience {
+  margin-top: 10px;
+  font-size: 15px;
+}
+.debug-bias #debugBiasSlider {
+  width: 100%;
+  margin-top: 4px;
+}
+.debug-patience input {
+  font-family: inherit;
+  font-size: 15px;
+  width: 64px;
+  margin-left: 4px;
+  padding: 2px 4px;
+}
+
+.debug-bubbles {
+  margin-top: 10px;
+  font-size: 15px;
+}
+.debug-bubble-freq input {
+  font-family: inherit;
+  font-size: 15px;
+  width: 52px;
+  padding: 2px 4px;
+}
+.debug-bubble-weights {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+.debug-bubble-weights label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.debug-bubble-weights input {
+  font-family: inherit;
+  font-size: 15px;
+  width: 48px;
+  padding: 2px 4px;
+}
+
+/* =========================================================================
+   Settings modal — volume + dangerous reset.
+   ========================================================================= */
+#settingsOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+}
+#settingsOverlay.hidden { display: none; }
+
+.settings-modal {
+  background: #fff3c0;
+  border: 4px solid #b85;
+  border-radius: 14px;
+  padding: 22px;
+  max-width: 380px;
+  width: 92%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  color: #3a2a1a;
+}
+.settings-modal h2 {
+  margin: 0 0 12px 0;
+  text-align: center;
+}
+.settings-row {
+  margin: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-row > label {
+  font-weight: bold;
+  color: #6a4a2a;
+}
+.settings-row #volumeSlider {
+  width: 100%;
+}
+#volumeValue {
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+  align-self: flex-end;
+}
+.settings-danger-row {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+}
+#resetProgressBtn {
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 10px;
+  border: 2px solid #c1121f;
+  background: #fff;
+  color: #c1121f;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#resetProgressBtn:hover {
+  background: #c1121f;
+  color: #fff;
+}
+.settings-danger-note {
+  margin: 0;
+  font-size: 11px;
+  color: #8a4a4a;
+  text-align: center;
+}
+#closeSettingsBtn {
+  margin-top: 14px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 8px;
+  border: none;
+  border-radius: 10px;
+  background: #b85;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* =========================================================================
+   Challenge toast — bottom-centre fade for mid-play "✓ <title>" feedback.
+   Shown the instant a challenge requirement is hit during gameplay; cross-
+   off animation happens later between waves.
+   ========================================================================= */
+#challengeToast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(20, 20, 20, 0.85);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 28px;
+  font-weight: bold;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+#challengeToast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+#challengeToast .toast-check {
+  color: #06d6a0;
+  font-size: 22px;
+}
+#challengeToast:empty { display: none; }
+
+/* =========================================================================
+   Wave transition overlay — between-wave/round screen.
+   ========================================================================= */
+#waveTransitionOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  transition: opacity 0.4s ease;
+  opacity: 1;
+}
+#waveTransitionOverlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wave-transition-modal {
+  background: linear-gradient(180deg, #fff8d6 0%, #fff3c0 100%);
+  border: 4px solid #b85;
+  border-radius: 16px;
+  padding: 24px 28px;
+  max-width: 560px;
+  width: 92%;
+  text-align: center;
+  color: #3a2a1a;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+.wt-title {
+  margin: 0 0 6px 0;
+  font-size: 28px;
+  color: #c1121f;
+}
+.wt-subtitle {
+  font-weight: bold;
+  color: #6a4a2a;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+
+.wt-challenges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  transition: opacity 0.3s ease;
+}
+.wt-challenges.fading-out { opacity: 0; }
+.wt-challenges.fading-in  { animation: wt-fade-in 0.5s ease both; }
+@keyframes wt-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.wt-new-label {
+  font-weight: bold;
+  color: #06d6a0;
+  text-align: center;
+  letter-spacing: 1px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+/* Cross-off animation — three beats per earned row:
+   1. Progress bar slides from 0% to 100%.
+   2. Checkmark pops in with fanfare (scale-bounce + glow).
+   3. Progress bar fades out; line-through fades onto the title text. */
+
+/* The progress bar's width is driven inline by JS (set to 0% in
+   _animateCrossOffs, then to 100% to trigger the fill). Add the transition
+   here so the fill is animated. */
+.challenge-row.earned-pending .challenge-progress-bar {
+  transition: width 0.5s ease-out;
+}
+
+/* Beat 2: checkmark pops in. The count cell is the target — its text was
+   swapped from "3/3" to "✓" right before this class is added. */
+.challenge-row.check-pop .challenge-count {
+  animation: cc-check-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  color: #06d6a0;
+  font-size: 22px;
+  text-shadow: 0 0 10px rgba(6, 214, 160, 0.7);
+}
+@keyframes cc-check-pop {
+  0%   { transform: scale(0.2) rotate(-25deg); opacity: 0; }
+  55%  { transform: scale(1.55) rotate(10deg); opacity: 1; }
+  80%  { transform: scale(0.95) rotate(-4deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* Beat 3: progress fades, title gets a fading line-through. text-decoration
+   itself can't animate cleanly so we lean on color + opacity for the
+   "fade in" feel — once the title turns grey and the line shows, the
+   transition reads as a soft strike. */
+.challenge-row.struck-fade .challenge-progress {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.challenge-row.struck-fade .challenge-title {
+  color: #888;
+  text-decoration: line-through;
+  text-decoration-color: rgba(193, 18, 31, 0.85);
+  text-decoration-thickness: 2px;
+  transition: color 0.4s ease;
+}
+
+.wt-rewards {
+  margin: 14px 0 6px 0;
+  padding: 10px 14px;
+  background: rgba(255, 215, 0, 0.25);
+  border-radius: 10px;
+  border: 2px solid #ffb703;
+  animation: wt-rewards-pop 0.5s ease both;
+}
+.wt-rewards.hidden { display: none; }
+@keyframes wt-rewards-pop {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.wt-rewards-title {
+  font-weight: bold;
+  font-size: 13px;
+  color: #6a4a2a;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.wt-reward-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.wt-reward {
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-weight: bold;
+  font-size: 13px;
+  color: #3a2a1a;
+  border: 1px solid #b85;
+}
+
+/* Between-wave store. */
+.wt-store {
+  margin: 14px 0 4px 0;
+  padding: 10px 14px;
+  background: rgba(6, 214, 160, 0.14);
+  border: 2px solid #06d6a0;
+  border-radius: 10px;
+}
+.wt-store.hidden { display: none; }
+/* TEMP: between-wave store hidden while the economy is reworked. The JS still
+   runs (heal logic, score) — this just suppresses the UI. Delete this one rule
+   to bring it back. */
+.wt-store { display: none !important; }
+.wt-store-score {
+  font-weight: bold;
+  font-size: 14px;
+  color: #2a6a55;
+  margin-bottom: 8px;
+}
+.wt-store-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.wt-store-items button {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: bold;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+}
+.wt-store-items button:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+.wt-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 10px;
+  margin-top: 18px;
+}
+.wt-buttons button {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: bold;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+}
+.wt-buttons .wt-play-btn {
+  background: #06d6a0;
+  color: #fff;
+  font-size: 16px;
+}
+.wt-buttons .secondary {
+  background: #fff;
+  color: #333;
+  border: 2px solid #888;
+}
+
+/* =========================================================================
+   Pause overlay — same look + feel as the wave-transition modal but with
+   a "Resume" centre button and no countdown / no challenge list.
+   Most styling is inherited via .wave-transition-modal.
+   ========================================================================= */
+#pauseOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 85;
+  transition: opacity 0.3s ease;
+  opacity: 1;
+}
+#pauseOverlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pause-modal {
+  /* Slightly tighter than the wave-transition modal since there's no
+     challenge list — keeps the visual weight balanced. */
+  max-width: 460px;
+}
+.pause-modal .wt-title {
+  color: #6a4a2a;
+}
+
+/* =========================================================================
+   In-game pause button (⏸) — bottom-right slot. Shown only while the
+   player is actually playing; hidden behind start/game-over screens by
+   the body.menu-visible gate so it never collides with the settings cog.
+   Wave-transition and pause overlays sit at a higher z-index so they
+   visually cover this button without needing extra state classes.
+   ========================================================================= */
+#pauseBtn {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 30;
+  font-family: inherit;
+  font-size: 20px;
+  padding: 6px 14px;
+  border: 3px solid #444;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.3s ease;
+}
+body.menu-visible #pauseBtn {
+  opacity: 0;
+  pointer-events: none;
+}

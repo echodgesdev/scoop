@@ -1,0 +1,21 @@
+{
+  "name": "scoop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Poop in a Scoop — a vanilla JS canvas game.",
+  "scripts": {
+    "serve": "node -e \"const p=8080;require('http').createServer((q,r)=>{const fs=require('fs'),path=require('path');let f=path.join(process.cwd(),decodeURIComponent(q.url.split('?')[0]));if(fs.existsSync(f)&&fs.statSync(f).isDirectory())f=path.join(f,'index.html');fs.readFile(f,(e,d)=>{if(e){r.writeHead(404);r.end()}else{const t={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json'}[path.extname(f)]||'text/plain';r.writeHead(200,{'Content-Type':t});r.end(d)}})}).listen(p,()=>console.log('http://localhost:'+p))\"",
+    "lint": "eslint js",
+    "format": "prettier --write \"**/*.{js,json,css,html,md}\"",
+    "typecheck": "tsc --noEmit -p jsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

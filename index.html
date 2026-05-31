@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Poop in a Scoop</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="stage">
+  <div id="hud">
+    <div class="stack-left">
+      <div class="gauge-row">
+        <div id="gauge-wrap">
+          <div id="gauge" aria-label="Wave progress">
+            <svg viewBox="0 0 120 120">
+              <circle class="ring-bg" cx="60" cy="60" r="50"/>
+              <circle class="ring-fill" cx="60" cy="60" r="50" pathLength="100"/>
+            </svg>
+            <div class="wave-num">1</div>
+          </div>
+        </div>
+      </div>
+      <div id="combo"></div>
+    </div>
+    <div class="panel" id="health-panel">
+      <div id="health-track"><div id="health-fill"></div></div>
+      <div id="score">0</div>
+    </div>
+  </div>
+
+  <div id="screen-flash"></div>
+
+  <canvas id="game"></canvas>
+
+  <button id="debugBtn">🐞 Debug</button>
+  <div id="debugPanel" class="hidden">
+    <h3>Debug (paused)</h3>
+    <div class="debug-options"></div>
+    <div class="debug-aspect">
+      <label>Aspect:
+        <select id="debugAspect">
+          <option value="3:4">3:4 (portrait)</option>
+          <option value="9:16">9:16 (tall)</option>
+          <option value="4:3">4:3 (landscape)</option>
+          <option value="3:2">3:2 (35mm)</option>
+          <option value="16:9">16:9 (wide)</option>
+        </select>
+      </label>
+    </div>
+    <div class="debug-bias">
+      <label>Demand bias: <span id="debugBiasLabel">65%</span></label>
+      <input type="range" id="debugBiasSlider" min="0" max="1" step="0.05" value="0.65" />
+    </div>
+    <div class="debug-patience">
+      <label>Patience (s): <input type="number" id="debugPatienceInput" min="0" step="0.5" placeholder="ramp" /></label>
+    </div>
+    <div class="debug-row">
+      <input type="checkbox" id="debugTutorial" />
+      <span>Show tutorial (next game)</span>
+    </div>
+    <div class="debug-bubbles">
+      <div class="debug-bubble-freq">
+        Bubble gap (s):
+        <input type="number" id="debugBubbleMin" min="0.2" step="0.5" title="min seconds between bubbles" />
+        –
+        <input type="number" id="debugBubbleMax" min="0.2" step="0.5" title="max seconds between bubbles" />
+      </div>
+      <div class="debug-bubble-weights">
+        <span>Bubble mix:</span>
+        <label>❤️<input type="number" id="debugWeightHeart" min="0" step="0.05" /></label>
+        <label>⚡<input type="number" id="debugWeightSpeed" min="0" step="0.05" /></label>
+        <label>❄️<input type="number" id="debugWeightPause" min="0" step="0.05" /></label>
+        <label>🌈<input type="number" id="debugWeightRainbow" min="0" step="0.05" /></label>
+      </div>
+    </div>
+    <div class="debug-wave">
+      <label>Wave: <input type="number" id="debugWaveInput" min="1" value="1" /></label>
+      <button id="debugWaveJump">Jump</button>
+    </div>
+    <div class="debug-time">
+      <label>Time of day: <span id="debugTimeLabel">0%</span></label>
+      <input type="range" id="debugTimeSlider" min="0" max="0.999" step="0.01" value="0" />
+    </div>
+    <button id="debugResume">Resume ▶</button>
+  </div>
+
+  <div id="overlay">
+    <h1>🍦 Poop in a Scoop 🍦</h1>
+    <div class="menu-buttons">
+      <button id="startBtn">▶ Start</button>
+      <button id="howBtn" class="secondary">📋 How to Play</button>
+      <button id="recipesBtn" class="secondary">📖 Recipes</button>
+      <button id="challengesBtn" class="secondary">🎯 Challenges</button>
+    </div>
+    <p id="title-best"></p>
+  </div>
+
+  <div id="recipesOverlay" class="hidden">
+    <div class="recipes-modal">
+      <h2>📖 Recipe Book</h2>
+      <div class="recipes-list"></div>
+      <button id="closeRecipesBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="challengesOverlay" class="hidden">
+    <div class="challenges-modal">
+      <h2>🎯 Challenges</h2>
+      <div class="challenges-list"></div>
+      <button id="closeChallengesBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="challengeToast"></div>
+
+  <div id="waveTransitionOverlay" class="hidden">
+    <div class="wave-transition-modal">
+      <h2 class="wt-title">Wave Complete</h2>
+      <div class="wt-subtitle"></div>
+      <div class="wt-challenges"></div>
+      <div class="wt-rewards hidden"></div>
+      <div class="wt-store hidden">
+        <div class="wt-store-score"></div>
+        <div class="wt-store-items">
+          <button class="wt-heal-btn secondary"></button>
+        </div>
+      </div>
+      <div class="wt-buttons">
+        <button class="wt-recipes-btn secondary">📖 Recipes</button>
+        <button class="wt-play-btn"><span class="wt-play-label">Next Wave in 3…</span></button>
+        <button class="wt-challenges-btn secondary">🎯 Challenges</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pauseOverlay" class="hidden">
+    <div class="wave-transition-modal pause-modal">
+      <h2 class="wt-title">Paused</h2>
+      <div class="wt-subtitle">Tap Resume or press Esc to continue</div>
+      <div class="wt-buttons">
+        <button class="wt-recipes-btn secondary" id="pauseRecipesBtn">📖 Recipes</button>
+        <button class="wt-play-btn" id="pauseResumeBtn">▶ Resume</button>
+        <button class="wt-challenges-btn secondary" id="pauseChallengesBtn">🎯 Challenges</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="pauseBtn" title="Pause (Esc)">⏸</button>
+  <button id="fullscreenBtn" title="Fullscreen">⛶</button>
+  <button id="settingsBtn" title="Settings">⚙️</button>
+  <div id="settingsOverlay" class="hidden">
+    <div class="settings-modal">
+      <h2>⚙️ Settings</h2>
+      <div class="settings-row">
+        <label for="volumeSlider">Sound Effects</label>
+        <input type="range" id="volumeSlider" min="0" max="100" value="100" />
+        <span id="volumeValue">100%</span>
+      </div>
+      <div class="settings-row settings-danger-row">
+        <button id="resetProgressBtn" class="danger">Reset Challenges &amp; Recipes</button>
+        <p class="settings-danger-note">Wipes all unlocks. This cannot be undone.</p>
+      </div>
+      <button id="closeSettingsBtn">Close</button>
+    </div>
+  </div>
+  </div><!-- #stage -->
+
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>
