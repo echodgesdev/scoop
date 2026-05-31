@@ -41,12 +41,20 @@ export class ScoopField {
     // constant but overridable live via the debug panel — lowering it is the
     // main "make the tray bind" scarcity knob. Persists across reset().
     this.demandBias = SPAWN_DEMAND_BIAS;
+    // Hard cap on simultaneously-falling scoops; live-overridable via the debug
+    // panel. Persists across reset().
+    this.maxLive = MAX_LIVE_SCOOPS;
     this._refill();
   }
 
   /** @param {() => ScoopColor[]} fn */
   setDemandSource(fn) {
     this.demandSource = fn;
+  }
+
+  /** @param {number} n debug override for the max simultaneous falling scoops */
+  setMaxLive(n) {
+    this.maxLive = Math.max(1, Math.round(n));
   }
 
   /** @param {number} v probability 0..1 */
@@ -91,7 +99,7 @@ export class ScoopField {
       this.spawnTimer = 0;
       // Idle at the cap — the spawner just retries next interval once a slot
       // frees up. Dissolving scoops don't count against the cap.
-      if (this._liveCount() < MAX_LIVE_SCOOPS) this._spawn(bounds, tuning.fallMult);
+      if (this._liveCount() < this.maxLive) this._spawn(bounds, tuning.fallMult);
     }
 
     for (let i = this.scoops.length - 1; i >= 0; i--) {

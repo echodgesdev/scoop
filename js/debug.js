@@ -30,10 +30,20 @@ export class DebugPanel {
    *   onStoreToggle?: (on: boolean) => void,
    *   getStoreEnabled?: () => boolean,
    *   onTouchScheme?: (name: string) => void,
-   *   getTouchScheme?: () => string
+   *   getTouchScheme?: () => string,
+   *   onDeliveryMode?: (name: string) => void,
+   *   getDeliveryMode?: () => string,
+   *   onMaxStack?: (n: number) => void,
+   *   getMaxStack?: () => number,
+   *   onMaxLive?: (n: number) => void,
+   *   getMaxLive?: () => number,
+   *   onSpawnInterval?: (sec: number) => void,
+   *   getSpawnInterval?: () => number,
+   *   onDragGain?: (g: number) => void,
+   *   getDragGain?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -57,6 +67,18 @@ export class DebugPanel {
     this.getStoreEnabled = getStoreEnabled || (() => false);
     this.onTouchScheme = onTouchScheme || (() => {});
     this.getTouchScheme = getTouchScheme || (() => 'relative');
+    this.onDeliveryMode = onDeliveryMode || (() => {});
+    this.getDeliveryMode = getDeliveryMode || (() => 'any');
+    this.onMaxStack = onMaxStack || (() => {});
+    this.getMaxStack = getMaxStack || (() => 6);
+    this.onMaxLive = onMaxLive || (() => {});
+    this.getMaxLive = getMaxLive || (() => 7);
+    this.onSpawnInterval = onSpawnInterval || (() => {});
+    this.getSpawnInterval = getSpawnInterval || (() => 0.85);
+    this.onDragGain = onDragGain || (() => {});
+    this.getDragGain = getDragGain || (() => 2);
+    /** @type {{ id: string, label: string, get: () => number, fmt: (n: number) => string }[]} */
+    this._sliders = [];
     this.open = false;
 
     this.button = /** @type {HTMLElement} */ (document.getElementById('debugBtn'));
@@ -65,6 +87,7 @@ export class DebugPanel {
     this._wireGameMode();
     this._wireStoreToggle();
     this._wireTouchScheme();
+    this._wireGameplay();
     this._wireAspect();
     this._wireDemandBias();
     this._wirePatience();
@@ -116,6 +139,43 @@ export class DebugPanel {
     if (!sel) return;
     sel.value = this.getTouchScheme();
     sel.addEventListener('change', () => this.onTouchScheme(sel.value));
+  }
+
+  /**
+   * Gameplay tuning (all modes): delivery method dropdown + the runtime sliders
+   * (max scoops on cone, max falling scoops, spawn interval, relative-drag gain).
+   */
+  _wireGameplay() {
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugDelivery'));
+    if (sel) {
+      sel.value = this.getDeliveryMode();
+      sel.addEventListener('change', () => this.onDeliveryMode(sel.value));
+    }
+    const int = n => String(Math.round(n));
+    const oneDp = n => n.toFixed(1);
+    const twoDp = n => n.toFixed(2);
+    this._wireSlider('debugMaxStack', 'debugMaxStackLabel', this.onMaxStack, this.getMaxStack, int);
+    this._wireSlider('debugMaxLive', 'debugMaxLiveLabel', this.onMaxLive, this.getMaxLive, int);
+    this._wireSlider('debugSpawnInterval', 'debugSpawnIntervalLabel', this.onSpawnInterval, this.getSpawnInterval, twoDp);
+    this._wireSlider('debugDragGain', 'debugDragGainLabel', this.onDragGain, this.getDragGain, oneDp);
+  }
+
+  /**
+   * Wire one debug range slider to a setter, with a live value label, and
+   * register it so it re-syncs to the live value when the panel opens.
+   * @param {string} id @param {string} labelId
+   * @param {(n: number) => void} onInput @param {() => number} get
+   * @param {(n: number) => string} fmt
+   */
+  _wireSlider(id, labelId, onInput, get, fmt) {
+    const slider = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
+    const label = /** @type {HTMLElement | null} */ (document.getElementById(labelId));
+    if (!slider) return;
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      if (Number.isFinite(v)) { onInput(v); if (label) label.textContent = fmt(v); }
+    });
+    this._sliders.push({ id, label: labelId, get, fmt });
   }
 
   /** Aspect-ratio selector: switches the locked virtual canvas (4:3 ⇄ 3:4). */
@@ -273,6 +333,16 @@ export class DebugPanel {
     if (storeCb) storeCb.checked = this.getStoreEnabled();
     const touchSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugTouchScheme'));
     if (touchSel) touchSel.value = this.getTouchScheme();
+    const delSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugDelivery'));
+    if (delSel) delSel.value = this.getDeliveryMode();
+    // Re-sync gameplay sliders to live values (they can change between games).
+    for (const s of this._sliders) {
+      const slider = /** @type {HTMLInputElement | null} */ (document.getElementById(s.id));
+      const label = /** @type {HTMLElement | null} */ (document.getElementById(s.label));
+      const v = s.get();
+      if (slider) slider.value = String(v);
+      if (label) label.textContent = s.fmt(v);
+    }
   }
 
   /** Sync the slider to the live wave fraction. Called when the panel opens. */

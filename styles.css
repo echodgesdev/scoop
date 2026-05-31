@@ -1136,6 +1136,17 @@ body.menu-visible #settingsBtn {
   margin-top: 10px;
   font-size: 15px;
 }
+.debug-slider {
+  font-size: 15px;
+}
+.debug-slider label {
+  display: flex;
+  justify-content: space-between;
+}
+.debug-slider input[type="range"] {
+  width: 100%;
+  margin-top: 4px;
+}
 .debug-bias #debugBiasSlider {
   width: 100%;
   margin-top: 4px;

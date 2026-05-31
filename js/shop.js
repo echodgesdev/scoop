@@ -65,6 +65,15 @@ export class Shop {
     // When true the wave director's auto-spawn/reconcile is suspended so the
     // tutorial can stage a specific customer. Existing customers still animate.
     this.scripted = false;
+    // Tipping mode: returns a tip (PickupTypeName | 'coin') for a new customer,
+    // or null for no tip. Game wires this; default = never tip.
+    /** @type {() => (import('./types.js').PickupTypeName | 'coin' | null)} */
+    this.tipRoller = () => null;
+  }
+
+  /** @param {() => (import('./types.js').PickupTypeName | 'coin' | null)} fn */
+  setTipRoller(fn) {
+    this.tipRoller = fn;
   }
 
   reset() {
@@ -191,7 +200,8 @@ export class Shop {
       timer: 0,
       waitT: 0,
       mood: null,
-      order
+      order,
+      tip: this.tipRoller()  // tipping mode: power-up / coin reward, or null
     });
   }
 
@@ -353,39 +363,50 @@ export class Shop {
   }
 
   /**
-   * Would pressing ↑ here do something useful right now? Top-down delivery:
-   * the customer takes the *top* tray scoop if its color is in their
-   * remaining order (or rainbow is active). Drives the green-bubble glow.
+   * Would pressing ↑ here do something useful right now? Depends on the
+   * delivery mode (drives the green-bubble glow):
+   *   'any'        — top tray scoop is any color still in the order (default)
+   *   'sequential' — top tray scoop is the NEXT color in the order
+   *   'whole'      — the whole tray exactly equals the order (deliver at once)
+   * Rainbow is a wildcard for the 1-at-a-time modes.
    * @param {number} index
    * @param {ScoopColor[]} trayColors bottom-to-top
    * @param {boolean} [rainbow]
+   * @param {'any'|'sequential'|'whole'} [mode]
    */
-  canServe(index, trayColors, rainbow = false) {
+  canServe(index, trayColors, rainbow = false, mode = 'any') {
     const c = this.customers[index];
     if (!c || c.state !== STATE.WAITING) return false;
     if (trayColors.length === 0) return false;
-    if (rainbow) return c.order.colors.length > 0;
+    const order = c.order.colors;
+    if (mode === 'whole') {
+      if (rainbow) return trayColors.length === order.length;
+      return multisetEqual(trayColors, order);
+    }
+    if (rainbow) return order.length > 0;
     const top = trayColors[trayColors.length - 1];
-    return c.order.colors.includes(top);
+    if (mode === 'sequential') return order[0] === top;
+    return order.includes(top);
   }
 
   /**
-   * Hand one scoop (the top of the tray) to the customer. If accepted,
-   * their remaining order shrinks by one slot and patience extends. When
-   * the last slot fills, the order completes (combo + score + leaving).
-   *
+   * Hand one scoop (the top of the tray) to the customer under 'any' or
+   * 'sequential' delivery. Shrinks the remaining order by one and extends
+   * patience; completes the order when the last slot fills.
    * @param {number} index
    * @param {ScoopColor} topColor
-   * @param {boolean} [rainbow] wildcard mode: any color fills the next slot
-   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null }}
+   * @param {boolean} [rainbow] wildcard: fills the next slot regardless of color
+   * @param {'any'|'sequential'} [mode]
+   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('./types.js').PickupTypeName|'coin'|null) }}
    */
-  serveOne(index, topColor, rainbow = false) {
+  serveOne(index, topColor, rainbow = false, mode = 'any') {
     const c = this.customers[index];
     if (!c || c.state !== STATE.WAITING) return { accepted: false, complete: false };
 
-    const matchIdx = rainbow
-      ? (c.order.colors.length > 0 ? 0 : -1)
-      : c.order.colors.indexOf(topColor);
+    let matchIdx;
+    if (rainbow) matchIdx = c.order.colors.length > 0 ? 0 : -1;
+    else if (mode === 'sequential') matchIdx = c.order.colors[0] === topColor ? 0 : -1;
+    else matchIdx = c.order.colors.indexOf(topColor);
     if (matchIdx < 0) return { accepted: false, complete: false };
 
     c.order.colors.splice(matchIdx, 1);
@@ -395,15 +416,40 @@ export class Shop {
       c.order.timeLeft = Math.min(c.order.duration, c.order.timeLeft + PARTIAL_SERVE_EXTEND_S);
       return { accepted: true, complete: false };
     }
+    return { accepted: true, complete: true, ...this._completeOrder(c) };
+  }
 
-    // Last slot filled — complete the order. Combo weight is now baked into
-    // the order itself by waves.pickOrder (from the recipe's group).
+  /**
+   * 'whole' delivery: the entire tray must equal the order (multiset). If it
+   * does, the order completes in one action and the caller clears the stack.
+   * @param {number} index
+   * @param {ScoopColor[]} trayColors
+   * @param {boolean} [rainbow] wildcard: only the count must match
+   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('./types.js').PickupTypeName|'coin'|null) }}
+   */
+  serveWhole(index, trayColors, rainbow = false) {
+    const c = this.customers[index];
+    if (!c || c.state !== STATE.WAITING) return { accepted: false, complete: false };
+    const ok = rainbow ? trayColors.length === c.order.colors.length
+                       : multisetEqual(trayColors, c.order.colors);
+    if (!ok) return { accepted: false, complete: false };
+    c.order.colors.length = 0;
+    return { accepted: true, complete: true, ...this._completeOrder(c) };
+  }
+
+  /**
+   * Finalize a completed order: bank combo + score, mark the customer leaving,
+   * notify the wave director, and surface any tip. Shared by all delivery modes.
+   * @param {Customer} c
+   */
+  _completeOrder(c) {
     this.combo += c.order.weight || 1;
     this.comboTimer = COMBO_DECAY_S;
     this.bestCombo = Math.max(this.bestCombo, this.combo);
     const gained = c.order.value * this.combo;
     this.score += gained;
     const colors = c.order.originalColors.slice();
+    const tip = c.tip || null;
 
     c.state = STATE.LEAVING;
     c.mood = 'happy';
@@ -411,6 +457,22 @@ export class Shop {
     const event = this.waves ? this.waves.onServed(colors) : null;
     this.respawnTimer = RESPAWN_DELAY;
 
-    return { accepted: true, complete: true, gained, colors, event };
+    return { gained, colors, event, tip };
   }
+}
+
+/**
+ * Order-independent equality of two color lists (same length, same counts).
+ * @param {ScoopColor[]} a @param {ScoopColor[]} b
+ */
+function multisetEqual(a, b) {
+  if (a.length !== b.length) return false;
+  /** @type {Record<string, number>} */
+  const counts = {};
+  for (const x of a) counts[x] = (counts[x] || 0) + 1;
+  for (const y of b) {
+    if (!counts[y]) return false;
+    counts[y] -= 1;
+  }
+  return true;
 }

@@ -1,6 +1,7 @@
 // @ts-check
 import { STATE } from './shop.js';
 import { drawScoop } from './player.js';
+import { PICKUP_ICONS, PICKUP_RING_COLOR } from './pickups.js';
 import {
   SCOOP_RADIUS,
   MINI_SCOOP_RADIUS,
@@ -85,12 +86,45 @@ export class Stations {
       ctx.textBaseline = 'middle';
       ctx.fillText(faceFor(c, patience, servable, pausePatience), cx, faceY);
 
+      // Tipping mode: a token by the face showing the reward this customer will
+      // tip on a completed order (until they leave).
+      if (c.tip && c.state !== STATE.LEAVING) this._drawTip(ctx, c.tip, cx, faceY);
+
       // Held mini-cone + flying-in / settled scoops. Drawn for every state
       // so it slides off with the customer on LEAVING. Pass faceY in so the
       // held cone tracks the customer's actual face position rather than
       // an absolute ground line.
       this._drawHeldCone(ctx, c, faceY);
     }
+  }
+
+  /**
+   * Tipping mode: a small token by the customer's face showing the reward
+   * they'll hand over when their order is completed.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {string} tip  pickup type or 'coin'
+   */
+  _drawTip(ctx, tip, cx, faceY) {
+    const r = 19;
+    const bx = cx - FACE_SIZE * 0.46;
+    const by = faceY - FACE_SIZE * 0.42;
+    ctx.save();
+    ctx.shadowColor = PICKUP_RING_COLOR[tip] || '#ffd700';
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = PICKUP_RING_COLOR[tip] || '#ffd700';
+    ctx.stroke();
+    ctx.font = `${Math.floor(r * 1.1)}px 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#222';
+    ctx.fillText(PICKUP_ICONS[tip] || '$', bx, by + 1);
+    ctx.restore();
   }
 
   /**

@@ -59,6 +59,7 @@
  * @property {number} waitT
  * @property {'happy'|'angry'|null} mood
  * @property {Order} order
+ * @property {(PickupTypeName|'coin'|null)} [tip]  tipping mode: reward granted on order completion
  *
  * @typedef {object} Tuning
  * @property {number} spawnInterval

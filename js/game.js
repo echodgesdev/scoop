@@ -59,6 +59,12 @@ const MAX_FRAME = 0.25;
 // moon arcing across) that plays after the cashout and before the wave overlay.
 const NIGHT_CYCLE_S = 2.0;
 
+// Tipping mode: relative weight of the "coin" (bonus points) tip vs. the four
+// power-up tips (whose weights come from the bubble-mix debug control), and the
+// points a coin tip awards.
+const TIP_COIN_WEIGHT = 0.4;
+const TIP_COIN_POINTS = 50;
+
 // Power-up indicator animation timings. Catching a timed bubble floats it UP
 // into the "active" slot at the bottom (where its countdown lives); when it
 // ends — or is replaced by a fresh catch — it slides off to the LEFT.
@@ -139,9 +145,19 @@ export class Game {
     this.bus = new EventBus();
 
     // Power-up handling mode (debug-switchable). 'auto' = fire on catch
-    // (replace-on-catch); 'banked' = a FIFO queue spent with Shift. Selected
-    // here so the tutorial + powerup strategies below can branch on it.
+    // (replace-on-catch); 'banked' = a FIFO queue spent with Shift; 'tipping' =
+    // no bubbles, power-ups come from customer tips. Selected here so the
+    // tutorial + powerup strategies below can branch on it.
     this.gameMode = 'auto';
+    // Delivery method (debug-switchable, all modes): how a tray serves an order.
+    // 'any' = top scoop fills any remaining color (default); 'sequential' = top
+    // must be the next color in order; 'whole' = the whole tray must equal the
+    // order, delivered in one action.
+    this.deliveryMode = 'any';
+    // Debug runtime overrides (null/​default = use the constant / wave ramp).
+    this.maxStack = MAX_STACK;
+    /** @type {number | null} */
+    this.spawnIntervalOverride = null;
 
     this.waves       = new Waves(() => this.challenges.unlockedSectionIds());
     this.powerups    = new PowerUps();
@@ -156,6 +172,9 @@ export class Game {
     // Couple supply to demand: the scoop field biases its incoming queue
     // toward colors the shop still needs.
     this.field.setDemandSource(() => this.shop.demandColors(this.player.colors()));
+    // Tipping mode: some customers arrive with a tip (power-up or coin); the
+    // roller decides per spawn. No-op in other modes.
+    this.shop.setTipRoller(() => this._rollTip());
 
     /** @type {{ text: string, t: number } | null} */
     this.banner = null;
@@ -283,7 +302,19 @@ export class Game {
         this.input.left = false;
         this.input.right = false;
       },
-      getTouchScheme: () => this.touchScheme
+      getTouchScheme: () => this.touchScheme,
+      onDeliveryMode: name => { this.deliveryMode = name; },
+      getDeliveryMode: () => this.deliveryMode,
+      onMaxStack: n => { this.maxStack = Math.max(1, Math.round(n)); },
+      getMaxStack: () => this.maxStack,
+      onMaxLive: n => this.field.setMaxLive(n),
+      getMaxLive: () => this.field.maxLive,
+      onSpawnInterval: sec => { this.spawnIntervalOverride = sec; },
+      getSpawnInterval: () => this.spawnIntervalOverride != null
+        ? this.spawnIntervalOverride
+        : this.waves.tuning().spawnInterval,
+      onDragGain: g => { this.touchGain = g; },
+      getDragGain: () => this.touchGain
     });
 
     // Recipes unlocked / mastered during this play session — drained on
@@ -647,9 +678,10 @@ export class Game {
     if (this.banner && (this.banner.t -= dt) <= 0) this.banner = null;
 
     const tuning = this.waves.tuning();
-    // Debug override wins over the wave ramp; only affects orders spawned from
-    // here on (in-flight customers keep their duration).
+    // Debug overrides win over the wave ramp; only affect spawns from here on
+    // (in-flight customers/scoops keep their values).
     this.shop.setOrderTime(this.patienceOverride != null ? this.patienceOverride : tuning.patience);
+    if (this.spawnIntervalOverride != null) tuning.spawnInterval = this.spawnIntervalOverride;
     this.player.update(dt, this.input, this.bounds, this.powerups.speedMultiplier);
     if (this.hurt > 0) this.hurt = Math.max(0, this.hurt - dt);
 
@@ -735,18 +767,45 @@ export class Game {
   }
 
   /**
-   * Which bubble types the pickup field may spawn. During the tutorial we force
-   * a single demo type (feather / ⚡) so the power-up lesson always has
-   * something to catch — but only AFTER the player has served their first
-   * order, so the opening beat is purely "catch a scoop, serve a customer".
-   * Otherwise it's the player's unlocked set.
+   * Which bubble types the pickup field may spawn. Tipping mode has no bubbles
+   * at all (power-ups come from customer tips). During the tutorial we force a
+   * single demo type (feather / ⚡) so the power-up lesson always has something
+   * to catch — but only AFTER the first order is served. Otherwise it's the
+   * player's unlocked set.
    * @returns {import('./types.js').PickupTypeName[]}
    */
   _bubbleTypes() {
+    if (this.gameMode === 'tipping') return [];
     if (this.tutorial.active) {
       return this.waves.servedColors.size >= 1 ? [PICKUP_TYPE.FEATHER] : [];
     }
     return this.challenges.unlockedPowerupTypes();
+  }
+
+  /**
+   * Tipping mode: roll a tip for a freshly-spawned customer. Frequency comes
+   * from the bubble spawn-gap debug control (shorter gap → more tips) and the
+   * mix from the bubble weights (+ a fixed coin share). Returns the tip type,
+   * 'coin', or null. No-op outside tipping mode.
+   * @returns {import('./types.js').PickupTypeName | 'coin' | null}
+   */
+  _rollTip() {
+    if (this.gameMode !== 'tipping') return null;
+    const avgGap = (this.pickups.spawnMin + this.pickups.spawnMax) / 2;
+    const chance = Math.max(0.1, Math.min(0.9, 4 / Math.max(0.5, avgGap)));
+    if (Math.random() > chance) return null;
+    // Weighted over the four power-up types (bubble mix) + a coin share.
+    const w = this.pickups.weights;
+    /** @type {(import('./types.js').PickupTypeName | 'coin')[]} */
+    const types = [PICKUP_TYPE.HEART, PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW, 'coin'];
+    const weights = [w[0] || 0, w[1] || 0, w[2] || 0, w[3] || 0, TIP_COIN_WEIGHT];
+    const total = weights.reduce((a, b) => a + b, 0) || 1;
+    let r = Math.random() * total;
+    for (let i = 0; i < types.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return types[i];
+    }
+    return 'coin';
   }
 
   /**
@@ -830,7 +889,7 @@ export class Game {
   }
 
   _onCatch(scoop, perfect) {
-    if (this.player.stack.length >= MAX_STACK) {
+    if (this.player.stack.length >= this.maxStack) {
       this.bus.emit('trayFull', /** @type {any} */ ({}));
       return;
     }
@@ -853,6 +912,9 @@ export class Game {
   _rotate() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
     if (this.player.locked) return;
+    // Tipping mode repurposes the "down" verb: discard the TOP scoop instead of
+    // rotating (the Swap/rotate verb is disabled in that mode).
+    if (this.gameMode === 'tipping') { this._discardTop(); return; }
     if (this.player.rotateDown()) {
       // Light "whoosh" — reuse the catch chime so it sits in the same audio
       // family as the other tray-manipulation verbs.
@@ -861,6 +923,17 @@ export class Game {
       // Too few scoops to rotate.
       this.sound.bad();
     }
+  }
+
+  /** Tipping mode: spit out the top scoop (discard). */
+  _discardTop() {
+    const stack = this.player.stack;
+    if (stack.length === 0) { this.sound.bad(); return; }
+    const pos = this.player.scoopPosition(stack.length - 1);
+    const color = stack[stack.length - 1].color;
+    this.player.popTop();
+    this.effects.burst(pos.x, pos.y, [this.shop.hex(color), '#fff'], 10);
+    this.sound.catch_();
   }
 
   /**
@@ -873,6 +946,8 @@ export class Game {
   _pop() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
     if (this.player.locked) return;
+    // Slingshot is disabled in tipping mode (no bubbles to shoot).
+    if (this.gameMode === 'tipping') return;
     if (this.player.stack.length === 0) {
       this.sound.bad();
       return;
@@ -911,12 +986,28 @@ export class Game {
       return;
     }
     const rainbow = this.powerups.rainbowActive;
+    const customer = this.shop.list[index];
+
+    // 'whole' delivery: the entire tray must equal the order; serve it in one
+    // action (every scoop flies over, the tray clears).
+    if (this.deliveryMode === 'whole') {
+      const result = this.shop.serveWhole(index, this.player.colors(), rainbow);
+      if (!result.accepted) { this.bus.emit('serveFail', /** @type {any} */ ({})); return; }
+      for (let i = 0; i < stack.length; i++) {
+        const p = this.player.scoopPosition(i);
+        customer.order.served.push({ color: stack[i].color, t: 0, srcX: p.x, srcY: p.y });
+        this.effects.burst(p.x, p.y, [this.shop.hex(stack[i].color), '#fff'], 8);
+      }
+      this.player.clearStack();
+      this._onOrderComplete(result, customer);
+      return;
+    }
+
+    // 1-at-a-time delivery ('any' or 'sequential'): hand over the top scoop.
     const topColor = stack[stack.length - 1].color;
-    // Capture the cone-top position BEFORE popping so the flying scoop
-    // animation knows where to launch from.
     const srcPos = this.player.scoopPosition(stack.length - 1);
 
-    const result = this.shop.serveOne(index, topColor, rainbow);
+    const result = this.shop.serveOne(index, topColor, rainbow, this.deliveryMode);
     if (!result.accepted) {
       this.bus.emit('serveFail', /** @type {any} */ ({}));
       return;
@@ -925,7 +1016,6 @@ export class Game {
     // Customer took the top scoop — physically remove it from the tray and
     // queue the flying-scoop animation on the customer's mini-cone.
     this.player.popTop();
-    const customer = this.shop.list[index];
     customer.order.served.push({ color: topColor, t: 0, srcX: srcPos.x, srcY: srcPos.y });
 
     // Cone leans toward the customer's face for a brief moment — the
@@ -938,23 +1028,34 @@ export class Game {
     // and "letting go" feel like the same kind of action.
     this.effects.burst(srcPos.x, srcPos.y, [this.shop.hex(topColor), '#fff'], 10);
 
+    if (!result.complete) {
+      this.sound.catch_();
+      const cy = this.stations.groundY - 60;
+      this.effects.popText(customer.x, cy, '✓', { color: '#43aa8b', size: 22, life: 0.5 });
+      return;
+    }
+    this._onOrderComplete(result, customer);
+  }
+
+  /**
+   * Shared order-completion handling: heal, recipe/challenge tracking, serve
+   * FX, tip grant, and the wave-progress event. Called by every delivery mode.
+   * @param {{ gained?: number, colors?: import('./types.js').ScoopColor[], event?: string|null, tip?: (import('./types.js').PickupTypeName|'coin'|null) }} result
+   * @param {import('./types.js').Customer} customer
+   */
+  _onOrderComplete(result, customer) {
+    const { gained, colors, event } = result;
     const cx = customer.x;
     const cy = this.stations.groundY - 60;
 
-    if (!result.complete) {
-      this.sound.catch_();
-      this.effects.popText(cx, cy, '✓', { color: '#43aa8b', size: 22, life: 0.5 });
-      return;
-    }
+    const targetY = this.stations.groundY + CUSTOMER_FACE_OFFSET_PX + customer.yOff;
+    this.player.triggerHandoff(customer.x, targetY);
 
-    // Final scoop — full completion FX (matches old serve() behavior).
-    const { gained, colors, event } = result;
     this.health = Math.min(MAX_HEALTH, this.health + HEAL_PER_SERVE);
 
     // Recipe book: record the completion. Stash any first-time-unlocked
     // or just-mastered ids for the game-over celebration overlay. Then
-    // forward to challenges so progress on discover/master/serve trackers
-    // updates in real time.
+    // forward to challenges so progress trackers update in real time.
     if (colors && colors.length > 0) {
       const ev = this.recipes.recordComplete(colors);
       if (ev.wasNew) {
@@ -968,6 +1069,9 @@ export class Game {
     }
     this.challenges.recordCustomerServed();
     this.challenges.recordCombo(this.shop.combo);
+
+    // Tipping mode: grant the customer's tip (coin = points, else fire it).
+    if (result.tip) this._grantTip(result.tip, cx, cy);
 
     this.bus.emit('serve', {
       gained: gained ?? 0,
@@ -997,6 +1101,24 @@ export class Game {
       // cashout animation, which opens the transition overlay when it ends.
       const completedWave = Math.max(1, (this.waves.wave || 1) - 1);
       setTimeout(() => this._runWaveCashout(completedWave), 700);
+    }
+  }
+
+  /**
+   * Tipping mode: hand the player a customer's tip on order completion. Coin =
+   * bonus points; a power-up tip auto-fires (same as a caught bubble in Auto).
+   * @param {import('./types.js').PickupTypeName | 'coin'} tip
+   * @param {number} x @param {number} y
+   */
+  _grantTip(tip, x, y) {
+    if (tip === 'coin') {
+      this.shop.addScore(TIP_COIN_POINTS);
+      this.hud.setScore(this.shop.score);
+      this.effects.burst(x, y, ['#ffd700', '#fff7c0', '#fff'], 18);
+      this.effects.popText(x, y - 28, `+${TIP_COIN_POINTS}`, { color: '#ffd700', size: 24 });
+      this.sound.bubblePop();
+    } else {
+      this._firePower(tip, this.player.x, this.player.stackTopY());
     }
   }
 
@@ -1230,7 +1352,7 @@ export class Game {
     const pausePatience = this.powerups.pauseActive || !this.flags.patternTimer;
     this.stations.draw(ctx, this.shop.list, {
       activeIndex:    this.shop.customerAt(this.player.x),
-      canServe:       i => this.shop.canServe(i, this.player.colors(), rainbow),
+      canServe:       i => this.shop.canServe(i, this.player.colors(), rainbow, this.deliveryMode),
       hex:            c => this.shop.hex(c),
       pausePatience,
       rainbow
