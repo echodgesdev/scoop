@@ -34,54 +34,106 @@
 
   <button id="debugBtn">🐞 Debug</button>
   <div id="debugPanel" class="hidden">
-    <h3>Debug (paused)</h3>
-    <div class="debug-options"></div>
-    <div class="debug-aspect">
-      <label>Aspect:
-        <select id="debugAspect">
-          <option value="3:4">3:4 (portrait)</option>
-          <option value="9:16">9:16 (tall)</option>
-          <option value="4:3">4:3 (landscape)</option>
-          <option value="3:2">3:2 (35mm)</option>
-          <option value="16:9">16:9 (wide)</option>
-        </select>
-      </label>
-    </div>
-    <div class="debug-bias">
-      <label>Demand bias: <span id="debugBiasLabel">65%</span></label>
-      <input type="range" id="debugBiasSlider" min="0" max="1" step="0.05" value="0.65" />
-    </div>
-    <div class="debug-patience">
-      <label>Patience (s): <input type="number" id="debugPatienceInput" min="0" step="0.5" placeholder="ramp" /></label>
-    </div>
-    <div class="debug-row">
-      <input type="checkbox" id="debugTutorial" />
-      <span>Show tutorial (next game)</span>
-    </div>
-    <div class="debug-bubbles">
-      <div class="debug-bubble-freq">
-        Bubble gap (s):
-        <input type="number" id="debugBubbleMin" min="0.2" step="0.5" title="min seconds between bubbles" />
-        –
-        <input type="number" id="debugBubbleMax" min="0.2" step="0.5" title="max seconds between bubbles" />
+    <div class="debug-modal">
+      <h2>🐞 Debug <span class="debug-paused">(paused)</span></h2>
+
+      <div class="debug-top">
+        <div class="debug-wave">
+          <label>Wave: <input type="number" id="debugWaveInput" min="1" value="1" /></label>
+          <button id="debugWaveJump">Jump</button>
+        </div>
+        <div class="debug-time">
+          <label>Time of day: <span id="debugTimeLabel">0%</span></label>
+          <input type="range" id="debugTimeSlider" min="0" max="0.999" step="0.01" value="0" />
+        </div>
       </div>
-      <div class="debug-bubble-weights">
-        <span>Bubble mix:</span>
-        <label>❤️<input type="number" id="debugWeightHeart" min="0" step="0.05" /></label>
-        <label>⚡<input type="number" id="debugWeightSpeed" min="0" step="0.05" /></label>
-        <label>❄️<input type="number" id="debugWeightPause" min="0" step="0.05" /></label>
-        <label>🌈<input type="number" id="debugWeightRainbow" min="0" step="0.05" /></label>
-      </div>
+
+      <details class="debug-section" open>
+        <summary>Game mode</summary>
+        <div class="debug-section-body">
+          <label class="debug-field">Mode:
+            <select id="debugGameMode">
+              <option value="auto">Auto Trigger</option>
+              <option value="banked">Banked Inventory</option>
+            </select>
+          </label>
+          <label class="debug-row">
+            <input type="checkbox" id="debugStoreToggle" />
+            <span>Show between-wave store (loot box)</span>
+          </label>
+        </div>
+      </details>
+
+      <details class="debug-section">
+        <summary>Cheats</summary>
+        <div class="debug-section-body">
+          <label class="debug-row"><input type="checkbox" data-flag="pickupKeys" /><span>Cheat keys: Q/W/E/R/T</span></label>
+          <label class="debug-row"><input type="checkbox" data-flag="invincible" /><span>Invincible</span></label>
+          <label class="debug-row"><input type="checkbox" data-flag="patternTimer" /><span>Customer patience timer</span></label>
+        </div>
+      </details>
+
+      <details class="debug-section">
+        <summary>Display</summary>
+        <div class="debug-section-body">
+          <label class="debug-row"><input type="checkbox" data-flag="showHitboxes" /><span>Show hitboxes</span></label>
+          <label class="debug-row"><input type="checkbox" data-flag="showFps" /><span>Show FPS</span></label>
+          <label class="debug-field">Aspect:
+            <select id="debugAspect">
+              <option value="3:4">3:4 (portrait)</option>
+              <option value="9:16">9:16 (tall)</option>
+              <option value="4:3">4:3 (landscape)</option>
+              <option value="3:2">3:2 (35mm)</option>
+              <option value="16:9">16:9 (wide)</option>
+            </select>
+          </label>
+        </div>
+      </details>
+
+      <details class="debug-section">
+        <summary>Bubble management</summary>
+        <div class="debug-section-body">
+          <div class="debug-bubble-freq">
+            Bubble gap (s):
+            <input type="number" id="debugBubbleMin" min="0.2" step="0.5" title="min seconds between bubbles" />
+            –
+            <input type="number" id="debugBubbleMax" min="0.2" step="0.5" title="max seconds between bubbles" />
+          </div>
+          <div class="debug-bubble-weights">
+            <span>Bubble mix:</span>
+            <label>❤️<input type="number" id="debugWeightHeart" min="0" step="0.05" /></label>
+            <label>⚡<input type="number" id="debugWeightSpeed" min="0" step="0.05" /></label>
+            <label>❄️<input type="number" id="debugWeightPause" min="0" step="0.05" /></label>
+            <label>🌈<input type="number" id="debugWeightRainbow" min="0" step="0.05" /></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="debug-section">
+        <summary>Difficulty</summary>
+        <div class="debug-section-body">
+          <div class="debug-bias">
+            <label>Demand bias: <span id="debugBiasLabel">65%</span></label>
+            <input type="range" id="debugBiasSlider" min="0" max="1" step="0.05" value="0.65" />
+          </div>
+          <div class="debug-patience">
+            <label>Patience (s): <input type="number" id="debugPatienceInput" min="0" step="0.5" placeholder="ramp" /></label>
+          </div>
+        </div>
+      </details>
+
+      <details class="debug-section">
+        <summary>Tutorial</summary>
+        <div class="debug-section-body">
+          <label class="debug-row">
+            <input type="checkbox" id="debugTutorial" />
+            <span>Show tutorial (next game)</span>
+          </label>
+        </div>
+      </details>
+
+      <button id="debugResume">Resume ▶</button>
     </div>
-    <div class="debug-wave">
-      <label>Wave: <input type="number" id="debugWaveInput" min="1" value="1" /></label>
-      <button id="debugWaveJump">Jump</button>
-    </div>
-    <div class="debug-time">
-      <label>Time of day: <span id="debugTimeLabel">0%</span></label>
-      <input type="range" id="debugTimeSlider" min="0" max="0.999" step="0.01" value="0" />
-    </div>
-    <button id="debugResume">Resume ▶</button>
   </div>
 
   <div id="overlay">
@@ -123,6 +175,7 @@
         <div class="wt-store-score"></div>
         <div class="wt-store-items">
           <button class="wt-heal-btn secondary"></button>
+          <button class="wt-loot-btn secondary"></button>
         </div>
       </div>
       <div class="wt-buttons">

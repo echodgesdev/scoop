@@ -783,6 +783,7 @@ export class Hud {
     // Store buttons. A purchase stops the auto-countdown so the player can keep
     // shopping, then re-renders the row (new score + affordability).
     const healBtn = this.waveTransitionOverlayEl.querySelector('.wt-heal-btn');
+    const lootBtn = this.waveTransitionOverlayEl.querySelector('.wt-loot-btn');
     const buy = (fn) => {
       if (!this._store) return;
       const r = fn();
@@ -796,6 +797,10 @@ export class Hud {
     if (healBtn && !(/** @type {HTMLElement} */ (healBtn).dataset.wired)) {
       healBtn.addEventListener('click', () => buy(() => this._store.onBuyHeal()));
       /** @type {HTMLElement} */ (healBtn).dataset.wired = '1';
+    }
+    if (lootBtn && !(/** @type {HTMLElement} */ (lootBtn).dataset.wired)) {
+      lootBtn.addEventListener('click', () => buy(() => this._store.onBuyLootbox()));
+      /** @type {HTMLElement} */ (lootBtn).dataset.wired = '1';
     }
   }
 
@@ -822,6 +827,11 @@ export class Hud {
     if (healBtn) {
       healBtn.textContent = `❤️ Full Heal — ${store.healCost}`;
       healBtn.disabled = score < store.healCost || store.getHealthFull();
+    }
+    const lootBtn = /** @type {HTMLButtonElement | null} */ (root.querySelector('.wt-loot-btn'));
+    if (lootBtn) {
+      lootBtn.textContent = `🎁 Loot Box — ${store.lootCost}`;
+      lootBtn.disabled = score < store.lootCost;
     }
   }
 

@@ -1,17 +1,9 @@
 // @ts-check
-const LABELS = {
-  patternTimer: 'Customer patience',
-  speedRamp:    'Speed ramp',
-  invincible:   'Invincible',
-  pickupKeys:   'Cheat keys: Q/W/E/R',
-  showHitboxes: 'Show hitboxes',
-  showFps:      'Show FPS'
-};
-
 /**
- * Bottom-left debug toggle. Opening it pauses the game (via onPauseChange)
- * and exposes a checkbox per flag plus a wave-jumper for fast-forwarding.
- * Flags are mutated in place so the game reads them live.
+ * Debug modal. Opening it pauses the game (via onPauseChange) and exposes the
+ * tuning/cheat controls grouped into accordion sections. Boolean cheat/display
+ * flags are declared in the HTML via `data-flag="<key>"` and mutated in place
+ * here so the game reads them live.
  */
 export class DebugPanel {
   /**
@@ -32,10 +24,14 @@ export class DebugPanel {
    *   onBubbleWeights?: (weights: number[]) => void,
    *   getBubbleWeights?: () => number[],
    *   onTutorialFlag?: (v: boolean) => void,
-   *   getTutorialFlag?: () => boolean
+   *   getTutorialFlag?: () => boolean,
+   *   onGameMode?: (name: string) => void,
+   *   getGameMode?: () => string,
+   *   onStoreToggle?: (on: boolean) => void,
+   *   getStoreEnabled?: () => boolean
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -53,11 +49,17 @@ export class DebugPanel {
     this.getBubbleWeights = getBubbleWeights || (() => [0.35, 0.3, 0.2, 0.15]);
     this.onTutorialFlag = onTutorialFlag || (() => {});
     this.getTutorialFlag = getTutorialFlag || (() => false);
+    this.onGameMode = onGameMode || (() => {});
+    this.getGameMode = getGameMode || (() => 'auto');
+    this.onStoreToggle = onStoreToggle || (() => {});
+    this.getStoreEnabled = getStoreEnabled || (() => false);
     this.open = false;
 
     this.button = /** @type {HTMLElement} */ (document.getElementById('debugBtn'));
     this.panel = /** @type {HTMLElement} */ (document.getElementById('debugPanel'));
-    this._buildOptions();
+    this._wireFlags();
+    this._wireGameMode();
+    this._wireStoreToggle();
     this._wireAspect();
     this._wireDemandBias();
     this._wirePatience();
@@ -71,24 +73,36 @@ export class DebugPanel {
     if (resumeBtn) resumeBtn.addEventListener('click', () => this.toggle(false));
   }
 
-  _buildOptions() {
-    const container = /** @type {HTMLElement} */ (this.panel.querySelector('.debug-options'));
-    container.innerHTML = '';
-    for (const key of Object.keys(this.flags)) {
-      const row = document.createElement('label');
-      row.className = 'debug-row';
+  /**
+   * Wire every boolean flag checkbox declared in the HTML as `data-flag="key"`.
+   * The checkbox writes straight back into the live flags object the game reads.
+   */
+  _wireFlags() {
+    /** @type {NodeListOf<HTMLInputElement>} */
+    const els = this.panel.querySelectorAll('input[data-flag]');
+    this._flagEls = els;
+    els.forEach(el => {
+      const key = el.dataset.flag;
+      if (!key) return;
+      el.checked = !!this.flags[key];
+      el.addEventListener('change', () => { this.flags[key] = el.checked; });
+    });
+  }
 
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = this.flags[key];
-      cb.addEventListener('change', () => { this.flags[key] = cb.checked; });
+  /** Game-mode dropdown: Auto Trigger ⇄ Banked Inventory power-up handling. */
+  _wireGameMode() {
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugGameMode'));
+    if (!sel) return;
+    sel.value = this.getGameMode();
+    sel.addEventListener('change', () => this.onGameMode(sel.value));
+  }
 
-      const span = document.createElement('span');
-      span.textContent = LABELS[/** @type {keyof typeof LABELS} */ (key)] || key;
-
-      row.append(cb, span);
-      container.appendChild(row);
-    }
+  /** Between-wave store (loot box) visibility — off by default. */
+  _wireStoreToggle() {
+    const cb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugStoreToggle'));
+    if (!cb) return;
+    cb.checked = this.getStoreEnabled();
+    cb.addEventListener('change', () => this.onStoreToggle(cb.checked));
   }
 
   /** Aspect-ratio selector: switches the locked virtual canvas (4:3 ⇄ 3:4). */
@@ -232,6 +246,18 @@ export class DebugPanel {
     }
     const tut = /** @type {HTMLInputElement | null} */ (document.getElementById('debugTutorial'));
     if (tut) tut.checked = this.getTutorialFlag();
+
+    // Re-sync the flag checkboxes + mode/store controls to live state.
+    if (this._flagEls) {
+      this._flagEls.forEach(el => {
+        const key = el.dataset.flag;
+        if (key) el.checked = !!this.flags[key];
+      });
+    }
+    const modeSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugGameMode'));
+    if (modeSel) modeSel.value = this.getGameMode();
+    const storeCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugStoreToggle'));
+    if (storeCb) storeCb.checked = this.getStoreEnabled();
   }
 
   /** Sync the slider to the live wave fraction. Called when the panel opens. */

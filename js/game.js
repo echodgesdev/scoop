@@ -17,6 +17,7 @@ import {
   COMBO_CASHOUT_PER,
   STACK_CASHOUT_PER_SCOOP,
   HEAL_COST,
+  LOOTBOX_COST,
   coneYFor
 } from './config.js';
 import { Player } from './player.js';
@@ -170,9 +171,15 @@ class Game {
     this.hurt = 0;
 
     this.flags = {
-      patternTimer: true, speedRamp: true, invincible: false, pickupKeys: false,
+      patternTimer: true, invincible: false, pickupKeys: false,
       showHitboxes: false, showFps: false
     };
+    // Power-up handling mode (debug-switchable). 'auto' = fire on catch
+    // (replace-on-catch); 'banked' = the queue + Shift inventory. Banked is
+    // wired up in a later pass; for now only 'auto' is functional.
+    this.gameMode = 'auto';
+    // Between-wave store (loot box) — off by default; toggled from the debug panel.
+    this.storeEnabled = false;
     // Debug patience override (seconds). null = follow the wave ramp.
     /** @type {number | null} */
     this.patienceOverride = null;
@@ -188,13 +195,17 @@ class Game {
       onPatience: sec => { this.patienceOverride = sec; },
       getPatience: () => this.patienceOverride != null
         ? this.patienceOverride
-        : Math.round(this.waves.tuning(this.flags.speedRamp).patience),
+        : Math.round(this.waves.tuning().patience),
       onBubbleRange: (min, max) => this.pickups.setSpawnRange(min, max),
       getBubbleRange: () => ({ min: this.pickups.spawnMin, max: this.pickups.spawnMax }),
       onBubbleWeights: weights => this.pickups.setWeights(weights),
       getBubbleWeights: () => this.pickups.weights,
       onTutorialFlag: v => this.setShowTutorial(v),
-      getTutorialFlag: () => this.showTutorial
+      getTutorialFlag: () => this.showTutorial,
+      onGameMode: name => { this.gameMode = name; },
+      getGameMode: () => this.gameMode,
+      onStoreToggle: on => { this.storeEnabled = on; },
+      getStoreEnabled: () => this.storeEnabled
     });
 
     // Recipes unlocked / mastered during this play session — drained on
@@ -260,7 +271,7 @@ class Game {
     if (!this.running) return;
     this.waves.jumpToWave(n);
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
-    this.shop.setOrderTime(this.waves.tuning(this.flags.speedRamp).patience);
+    this.shop.setOrderTime(this.waves.tuning().patience);
   }
 
   /**
@@ -408,7 +419,7 @@ class Game {
     this.stations.layout(this.bounds);
     this.shop.layout(this.bounds.width);
     this.waves.reset();
-    this.shop.setOrderTime(this.waves.tuning(this.flags.speedRamp).patience);
+    this.shop.setOrderTime(this.waves.tuning().patience);
     this.shop.reset();
     this.health = MAX_HEALTH;
     this.hurt = 0;
@@ -486,7 +497,7 @@ class Game {
     this.powerups.update(dt);
     if (this.banner && (this.banner.t -= dt) <= 0) this.banner = null;
 
-    const tuning = this.waves.tuning(this.flags.speedRamp);
+    const tuning = this.waves.tuning();
     // Debug override wins over the wave ramp; only affects orders spawned from
     // here on (in-flight customers keep their duration).
     this.shop.setOrderTime(this.patienceOverride != null ? this.patienceOverride : tuning.patience);
@@ -564,12 +575,19 @@ class Game {
     // Challenge tracking: every popped bubble counts (catch hitbox OR slingshot
     // projectile both route here).
     this.challenges.recordBubblePop(pickup.type);
-    const type = pickup.type;
-    const x = this.player.x;
-    const y = this.player.stackTopY();
-
     this.bus.emit('pickup', { pickup });  // white burst at the catch point
+    this._firePower(pickup.type, this.player.x, this.player.stackTopY());
+  }
 
+  /**
+   * Apply a power-up's effect at (x, y): heart heals instantly and is
+   * orthogonal (never disturbs a running timed power-up); the three timed types
+   * replace whatever is running (mutual exclusion via PowerUps.trigger) and
+   * float into the active slot. Shared by catch (auto mode) and the loot box.
+   * @param {import('./types.js').PickupTypeName} type
+   * @param {number} x @param {number} y
+   */
+  _firePower(type, x, y) {
     if (type === PICKUP_TYPE.HEART) {
       if (!this.flags.invincible) {
         this.health = Math.min(MAX_HEALTH, this.health + HEART_HEAL_AMOUNT);
@@ -876,14 +894,17 @@ class Game {
     this.hud.showWaveTransition({
       completedWave,
       onResume: () => this._endWaveTransition(),
-      // Between-wave store: spend score (the windfall the cashout just paid out)
-      // on survival. Lootboxes are off for now — heal is the only item.
-      store: {
+      // Between-wave store — gated behind the debug "show store" toggle (off by
+      // default). Spend the cashout windfall on survival (heal) or a random
+      // power-up (loot box). Passing null hides the store row entirely.
+      store: this.storeEnabled ? {
         healCost: HEAL_COST,
+        lootCost: LOOTBOX_COST,
         getScore: () => this.shop.score,
         getHealthFull: () => this.health >= MAX_HEALTH,
-        onBuyHeal: () => this._buyHeal()
-      }
+        onBuyHeal: () => this._buyHeal(),
+        onBuyLootbox: () => this._buyLootbox()
+      } : null
     });
   }
 
@@ -897,6 +918,23 @@ class Game {
     this.hud.setHealth(this.health / MAX_HEALTH);
     this.sound.heart();
     return { ok: true, score: this.shop.score, healthFull: true };
+  }
+
+  /**
+   * Store: spend score for a random unlocked power-up. In Auto mode it fires
+   * immediately via _firePower; the banked-inventory mode (later pass) will
+   * route this through its queue instead.
+   * @returns {{ ok: boolean, score: number, lootType?: string }}
+   */
+  _buyLootbox() {
+    if (this.shop.score < LOOTBOX_COST) return { ok: false, score: this.shop.score };
+    let pool = this.challenges.unlockedPowerupTypes();
+    if (!pool || pool.length === 0) pool = [PICKUP_TYPE.HEART];  // baseline before any unlocks
+    const type = pool[Math.floor(Math.random() * pool.length)];
+    this.shop.score -= LOOTBOX_COST;
+    this._firePower(type, this.player.x, this.player.stackTopY());
+    this.hud.setScore(this.shop.score);
+    return { ok: true, score: this.shop.score, lootType: type };
   }
 
   _endWaveTransition() {

@@ -89,9 +89,10 @@ export const STACK_CASHOUT_PER_SCOOP = 10;  // points per leftover tray scoop
 // === Between-wave store =======================================================
 // Score IS the currency — spending lowers your run total, so the high score
 // reflects how efficiently you converted survival into points. Costs are flat
-// (tune against typical per-wave income). Lootboxes are off for now (power-ups
-// fire on catch); heal is the only store item.
+// (tune against typical per-wave income). The store is off by default and
+// toggled from the debug panel while the economy is being explored.
 export const HEAL_COST = 400;       // full heal
+export const LOOTBOX_COST = 250;    // one random unlocked power-up
 
 // === Spawn demand coupling ====================================================
 // Probability that a freshly-spawned scoop is biased toward what waiting
