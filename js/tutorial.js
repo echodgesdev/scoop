@@ -1,5 +1,5 @@
 // @ts-check
-import { CONE_HEIGHT, PICKUP_TYPE, POWERUP_TYPE } from './config.js';
+import { CONE_HEIGHT, PICKUP_TYPE, POWERUP_TYPE, GAME_MODE } from './config.js';
 import { STATE } from './shop.js';
 
 /** @typedef {import('./game.js').Game} Game */
@@ -201,11 +201,11 @@ class TippingTutorial extends TutorialBase {
 
 /**
  * Pick the tutorial that matches the active game mode.
- * @param {string} mode 'auto' | 'banked' | 'tipping'
+ * @param {string} mode one of GAME_MODE (auto | banked | tipping)
  * @returns {TutorialBase}
  */
 export function createTutorial(mode) {
-  if (mode === 'banked') return new BankedTutorial();
-  if (mode === 'tipping') return new TippingTutorial();
+  if (mode === GAME_MODE.BANKED) return new BankedTutorial();
+  if (mode === GAME_MODE.TIPPING) return new TippingTutorial();
   return new AutoTutorial();
 }

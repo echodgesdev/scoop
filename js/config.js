@@ -2,7 +2,11 @@
 // Code-touching constants and enums. Balance numbers live in tuning.js and
 // are re-exported from here so existing call-sites don't need to change.
 
-import { FLOOR_Y_RATIO as _FLOOR_Y_RATIO, CONE_EMBED_PX as _CONE_EMBED_PX } from './tuning.js';
+import {
+  FLOOR_Y_RATIO as _FLOOR_Y_RATIO,
+  CONE_EMBED_PX as _CONE_EMBED_PX,
+  MAX_LIVE_SCOOPS as _MAX_LIVE_SCOOPS
+} from './tuning.js';
 
 /** @typedef {import('./types.js').ScoopColor} ScoopColor */
 /** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
@@ -57,6 +61,80 @@ export const POWERUP_TYPE = Object.freeze({
   PAUSE: 'pause',
   RAINBOW: 'rainbow'
 });
+
+// Stringly-typed config values, centralized as frozen enums so a typo is a
+// missing property (loud — undefined) instead of a silently-false comparison.
+/** Game type. @type {Readonly<{AUTO:'auto',BANKED:'banked',TIPPING:'tipping'}>} */
+export const GAME_MODE = Object.freeze({ AUTO: 'auto', BANKED: 'banked', TIPPING: 'tipping' });
+/** Power-up handling. @type {Readonly<{AUTO:'auto',BANKED:'banked'}>} */
+export const POWERUP_MODE = Object.freeze({ AUTO: 'auto', BANKED: 'banked' });
+/** Where power-ups come from. @type {Readonly<{BUBBLES:'bubbles',TIPS:'tips'}>} */
+export const POWERUP_SOURCE = Object.freeze({ BUBBLES: 'bubbles', TIPS: 'tips' });
+/** Up-gesture / Space action. @type {Readonly<{SLINGSHOT:'slingshot',DISCARD:'discard'}>} */
+export const TOP_GESTURE = Object.freeze({ SLINGSHOT: 'slingshot', DISCARD: 'discard' });
+/** Tray→customer delivery rule. @type {Readonly<{ANY:'any',SEQUENTIAL:'sequential',WHOLE:'whole'}>} */
+export const DELIVERY_MODE = Object.freeze({ ANY: 'any', SEQUENTIAL: 'sequential', WHOLE: 'whole' });
+/** Touch steering scheme. @type {Readonly<{RELATIVE:'relative',ABSOLUTE:'absolute',HOLDZONES:'holdzones'}>} */
+export const TOUCH_SCHEME = Object.freeze({ RELATIVE: 'relative', ABSOLUTE: 'absolute', HOLDZONES: 'holdzones' });
+
+// === Game modes ==============================================================
+// One config object per game type — the single place mode differences live,
+// applied on load / mode switch by Game._applyModeConfig instead of magic
+// numbers and `gameMode === 'x'` checks scattered through game.js. A mode
+// inherits BASE_MODE (the engine defaults from this file / tuning.js) and lists
+// only what it overrides.
+/**
+ * @typedef {object} GameModeConfig
+ * @property {string} id
+ * @property {string} label                       shown in the debug mode dropdown
+ * @property {number} maxStack                    cone capacity (scoops)
+ * @property {number} maxLive                     max simultaneously-falling scoops
+ * @property {'auto'|'banked'} powerupMode        fire-on-catch vs. a Shift-spent queue
+ * @property {'bubbles'|'tips'} powerupSource     caught falling bubbles vs. customer tips
+ * @property {boolean} comboBreaker               chain serves → supercharged power-up
+ * @property {boolean} canRotate                  down gesture rotates the stack
+ * @property {'slingshot'|'discard'} topGesture   up gesture / Space: shoot vs. toss top scoop
+ */
+/** @type {GameModeConfig} */
+const BASE_MODE = {
+  id: GAME_MODE.AUTO,
+  label: 'Auto Trigger',
+  maxStack: MAX_STACK,
+  maxLive: _MAX_LIVE_SCOOPS,
+  powerupMode: POWERUP_MODE.AUTO,
+  powerupSource: POWERUP_SOURCE.BUBBLES,
+  comboBreaker: false,
+  canRotate: true,
+  topGesture: TOP_GESTURE.SLINGSHOT
+};
+
+/** @type {Record<string, GameModeConfig>} */
+export const GAME_MODES = {
+  [GAME_MODE.AUTO]: { ...BASE_MODE },
+  [GAME_MODE.BANKED]: { ...BASE_MODE, id: GAME_MODE.BANKED, label: 'Banked Inventory', powerupMode: POWERUP_MODE.BANKED },
+  // Tipping: no bubble lane (power-ups arrive as customer tips), a tighter cone,
+  // the combo breaker as its active payoff, and the upward gesture tosses the
+  // top scoop (no rotate verb).
+  [GAME_MODE.TIPPING]: {
+    ...BASE_MODE,
+    id: GAME_MODE.TIPPING,
+    label: 'Tipping (no bubbles)',
+    maxStack: 4,
+    maxLive: 7,
+    powerupSource: POWERUP_SOURCE.TIPS,
+    comboBreaker: true,
+    canRotate: false,
+    topGesture: TOP_GESTURE.DISCARD
+  }
+};
+
+/**
+ * The config for a game-mode id, falling back to Auto for an unknown name.
+ * @param {string} name @returns {GameModeConfig}
+ */
+export function modeConfig(name) {
+  return GAME_MODES[name] || GAME_MODES[GAME_MODE.AUTO];
+}
 
 // Recipe templates and per-wave pools used to live here, but recipes are
 // now defined in recipes.js by their specific color combo + group. Per-wave

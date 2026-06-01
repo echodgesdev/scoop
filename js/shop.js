@@ -5,7 +5,8 @@ import {
   PATTERN_TIME_START,
   COMBO_DECAY_S,
   PARTIAL_SERVE_EXTEND_S,
-  SERVED_FLIGHT_S
+  SERVED_FLIGHT_S,
+  DELIVERY_MODE
 } from './config.js';
 
 /** @typedef {import('./types.js').ScoopColor} ScoopColor */
@@ -388,18 +389,18 @@ export class Shop {
    * @param {boolean} [rainbow]
    * @param {'any'|'sequential'|'whole'} [mode]
    */
-  canServe(index, trayColors, rainbow = false, mode = 'any') {
+  canServe(index, trayColors, rainbow = false, mode = DELIVERY_MODE.ANY) {
     const c = this.customers[index];
     if (!c || c.state !== STATE.WAITING) return false;
     if (trayColors.length === 0) return false;
     const order = c.order.colors;
-    if (mode === 'whole') {
+    if (mode === DELIVERY_MODE.WHOLE) {
       if (rainbow) return trayColors.length === order.length;
       return multisetEqual(trayColors, order);
     }
     if (rainbow) return order.length > 0;
     const top = trayColors[trayColors.length - 1];
-    if (mode === 'sequential') return order[0] === top;
+    if (mode === DELIVERY_MODE.SEQUENTIAL) return order[0] === top;
     return order.includes(top);
   }
 
@@ -413,13 +414,13 @@ export class Shop {
    * @param {'any'|'sequential'} [mode]
    * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('./types.js').PickupTypeName|'coin'|null) }}
    */
-  serveOne(index, topColor, rainbow = false, mode = 'any') {
+  serveOne(index, topColor, rainbow = false, mode = DELIVERY_MODE.ANY) {
     const c = this.customers[index];
     if (!c || c.state !== STATE.WAITING) return { accepted: false, complete: false };
 
     let matchIdx;
     if (rainbow) matchIdx = c.order.colors.length > 0 ? 0 : -1;
-    else if (mode === 'sequential') matchIdx = c.order.colors[0] === topColor ? 0 : -1;
+    else if (mode === DELIVERY_MODE.SEQUENTIAL) matchIdx = c.order.colors[0] === topColor ? 0 : -1;
     else matchIdx = c.order.colors.indexOf(topColor);
     if (matchIdx < 0) return { accepted: false, complete: false };
 

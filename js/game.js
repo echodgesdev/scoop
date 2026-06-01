@@ -3,8 +3,6 @@ import {
   MAX_HEALTH,
   DAMAGE_PER_EXPIRE,
   HEAL_PER_SERVE,
-  MAX_STACK,
-  MAX_LIVE_SCOOPS,
   PERFECT_CATCH_BAND,
   PERFECT_CATCH_BONUS,
   HEART_HEAL_AMOUNT,
@@ -25,7 +23,14 @@ import {
   WAVE0_DEMAND_BIAS,
   coneYFor,
   setFloorRatio,
-  getFloorRatio
+  getFloorRatio,
+  modeConfig,
+  GAME_MODE,
+  POWERUP_MODE,
+  POWERUP_SOURCE,
+  TOP_GESTURE,
+  DELIVERY_MODE,
+  TOUCH_SCHEME
 } from './config.js';
 import { Player } from './player.js';
 import { ScoopField, isCaught } from './scoops.js';
@@ -69,10 +74,6 @@ const NIGHT_CYCLE_S = 2.0;
 // points a coin tip awards.
 const TIP_COIN_WEIGHT = 0.4;
 const TIP_COIN_POINTS = 50;
-// Tipping plays with a shorter cone (4) but a fuller sky (7 falling scoops) so
-// there's enough to react to while the stack stays simple. (Debug-tunable.)
-const TIPPING_MAX_STACK = 4;
-const TIPPING_MAX_LIVE = 7;
 
 // Power-up indicator animation timings. Catching a timed bubble floats it UP
 // into the "active" slot at the bottom (where its countdown lives); when it
@@ -156,21 +157,27 @@ export class Game {
     // Power-up handling mode (debug-switchable). 'auto' = fire on catch
     // (replace-on-catch); 'banked' = a FIFO queue spent with Shift; 'tipping' =
     // no bubbles, power-ups come from customer tips (the current default).
-    // Selected here so the tutorial + powerup strategies below can branch on it.
-    this.gameMode = 'tipping';
+    // gameMode is the source-of-truth id; modeConfig is its resolved settings
+    // object (board size, power-up source, verbs, …) — see config.GAME_MODES.
+    // Everything mode-varying reads modeConfig, applied via _applyModeConfig.
+    this.gameMode = GAME_MODE.TIPPING;
+    this.modeConfig = modeConfig(this.gameMode);
     // Delivery method (debug-switchable, all modes): how a tray serves an order.
     // 'any' = top scoop fills any remaining color (default); 'sequential' = top
     // must be the next color in order; 'whole' = the whole tray must equal the
     // order, delivered in one action.
-    this.deliveryMode = 'any';
-    // Debug runtime overrides (null/​default = use the constant / wave ramp).
-    this.maxStack = MAX_STACK;
+    this.deliveryMode = DELIVERY_MODE.ANY;
+    // Debug runtime overrides (null/​default = use the mode config / wave ramp).
+    // maxStack seeds from the mode config; _applyModeConfig re-applies it (and
+    // the falling-scoop cap + combo breaker) on load and on every mode switch.
+    this.maxStack = this.modeConfig.maxStack;
     /** @type {number | null} */
     this.spawnIntervalOverride = null;
     // Combo breaker: the score combo doubles as a charge meter — at this many
     // chained serves it "breaks" into a supercharged power-up. A per-mode
-    // capability (comboBreakerEnabled, set by _applyModeDefaults) defaulted on
-    // for Tipping only; both the toggle and the threshold are debug-tunable.
+    // capability (comboBreakerEnabled, set by _applyModeConfig from the mode
+    // config) defaulted on for Tipping; both the toggle and the threshold are
+    // debug-tunable.
     this.comboBreakerThreshold = COMBO_BREAKER_THRESHOLD;
     this.comboBreakerEnabled = false;
 
@@ -190,7 +197,7 @@ export class Game {
     // Tipping mode: some customers arrive with a tip (power-up or coin); the
     // roller decides per spawn. No-op in other modes.
     this.shop.setTipRoller(() => this._rollTip());
-    this._applyModeDefaults();  // per-mode board size (default tipping = 4/4)
+    this._applyModeConfig();  // apply the active mode's board size + capabilities
 
     /** @type {{ text: string, t: number } | null} */
     this.banner = null;
@@ -208,7 +215,7 @@ export class Game {
     // fatiguing. 'absolute' = cone tracks the finger; 'holdzones' = press the
     // left/right edge thirds to drive. Discrete verbs (tap/swipe) are identical
     // across all three; only steering differs.
-    this.touchScheme = 'relative';
+    this.touchScheme = TOUCH_SCHEME.RELATIVE;
     this.touchGain = 2.0;
 
     // Native touch layer (also handles mouse/pen). Reports raw gestures; the
@@ -217,24 +224,24 @@ export class Game {
       toVirtual: (cx, cy) => this._toVirtual(cx, cy),
       onHold: vx => {
         this.input.lastWasTouch = true;
-        if (this.touchScheme === 'holdzones') {
+        if (this.touchScheme === TOUCH_SCHEME.HOLDZONES) {
           const third = this.bounds.width / 3;
           this.input.left = vx < third;
           this.input.right = vx > this.bounds.width - third;
         }
       },
       onHoldEnd: () => {
-        if (this.touchScheme === 'holdzones') { this.input.left = false; this.input.right = false; }
+        if (this.touchScheme === TOUCH_SCHEME.HOLDZONES) { this.input.left = false; this.input.right = false; }
       },
       onMove: (vx, dvx) => {
-        if (this.touchScheme === 'relative') this.input.moveDelta += dvx * this.touchGain;
-        else if (this.touchScheme === 'absolute') this.input.moveTargetX = vx;
+        if (this.touchScheme === TOUCH_SCHEME.RELATIVE) this.input.moveDelta += dvx * this.touchGain;
+        else if (this.touchScheme === TOUCH_SCHEME.ABSOLUTE) this.input.moveTargetX = vx;
         // holdzones: dragging doesn't steer (the edge-hold does)
       },
       onMoveEnd: () => { this.input.moveTargetX = null; },
       onTap: (vx, vy) => {
         // In hold-zones the edge thirds are move pads, so only middle taps serve.
-        if (this.touchScheme === 'holdzones') {
+        if (this.touchScheme === TOUCH_SCHEME.HOLDZONES) {
           const third = this.bounds.width / 3;
           if (vx < third || vx > this.bounds.width - third) return;
         }
@@ -302,11 +309,12 @@ export class Game {
       getTutorialFlag: () => this.showTutorial,
       onGameMode: name => {
         this.gameMode = name;
+        this.modeConfig = modeConfig(name);
         // Swap the strategy live so testers can flip modes mid-run. The shared
         // active bubble persists (it's Game-owned); only the queue resets.
         this.powerupMode = this._makePowerupMode();
         this.powerupMode.reset();
-        this._applyModeDefaults();  // re-apply per-mode board size
+        this._applyModeConfig();  // re-apply the new mode's settings
       },
       getGameMode: () => this.gameMode,
       onStoreToggle: on => { this.storeEnabled = on; },
@@ -424,7 +432,7 @@ export class Game {
    * @param {number} vx @param {number} vy
    */
   _onTouchTap(vx, vy) {
-    if (this.gameMode === 'banked' && !this.powerupMode.queueEmpty() && vy > this.bounds.height - 90) {
+    if (this.modeConfig.powerupMode === POWERUP_MODE.BANKED && !this.powerupMode.queueEmpty() && vy > this.bounds.height - 90) {
       this._useShift();
       return;
     }
@@ -636,7 +644,7 @@ export class Game {
     this.powerupMode = this._makePowerupMode();
     this.powerupMode.reset();
     this.tutorial = createTutorial(this.gameMode);
-    this._applyModeDefaults();  // per-mode board size (tipping = 4/4)
+    this._applyModeConfig();  // apply the active mode's board size + capabilities
     // Wave 0 (the opening tutorial wave) leans harder toward demanded colors.
     this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
     this.lastTime = 0;
@@ -798,42 +806,35 @@ export class Game {
     this.powerupMode.onCatch(pickup.type, this.player.x, this.player.stackTopY());
   }
 
-  /** Build the PowerupMode strategy for the current this.gameMode. */
+  /** Build the PowerupMode strategy named by the active mode config. */
   _makePowerupMode() {
-    return this.gameMode === 'banked'
+    return this.modeConfig.powerupMode === POWERUP_MODE.BANKED
       ? new BankedPowerupMode(this)
       : new AutoPowerupMode(this);
   }
 
   /**
-   * Per-mode default tuning (debug sliders can still override afterward).
-   * Tipping plays with a smaller board (4 falling / 4 on the cone); the bubble
-   * modes use the standard caps.
+   * Apply the active mode config's settings (board size + combo-breaker
+   * capability). The single place mode load-time defaults land; debug sliders
+   * can still override afterward. Called on construction, on each game start,
+   * and on a live mode switch.
    */
-  _applyModeDefaults() {
-    // Combo breaker is a capability defaulted per mode — on only for Tipping
-    // (no bubble lane → room for it; redundant in Auto/Banked, which already
-    // have a power-up source). Debug can flip it for any mode afterward.
-    this.comboBreakerEnabled = this.gameMode === 'tipping';
-    if (this.gameMode === 'tipping') {
-      this.maxStack = TIPPING_MAX_STACK;
-      this.field.setMaxLive(TIPPING_MAX_LIVE);
-    } else {
-      this.maxStack = MAX_STACK;
-      this.field.setMaxLive(MAX_LIVE_SCOOPS);
-    }
+  _applyModeConfig() {
+    this.maxStack = this.modeConfig.maxStack;
+    this.field.setMaxLive(this.modeConfig.maxLive);
+    this.comboBreakerEnabled = this.modeConfig.comboBreaker;
   }
 
   /**
-   * Which bubble types the pickup field may spawn. Tipping mode has no bubbles
-   * at all (power-ups come from customer tips). During the tutorial we force a
-   * single demo type (feather / ⚡) so the power-up lesson always has something
-   * to catch — but only AFTER the first order is served. Otherwise it's the
-   * player's unlocked set.
+   * Which bubble types the pickup field may spawn. Tip-sourced modes have no
+   * bubble lane (power-ups come from customer tips). During the tutorial we
+   * force a single demo type (feather / ⚡) so the power-up lesson always has
+   * something to catch — but only AFTER the first order is served. Otherwise
+   * it's the player's unlocked set.
    * @returns {import('./types.js').PickupTypeName[]}
    */
   _bubbleTypes() {
-    if (this.gameMode === 'tipping') return [];
+    if (this.modeConfig.powerupSource !== POWERUP_SOURCE.BUBBLES) return [];
     if (this.tutorial.active) {
       return this.waves.servedColors.size >= 1 ? [PICKUP_TYPE.FEATHER] : [];
     }
@@ -841,14 +842,14 @@ export class Game {
   }
 
   /**
-   * Tipping mode: roll a tip for a freshly-spawned customer. Frequency comes
-   * from the bubble spawn-gap debug control (shorter gap → more tips) and the
-   * mix from the bubble weights (+ a fixed coin share). Returns the tip type,
-   * 'coin', or null. No-op outside tipping mode.
+   * Tip-sourced modes: roll a tip for a freshly-spawned customer. Frequency
+   * comes from the bubble spawn-gap debug control (shorter gap → more tips) and
+   * the mix from the bubble weights (+ a fixed coin share). Returns the tip
+   * type, 'coin', or null. No-op when the mode's power-up source isn't tips.
    * @returns {import('./types.js').PickupTypeName | 'coin' | null}
    */
   _rollTip() {
-    if (this.gameMode !== 'tipping') return null;
+    if (this.modeConfig.powerupSource !== POWERUP_SOURCE.TIPS) return null;
     const avgGap = (this.pickups.spawnMin + this.pickups.spawnMax) / 2;
     const chance = Math.max(0.1, Math.min(0.9, 4 / Math.max(0.5, avgGap)));
     if (Math.random() > chance) return null;
@@ -972,9 +973,9 @@ export class Game {
   _rotate() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
     if (this.player.locked) return;
-    // Tipping mode has no rotate/Swap verb; the "down" gesture does nothing
-    // (discard is the upward gesture — see _pop).
-    if (this.gameMode === 'tipping') return;
+    // Modes without a rotate verb ignore the "down" gesture (Tipping discards
+    // via the upward gesture instead — see _pop).
+    if (!this.modeConfig.canRotate) return;
     if (this.player.rotateDown()) {
       // Light "whoosh" — reuse the catch chime so it sits in the same audio
       // family as the other tray-manipulation verbs.
@@ -1006,9 +1007,9 @@ export class Game {
   _pop() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
     if (this.player.locked) return;
-    // Tipping mode: the upward gesture (swipe up / Space) discards the top
-    // scoop — flicking it off the cone — instead of firing the slingshot.
-    if (this.gameMode === 'tipping') { this._discardTop(); return; }
+    // 'discard' modes: the upward gesture (swipe up / Space) flicks the top
+    // scoop off the cone instead of firing the slingshot.
+    if (this.modeConfig.topGesture === TOP_GESTURE.DISCARD) { this._discardTop(); return; }
     if (this.player.stack.length === 0) {
       this.sound.bad();
       return;
@@ -1051,7 +1052,7 @@ export class Game {
 
     // 'whole' delivery: the entire tray must equal the order; serve it in one
     // action (every scoop flies over, the tray clears).
-    if (this.deliveryMode === 'whole') {
+    if (this.deliveryMode === DELIVERY_MODE.WHOLE) {
       const result = this.shop.serveWhole(index, this.player.colors(), rainbow);
       if (!result.accepted) { this.bus.emit('serveFail', /** @type {any} */ ({})); return; }
       for (let i = 0; i < stack.length; i++) {
@@ -1150,7 +1151,7 @@ export class Game {
     // Combo breaker: the serve event above already showed the combo at its
     // peak; if that pushed the chain to the threshold, break it now into a
     // supercharged power-up (resets the meter + re-syncs the readout). Enabled
-    // per mode (default Tipping-only) — see _applyModeDefaults.
+    // per mode (default Tipping-only) — see _applyModeConfig / GAME_MODES.
     if (this.comboBreakerEnabled && this.shop.combo >= this.comboBreakerThreshold) {
       this._fireComboBreaker(cx, cy);
     }
@@ -1614,7 +1615,7 @@ export class Game {
    * @returns {{ x: number, y: number, r: number }}
    */
   _activeSlotPos() {
-    const y = this.gameMode === 'banked' ? this.bounds.height - 118 : this.bounds.height - 80;
+    const y = this.modeConfig.powerupMode === POWERUP_MODE.BANKED ? this.bounds.height - 118 : this.bounds.height - 80;
     return { x: this.bounds.width / 2, y, r: 40 };
   }
 
