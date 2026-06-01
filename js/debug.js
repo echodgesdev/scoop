@@ -44,10 +44,12 @@ export class DebugPanel {
    *   onComboBreaker?: (n: number) => void,
    *   getComboBreaker?: () => number,
    *   onComboBreakerToggle?: (on: boolean) => void,
-   *   getComboBreakerEnabled?: () => boolean
+   *   getComboBreakerEnabled?: () => boolean,
+   *   onFallSpeed?: (m: number) => void,
+   *   getFallSpeed?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -85,6 +87,8 @@ export class DebugPanel {
     this.getComboBreaker = getComboBreaker || (() => 8);
     this.onComboBreakerToggle = onComboBreakerToggle || (() => {});
     this.getComboBreakerEnabled = getComboBreakerEnabled || (() => false);
+    this.onFallSpeed = onFallSpeed || (() => {});
+    this.getFallSpeed = getFallSpeed || (() => 1);
     /** @type {{ id: string, label: string, get: () => number, fmt: (n: number) => string }[]} */
     this._sliders = [];
     this.open = false;
@@ -165,6 +169,7 @@ export class DebugPanel {
     this._wireSlider('debugMaxStack', 'debugMaxStackLabel', this.onMaxStack, this.getMaxStack, int);
     this._wireSlider('debugMaxLive', 'debugMaxLiveLabel', this.onMaxLive, this.getMaxLive, int);
     this._wireSlider('debugSpawnInterval', 'debugSpawnIntervalLabel', this.onSpawnInterval, this.getSpawnInterval, twoDp);
+    this._wireSlider('debugFallSpeed', 'debugFallSpeedLabel', this.onFallSpeed, this.getFallSpeed, oneDp);
     this._wireSlider('debugDragGain', 'debugDragGainLabel', this.onDragGain, this.getDragGain, oneDp);
     this._wireSlider('debugComboBreaker', 'debugComboBreakerLabel', this.onComboBreaker, this.getComboBreaker, int);
 

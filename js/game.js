@@ -328,6 +328,8 @@ export class Game {
       getSpawnInterval: () => this.spawnIntervalOverride != null
         ? this.spawnIntervalOverride
         : this.waves.tuning().spawnInterval,
+      onFallSpeed: m => this.field.setFallScale(m),
+      getFallSpeed: () => this.field.fallScale,
       onDragGain: g => { this.touchGain = g; },
       getDragGain: () => this.touchGain,
       onComboBreaker: n => { this.comboBreakerThreshold = Math.max(2, Math.round(n)); },

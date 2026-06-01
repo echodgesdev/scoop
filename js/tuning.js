@@ -55,8 +55,13 @@ export const WAVE_RAMP = 6;
 export const SPAWN_INTERVAL_START = 0.85;
 export const SPAWN_INTERVAL_END = 0.42;
 export const FALL_SPEED_MULT_END = 2.2;
-export const SCOOP_FALL_MIN = 130;
-export const SCOOP_FALL_RANGE = 140;
+// Time-to-cone, not just speed: scoops fall ~0.65·H (≈990px on a phone) to reach
+// the cone, so at the old 130–270 px/s a wave-1 scoop took 4–8s to arrive — dead
+// air you feel acutely holding a phone. Raised so a wave-1 scoop lands in ~2–4s
+// while still leaving a readable window. Fine-tune live via the debug fall-speed
+// multiplier (ScoopField.fallScale).
+export const SCOOP_FALL_MIN = 240;
+export const SCOOP_FALL_RANGE = 200;
 // Hard cap on simultaneously-falling scoops. When at the cap the spawner idles
 // (retrying each frame) until a scoop is caught or dissolves. This is the main
 // lever against the "endless stream + framerate" problem.

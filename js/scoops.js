@@ -44,6 +44,10 @@ export class ScoopField {
     // Hard cap on simultaneously-falling scoops; live-overridable via the debug
     // panel. Persists across reset().
     this.maxLive = MAX_LIVE_SCOOPS;
+    // Fall-speed multiplier on top of the wave ramp — the live "how fast do
+    // scoops arrive" knob (debug slider). 1 = the tuned base. Persists across
+    // reset().
+    this.fallScale = 1;
     this._refill();
   }
 
@@ -55,6 +59,11 @@ export class ScoopField {
   /** @param {number} n debug override for the max simultaneous falling scoops */
   setMaxLive(n) {
     this.maxLive = Math.max(1, Math.round(n));
+  }
+
+  /** @param {number} m debug fall-speed multiplier (× the wave ramp) */
+  setFallScale(m) {
+    this.fallScale = Math.max(0.1, m);
   }
 
   /** @param {number} v probability 0..1 */
@@ -174,7 +183,7 @@ export class ScoopField {
     this.scoops.push({
       x: Math.random() * (bounds.width - 80) + 40,
       y: -SCOOP_RADIUS,
-      vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * fallMult,
+      vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * fallMult * this.fallScale,
       color
     });
   }
