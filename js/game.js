@@ -42,7 +42,7 @@ import { Input } from './input.js';
 import { Sound } from './audio.js';
 import { Effects } from './effects.js';
 import { DebugPanel } from './debug.js';
-import { drawSkyAndSun, drawNightSky, drawSand } from './scene.js';
+import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
 import { dayCycleState, nightCycleState } from './dayCycle.js';
 import { PowerUps } from './powerups.js';
 import { AutoPowerupMode } from './auto-powerup-mode.js';
@@ -1465,10 +1465,12 @@ export class Game {
       const nightState = nightCycleState(this.nightT, this.bounds);
       drawNightSky(ctx, this.bounds, nightState);
       drawSand(ctx, this.bounds, nightState);
+      drawOcean(ctx, this.bounds, nightState, this.clock);
     } else {
       const dayState = dayCycleState(this.waves.waveFraction, this.bounds);
       drawSkyAndSun(ctx, this.bounds, dayState);
       drawSand(ctx, this.bounds, dayState);
+      drawOcean(ctx, this.bounds, dayState, this.clock);
     }
 
     this.field.draw(ctx, rainbow);
