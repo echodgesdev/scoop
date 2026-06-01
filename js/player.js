@@ -359,7 +359,34 @@ export class Player {
       drawX += laggedLean * arc;
 
       drawScoop(ctx, drawX, drawY, rainbow ? 'rainbow' : s.color, drawScale);
+
+      // Highlight the top scoop — the one a tap hands to the customer — with the
+      // same amber outline + glow as the "selected" customer speech bubble. The
+      // matching outline pairs "this scoop ↔ that customer" so the player can see
+      // exactly what they're about to deliver.
+      if (i === this.stack.length - 1) {
+        this._drawTopRing(ctx, drawX, drawY, SCOOP_RADIUS * drawScale);
+      }
     }
+    ctx.restore();
+  }
+
+  /**
+   * Amber selection ring around the top (next-to-be-delivered) scoop. Mirrors
+   * the active customer bubble's outline in stations.js (#ffb703 stroke +
+   * #ffd166 glow) so the "I'm giving you this" read is unmistakable.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} x @param {number} y @param {number} r drawn scoop radius
+   */
+  _drawTopRing(ctx, x, y, r) {
+    ctx.save();
+    ctx.shadowColor = '#ffd166';
+    ctx.shadowBlur = 16;
+    ctx.strokeStyle = '#ffb703';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(x, y, r + 2.5, 0, Math.PI * 2);
+    ctx.stroke();
     ctx.restore();
   }
 

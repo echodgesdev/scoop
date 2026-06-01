@@ -474,14 +474,15 @@ export class Game {
       if (c) this.effects.burst(c.x, c.y, ['#ffd166', '#fff'], 14);
     });
 
-    this.bus.on('waveUp', ({ wave }) => {
+    this.bus.on('waveUp', () => {
+      // The "WAVE N!" banner moved to the next-wave START (see the night-cycle
+      // completion in _loop) so it lands after the recap modal, not before it.
       this.hud.setGauge(this.waves.wave, 1);
       this.hud.flashWaveUp();
       this.sound.levelUp();
       this.effects.addShake(14);
       const c = this.hud.gaugeCenter();
       if (c) this.effects.burst(c.x, c.y, ['#ffec5c', '#ffd166', '#ff6fa3', '#7fe3c4'], 60);
-      this.banner = { text: `WAVE ${wave}!`, t: 1.6 };
     });
   }
 
@@ -624,6 +625,9 @@ export class Game {
       if (this.nightT >= 1) {
         this.nightT = 1;
         this.inNightCycle = false;
+        // The recap modal + night sweep are done — announce the wave we're now
+        // entering. (The banner used to fire on completion, ahead of the modal.)
+        this.banner = { text: `WAVE ${this.waves.wave}!`, t: 1.6 };
       }
     }
     // Visual-only systems run variable-step — including during the cashout /
