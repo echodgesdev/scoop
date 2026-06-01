@@ -239,7 +239,7 @@ export class Stations {
     ctx.font = 'bold 18px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${c.order.value} pts`, cx, top + 62);
+    ctx.fillText(`${c.order.value}`, cx, top + 62);
 
     // Patience bar
     const barX = left + 14;
