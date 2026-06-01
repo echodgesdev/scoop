@@ -43,4 +43,5 @@ export class Haptics {
   expire()  { this._buzz(45); }                 // customer left / took damage
   phaseUp() { this._buzz(12); }                 // phase cleared
   wave()    { this._buzz([20, 50, 20, 50, 80]); } // wave cleared — celebratory roll
+  gameOver(){ this._buzz(30); }                 // round over — medium pulse
 }

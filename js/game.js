@@ -1263,6 +1263,7 @@ export class Game {
     this.inCashout = false;
     this.inNightCycle = false;
     this.sound.gameOver();
+    this.haptics.gameOver();
     this.bus.emit('gameOver', /** @type {any} */ ({}));
     // Commit any earned-but-uncommitted challenges so the game-over screen
     // shows the player's final state. Cross-off animation on the game-over
