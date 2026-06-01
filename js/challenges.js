@@ -49,7 +49,8 @@ export const SETS = [
       { id: 's1-wave',      type: 'wave_reach',       target: 1, title: 'Reach Wave 1' }
     ],
     rewards: [
-      { type: 'unlock_powerup', value: 'heart' }
+      { type: 'unlock_powerup', value: 'heart' },
+      { type: 'unlock_section', value: 'DAILY_DOUBLE' }
     ]
   },
   // Set 2 — introduces the "use a power-up" verb (works in every mode: a
@@ -64,7 +65,7 @@ export const SETS = [
     ],
     rewards: [
       { type: 'unlock_powerup', value: 'feather' },
-      { type: 'unlock_section', value: 'DAILY_DOUBLE' }
+      { type: 'unlock_section', value: 'YIN_YANG' }
     ]
   },
   // Set 3 — speed unlocked.
@@ -77,7 +78,7 @@ export const SETS = [
     ],
     rewards: [
       { type: 'unlock_powerup', value: 'pause' },
-      { type: 'unlock_section', value: 'YIN_YANG' }
+      { type: 'unlock_section', value: 'ODD_COUPLE' }
     ]
   },
   // Set 4 — star struck unlocked.
@@ -114,7 +115,7 @@ export const SETS = [
       { id: 's6-combo',     type: 'combo_reach',      target: 15, title: 'Reach a 15× combo' }
     ],
     rewards: [
-      { type: 'unlock_section', value: 'HOLY_TRINITY' }
+      { type: 'unlock_section', value: 'DOUBLE_DATE' }
     ]
   },
   // Set 7 — late game.
@@ -126,7 +127,7 @@ export const SETS = [
       { id: 's7-wave',      type: 'wave_reach',       target: 6,  title: 'Reach wave 6' }
     ],
     rewards: [
-      { type: 'unlock_section', value: 'FAB_FOUR' }
+      { type: 'unlock_section', value: 'PAIR_UP' }
     ]
   },
   // Set 8 — toward mastery.
@@ -138,22 +139,22 @@ export const SETS = [
       { id: 's8-master',    type: 'master_recipes',   target: 5,  title: 'Master 5 recipes total' }
     ],
     rewards: [
-      { type: 'unlock_section', value: 'ROYAL_FLUSH' }
+      { type: 'unlock_section', value: 'ODD_TRIO' }
     ]
   },
   // Set 9 — deep game.
   {
     name: 'Sugar Overload',
     challenges: [
-      { id: 's9-discover',  type: 'discover_recipes', target: 40, title: 'Discover 40 recipes total' },
+      { id: 's9-discover',  type: 'discover_recipes', target: 35, title: 'Discover 35 recipes total' },
       { id: 's9-wave',      type: 'wave_reach',       target: 8,  title: 'Reach wave 8' },
       { id: 's9-master',    type: 'master_recipes',   target: 10, title: 'Master 10 recipes total' }
     ],
     rewards: [
-      { type: 'unlock_section', value: 'TWO_PAIR' }
+      { type: 'unlock_section', value: 'HOLY_TRINITY' }
     ]
   },
-  // Set 10 — the last 4-scoop pattern.
+  // Set 10 — the last recipe section (the second 3-different group).
   {
     name: 'Apex',
     challenges: [

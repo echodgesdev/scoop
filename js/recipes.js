@@ -1,45 +1,119 @@
 // @ts-check
-import { COLOR_KEYS } from './config.js';
-
 /** @typedef {import('./types.js').ScoopColor} ScoopColor */
 
 const STORAGE_KEY = 'scoop.recipes';
 export const RECIPE_TARGET = 10; // serves to "master" a recipe
 
-/** @type {Record<ScoopColor, string>} */
-const FLAVOR_NAMES = {
-  pink:      'Strawberry',
-  mint:      'Mint',
-  choco:     'Chocolate',
-  vanilla:   'Vanilla',
-  blueberry: 'Blueberry'
-};
+// The five flavor-key constants — the ScoopColor ids used everywhere (recipe
+// matching, demand bias, rendering). Referenced by the GROUPS catalog below
+// instead of raw strings, so the flavor set lives in one place and a typo is a
+// reference error. Display NAMES are baked into each recipe at seed time
+// (seed/gen-recipes.mjs builds them); there's no runtime name builder here.
+const PINK = 'pink', MINT = 'mint', CHOCO = 'choco', VANILLA = 'vanilla', BLUEBERRY = 'blueberry';
 
 /**
- * Recipe groups. Order here drives the display order in the book and the
- * unlock order across waves. Each group sets the points awarded and the
- * combo-weight bump for its recipes — values increase down the list so
- * harder recipes pay more.
+ * Recipe catalog — defined EXPLICITLY here, no combinatorial generation: each
+ * group lists its recipes as color arrays. Sizes cap at 3 scoops (no 4-scoop,
+ * hence no four-of-a-kind). Every group holds exactly 5 recipes of one uniform
+ * size; together the 11 groups cover the entire 1/2/3-scoop multiset space
+ * (5 + 15 + 35 = 55). Order drives the recipe-book display + the wave/challenge
+ * unlock order; value rises down the list so harder recipes pay more, and
+ * `weight` is the combo bump. Each recipe is { name, colors } with the display
+ * name BAKED at seed time. Regenerate the whole block with seed/gen-recipes.mjs.
+ * @typedef {{ name: string, colors: ScoopColor[] }} Recipe
+ * @typedef {{ id: string, name: string, size: number, value: number, weight: number, recipes: Recipe[] }} RecipeGroup
  */
-// Cone size caps at 4 scoops. The catalog is dense at the 3-scoop core (the
-// designed "most of the late game" tier — fully saturated to all 35 combos),
-// with 4-scoop kept to a small, rare set of distinct patterns. (There is no
-// 5-scoop content; the two former 5-scoop groups were repurposed into the
-// mixed-count 4-scoop patterns Two Pair / Triple Threat.)
+/** @type {RecipeGroup[]} */
 export const GROUPS = [
-  { id: 'JUNIOR_SCOOP',         name: 'Junior Scoop',          size: 1, value: 60,  weight: 1 },
-  { id: 'DAILY_DOUBLE',         name: 'Daily Double',          size: 2, value: 140, weight: 1 },
-  { id: 'YIN_YANG',             name: 'Yin & Yang',            size: 2, value: 180, weight: 1 },
-  { id: 'THREES_COMPANY',       name: "Three's Company",       size: 3, value: 280, weight: 2 },
-  { id: 'BEST_TWO_OF_THREE',    name: 'Best Two Out Of Three', size: 3, value: 320, weight: 2 },
-  { id: 'HOLY_TRINITY',         name: 'Holy Trinity',          size: 3, value: 400, weight: 2 },
-  { id: 'FAB_FOUR',             name: 'Fab Four',              size: 4, value: 600, weight: 3 },
-  { id: 'ROYAL_FLUSH',          name: 'Royal Flush',           size: 4, value: 700, weight: 3 },
-  { id: 'TWO_PAIR',             name: 'Two Pair',              size: 4, value: 640, weight: 3 },
-  { id: 'TRIPLE_THREAT',        name: 'Triple Threat',         size: 4, value: 560, weight: 3 }
+  { id: 'JUNIOR_SCOOP', name: "Junior Scoop", size: 1, value: 60, weight: 1,
+    recipes: [
+      { name: "Strawberry", colors: [PINK] },
+      { name: "Mint", colors: [MINT] },
+      { name: "Chocolate", colors: [CHOCO] },
+      { name: "Vanilla", colors: [VANILLA] },
+      { name: "Blueberry", colors: [BLUEBERRY] },
+    ] },
+  { id: 'DAILY_DOUBLE', name: "Daily Double", size: 2, value: 140, weight: 1,
+    recipes: [
+      { name: "Double Strawberry", colors: [PINK, PINK] },
+      { name: "Double Mint", colors: [MINT, MINT] },
+      { name: "Double Chocolate", colors: [CHOCO, CHOCO] },
+      { name: "Double Vanilla", colors: [VANILLA, VANILLA] },
+      { name: "Double Blueberry", colors: [BLUEBERRY, BLUEBERRY] },
+    ] },
+  { id: 'YIN_YANG', name: "Yin & Yang", size: 2, value: 170, weight: 1,
+    recipes: [
+      { name: "Blueberry + Chocolate", colors: [CHOCO, BLUEBERRY] },
+      { name: "Blueberry + Mint", colors: [MINT, BLUEBERRY] },
+      { name: "Blueberry + Strawberry", colors: [PINK, BLUEBERRY] },
+      { name: "Blueberry + Vanilla", colors: [VANILLA, BLUEBERRY] },
+      { name: "Chocolate + Mint", colors: [MINT, CHOCO] },
+    ] },
+  { id: 'ODD_COUPLE', name: "Odd Couple", size: 2, value: 190, weight: 1,
+    recipes: [
+      { name: "Chocolate + Strawberry", colors: [PINK, CHOCO] },
+      { name: "Chocolate + Vanilla", colors: [CHOCO, VANILLA] },
+      { name: "Mint + Strawberry", colors: [PINK, MINT] },
+      { name: "Mint + Vanilla", colors: [MINT, VANILLA] },
+      { name: "Strawberry + Vanilla", colors: [PINK, VANILLA] },
+    ] },
+  { id: 'THREES_COMPANY', name: "Three's Company", size: 3, value: 280, weight: 2,
+    recipes: [
+      { name: "Triple Strawberry", colors: [PINK, PINK, PINK] },
+      { name: "Triple Mint", colors: [MINT, MINT, MINT] },
+      { name: "Triple Chocolate", colors: [CHOCO, CHOCO, CHOCO] },
+      { name: "Triple Vanilla", colors: [VANILLA, VANILLA, VANILLA] },
+      { name: "Triple Blueberry", colors: [BLUEBERRY, BLUEBERRY, BLUEBERRY] },
+    ] },
+  { id: 'BEST_TWO_OF_THREE', name: "Best Two of Three", size: 3, value: 300, weight: 2,
+    recipes: [
+      { name: "Double Blueberry + Chocolate", colors: [BLUEBERRY, BLUEBERRY, CHOCO] },
+      { name: "Double Blueberry + Mint", colors: [BLUEBERRY, BLUEBERRY, MINT] },
+      { name: "Double Blueberry + Strawberry", colors: [BLUEBERRY, BLUEBERRY, PINK] },
+      { name: "Double Blueberry + Vanilla", colors: [BLUEBERRY, BLUEBERRY, VANILLA] },
+      { name: "Double Chocolate + Blueberry", colors: [CHOCO, CHOCO, BLUEBERRY] },
+    ] },
+  { id: 'DOUBLE_DATE', name: "Double Date", size: 3, value: 320, weight: 2,
+    recipes: [
+      { name: "Double Mint + Blueberry", colors: [MINT, MINT, BLUEBERRY] },
+      { name: "Double Strawberry + Blueberry", colors: [PINK, PINK, BLUEBERRY] },
+      { name: "Double Vanilla + Blueberry", colors: [VANILLA, VANILLA, BLUEBERRY] },
+      { name: "Double Chocolate + Mint", colors: [CHOCO, CHOCO, MINT] },
+      { name: "Double Chocolate + Strawberry", colors: [CHOCO, CHOCO, PINK] },
+    ] },
+  { id: 'PAIR_UP', name: "Pair Up", size: 3, value: 340, weight: 2,
+    recipes: [
+      { name: "Double Chocolate + Vanilla", colors: [CHOCO, CHOCO, VANILLA] },
+      { name: "Double Mint + Chocolate", colors: [MINT, MINT, CHOCO] },
+      { name: "Double Strawberry + Chocolate", colors: [PINK, PINK, CHOCO] },
+      { name: "Double Vanilla + Chocolate", colors: [VANILLA, VANILLA, CHOCO] },
+      { name: "Double Mint + Strawberry", colors: [MINT, MINT, PINK] },
+    ] },
+  { id: 'ODD_TRIO', name: "Odd Trio", size: 3, value: 360, weight: 2,
+    recipes: [
+      { name: "Double Mint + Vanilla", colors: [MINT, MINT, VANILLA] },
+      { name: "Double Strawberry + Mint", colors: [PINK, PINK, MINT] },
+      { name: "Double Vanilla + Mint", colors: [VANILLA, VANILLA, MINT] },
+      { name: "Double Strawberry + Vanilla", colors: [PINK, PINK, VANILLA] },
+      { name: "Double Vanilla + Strawberry", colors: [VANILLA, VANILLA, PINK] },
+    ] },
+  { id: 'HOLY_TRINITY', name: "Holy Trinity", size: 3, value: 400, weight: 2,
+    recipes: [
+      { name: "Blueberry + Chocolate + Mint", colors: [MINT, CHOCO, BLUEBERRY] },
+      { name: "Blueberry + Chocolate + Strawberry", colors: [PINK, CHOCO, BLUEBERRY] },
+      { name: "Blueberry + Chocolate + Vanilla", colors: [CHOCO, VANILLA, BLUEBERRY] },
+      { name: "Blueberry + Mint + Strawberry", colors: [PINK, MINT, BLUEBERRY] },
+      { name: "Blueberry + Mint + Vanilla", colors: [MINT, VANILLA, BLUEBERRY] },
+    ] },
+  { id: 'TRIPLE_THREAT', name: "Triple Threat", size: 3, value: 440, weight: 2,
+    recipes: [
+      { name: "Blueberry + Strawberry + Vanilla", colors: [PINK, VANILLA, BLUEBERRY] },
+      { name: "Chocolate + Mint + Strawberry", colors: [PINK, MINT, CHOCO] },
+      { name: "Chocolate + Mint + Vanilla", colors: [MINT, CHOCO, VANILLA] },
+      { name: "Chocolate + Strawberry + Vanilla", colors: [PINK, CHOCO, VANILLA] },
+      { name: "Mint + Strawberry + Vanilla", colors: [PINK, MINT, VANILLA] },
+    ] }
 ];
-
-const GROUP_BY_ID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
 
 /**
  * Canonical key for a color multiset. Order-independent.
@@ -49,170 +123,36 @@ export function recipeIdFor(colors) {
   return [...colors].sort().join('+');
 }
 
-/** @param {ScoopColor[]} colors */
-function defaultRecipeName(colors) {
-  const n = colors.length;
-  /** @type {Record<string, number>} */
-  const counts = {};
-  for (const c of colors) counts[c] = (counts[c] || 0) + 1;
-  const unique = Object.keys(counts);
-
-  if (n === 1) return FLAVOR_NAMES[colors[0]];
-  if (unique.length === 1) {
-    const flavor = FLAVOR_NAMES[/** @type {ScoopColor} */ (unique[0])];
-    if (n === 2) return `Double ${flavor}`;
-    if (n === 3) return `Triple ${flavor}`;
-    if (n === 4) return `Quad ${flavor}`;
-    if (n === 5) return `Mega ${flavor}`;
-  }
-  if (n === 5 && unique.length === 5) return 'Rainbow';
-
-  // "Strawberry + Mint + Chocolate" — unique colors only, alphabetised.
-  return unique.sort().map(c => FLAVOR_NAMES[/** @type {ScoopColor} */ (c)]).join(' + ');
-}
-
 /**
- * Build the master list of *active* recipes. Each recipe belongs to exactly
- * one group and inherits that group's point value + combo weight. Groups
- * with more theoretical combos than the design wants are trimmed to a
- * deterministic subset (sorted by canonical id) so the picks are stable
- * across sessions.
- *
+ * Flatten GROUPS into the master recipe list. Each recipe carries its baked
+ * display name and inherits its group's size / value / weight, plus a canonical
+ * multiset id. The catalog is the explicit GROUPS data above — no generation,
+ * no runtime name building.
  * @returns {Array<{ id: string, colors: ScoopColor[], name: string, group: string, size: number, value: number, weight: number }>}
  */
 function generateActiveRecipes() {
-  const recipes = [];
-  const seen = new Set();
-
-  /**
-   * @param {(typeof GROUPS)[number]} group
-   * @param {ScoopColor[]} colors
-   */
-  function add(group, colors) {
-    const id = recipeIdFor(colors);
-    if (seen.has(id)) return;
-    seen.add(id);
-    recipes.push({
-      id,
-      colors: colors.slice(),
-      name: defaultRecipeName(colors),
-      group: group.id,
-      size: group.size,
-      value: group.value,
-      weight: group.weight
-    });
-  }
-
-  /**
-   * Sort and trim a candidate list down to `limit` items by canonical id —
-   * deterministic so the same combos are picked every session.
-   * @template T
-   * @param {ScoopColor[][]} candidates
-   * @param {number} limit
-   * @returns {ScoopColor[][]}
-   */
-  function trim(candidates, limit) {
-    candidates.sort((a, b) => recipeIdFor(a).localeCompare(recipeIdFor(b)));
-    return candidates.slice(0, limit);
-  }
-
-  // 1. Junior Scoop — every single color (5)
-  for (const c of COLOR_KEYS) add(GROUP_BY_ID.JUNIOR_SCOOP, [c]);
-
-  // 2. Daily Double — every 2-same (5)
-  for (const c of COLOR_KEYS) add(GROUP_BY_ID.DAILY_DOUBLE, [c, c]);
-
-  // 3. Yin & Yang — all 10 of the 2-diff pairs (the 2-scoop tier is saturated)
-  /** @type {ScoopColor[][]} */
-  const yyAll = [];
-  for (let i = 0; i < COLOR_KEYS.length; i++) {
-    for (let j = i + 1; j < COLOR_KEYS.length; j++) {
-      yyAll.push([COLOR_KEYS[i], COLOR_KEYS[j]]);
-    }
-  }
-  for (const c of yyAll) add(GROUP_BY_ID.YIN_YANG, c);
-
-  // 4. Three's Company — every 3-same (5)
-  for (const c of COLOR_KEYS) add(GROUP_BY_ID.THREES_COMPANY, [c, c, c]);
-
-  // 5. Best Two Out Of Three — ALL 20 AAB combos (3-scoop tier saturated)
-  /** @type {ScoopColor[][]} */
-  const b2o3All = [];
-  for (const a of COLOR_KEYS) {
-    for (const b of COLOR_KEYS) {
-      if (a !== b) b2o3All.push([a, a, b]);
-    }
-  }
-  for (const c of b2o3All) add(GROUP_BY_ID.BEST_TWO_OF_THREE, c);
-
-  // 6. Holy Trinity — ALL 10 of the 3-all-diff combos (3-scoop tier saturated)
-  /** @type {ScoopColor[][]} */
-  const htAll = [];
-  for (let i = 0; i < COLOR_KEYS.length; i++) {
-    for (let j = i + 1; j < COLOR_KEYS.length; j++) {
-      for (let k = j + 1; k < COLOR_KEYS.length; k++) {
-        htAll.push([COLOR_KEYS[i], COLOR_KEYS[j], COLOR_KEYS[k]]);
-      }
-    }
-  }
-  for (const c of htAll) add(GROUP_BY_ID.HOLY_TRINITY, c);
-  // 3-scoop is now fully saturated: 5 (Three's Company) + 20 (Best Two Of
-  // Three) + 10 (Holy Trinity) = all 35 distinct 3-scoop multisets.
-
-  // 7. Fab Four — every 4-all-diff (5; this is C(5,4) which is the natural max)
-  for (let leaveOut = 0; leaveOut < COLOR_KEYS.length; leaveOut++) {
-    const four = COLOR_KEYS.filter((_, i) => i !== leaveOut);
-    add(GROUP_BY_ID.FAB_FOUR, /** @type {ScoopColor[]} */ (four));
-  }
-
-  // 8. Royal Flush — every 4-same (5)
-  for (const c of COLOR_KEYS) add(GROUP_BY_ID.ROYAL_FLUSH, [c, c, c, c]);
-
-  // 9. Two Pair — 4-scoop AABB (two colors, two scoops each). 10 possible;
-  //    trimmed to a small, rare set (4-scoop is meant to be an occasional treat).
-  /** @type {ScoopColor[][]} */
-  const twoPairAll = [];
-  for (let i = 0; i < COLOR_KEYS.length; i++) {
-    for (let j = i + 1; j < COLOR_KEYS.length; j++) {
-      twoPairAll.push([COLOR_KEYS[i], COLOR_KEYS[i], COLOR_KEYS[j], COLOR_KEYS[j]]);
-    }
-  }
-  for (const c of trim(twoPairAll, 6)) add(GROUP_BY_ID.TWO_PAIR, c);
-
-  // 10. Triple Threat — 4-scoop AAAB (three of one + one other). 20 possible;
-  //     trimmed to a small, rare set.
-  /** @type {ScoopColor[][]} */
-  const tripleAll = [];
-  for (const a of COLOR_KEYS) {
-    for (const b of COLOR_KEYS) {
-      if (a !== b) tripleAll.push([a, a, a, b]);
-    }
-  }
-  for (const c of trim(tripleAll, 6)) add(GROUP_BY_ID.TRIPLE_THREAT, c);
-
-  return recipes;
+  return GROUPS.flatMap(g => g.recipes.map(rec => ({
+    id: recipeIdFor(rec.colors),
+    colors: rec.colors.slice(),
+    name: rec.name,
+    group: g.id,
+    size: g.size,
+    value: g.value,
+    weight: g.weight
+  })));
 }
 
 export const ALL_RECIPES = generateActiveRecipes();
 
-// Wave -> set of accessible group ids. Waves 1-3 ramp through 1/2-scoop;
-// 4-6 introduce the 3-scoop core; 7-10 stagger the four 4-scoop groups so the
-// player meets one new (rare) 4-scoop pattern per wave through the late game.
-const _CORE = ['JUNIOR_SCOOP', 'DAILY_DOUBLE', 'YIN_YANG', 'THREES_COMPANY', 'BEST_TWO_OF_THREE', 'HOLY_TRINITY'];
+// Wave -> accessible group ids. The pool grows by one group per wave (in GROUPS
+// order — singles → 2-scoop → the 3-scoop families), clamping at the full set.
+// recipesForWave further intersects this with the player's challenge-unlocked
+// sections, so a group appears only once it is BOTH wave-reached AND unlocked.
+const _GROUP_IDS = GROUPS.map(g => g.id);
+// Cumulative group count by wave index (wave 0 = tutorial singles only).
+const _WAVE_COUNTS = [1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 /** @type {(string[] | null)[]} */
-const WAVE_GROUPS = [
-  ['JUNIOR_SCOOP'], // wave 0 — the tutorial wave: single-color juniors only
-  ['JUNIOR_SCOOP'],
-  ['JUNIOR_SCOOP', 'DAILY_DOUBLE'],
-  ['JUNIOR_SCOOP', 'DAILY_DOUBLE', 'YIN_YANG'],
-  ['JUNIOR_SCOOP', 'DAILY_DOUBLE', 'YIN_YANG', 'THREES_COMPANY'],
-  ['JUNIOR_SCOOP', 'DAILY_DOUBLE', 'YIN_YANG', 'THREES_COMPANY', 'BEST_TWO_OF_THREE'],
-  _CORE,
-  [..._CORE, 'FAB_FOUR'],
-  [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH'],
-  [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH', 'TWO_PAIR'],
-  [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH', 'TWO_PAIR', 'TRIPLE_THREAT']
-];
+const WAVE_GROUPS = _WAVE_COUNTS.map(k => _GROUP_IDS.slice(0, k));
 
 /**
  * Recipes available at a given wave, optionally intersected with a set of

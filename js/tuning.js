@@ -124,22 +124,22 @@ export const WAVE0_DEMAND_BIAS = 0.75;
 // size by these weights (restricted to the sizes actually present in the wave's
 // section-gated pool, then renormalized), THEN picks a recipe of that size.
 // This decouples how OFTEN a size shows up from how MANY recipes of that size
-// exist — so 3-scoop can be the rich, dominant core while 4-scoop stays a rare
-// treat and 1-scoop tapers off late. Indexed by wave; waves past the end clamp
-// to the last row. (Cap is 4 — there is no 5-scoop content.)
+// exist — so 3-scoop becomes the rich, dominant core while 1-scoop tapers off
+// late. Sizes cap at 3 (no 4-scoop content). Indexed by wave; waves past the
+// end clamp to the last row.
 /** @type {Record<number, number>[]} */
 export const ORDER_SIZE_WEIGHTS = [
-  { 1: 1 },                          // wave 0 — tutorial: singles only
-  { 1: 1 },                          // wave 1 — pool is singles only
-  { 1: 50, 2: 50 },                  // wave 2 — doubles arrive
-  { 1: 30, 2: 45, 3: 25 },           // wave 3
-  { 1: 22, 2: 40, 3: 38 },           // wave 4 — 3-scoop core opens
-  { 1: 15, 2: 32, 3: 53 },           // wave 5
-  { 1: 12, 2: 26, 3: 62 },           // wave 6 — full 3-scoop core
-  { 1: 10, 2: 24, 3: 60, 4: 6 },     // wave 7 — first 4-scoop, kept rare
-  { 1: 8,  2: 22, 3: 62, 4: 8 },     // wave 8
-  { 1: 7,  2: 19, 3: 64, 4: 10 },    // wave 9
-  { 1: 6,  2: 18, 3: 66, 4: 10 }     // wave 10+ — 3-scoop dominant, 4-scoop a treat
+  { 1: 1 },                  // wave 0 — tutorial: singles only
+  { 1: 1 },                  // wave 1 — pool is singles only
+  { 1: 50, 2: 50 },          // wave 2 — doubles arrive
+  { 1: 35, 2: 50, 3: 15 },   // wave 3
+  { 1: 25, 2: 45, 3: 30 },   // wave 4 — 3-scoop core opens
+  { 1: 18, 2: 37, 3: 45 },   // wave 5
+  { 1: 12, 2: 30, 3: 58 },   // wave 6 — full 3-scoop core
+  { 1: 10, 2: 25, 3: 65 },   // wave 7
+  { 1: 8,  2: 22, 3: 70 },   // wave 8
+  { 1: 7,  2: 20, 3: 73 },   // wave 9
+  { 1: 6,  2: 18, 3: 76 }    // wave 10+ — 3-scoop is the late-game core
 ];
 
 // === New-recipe discovery bias ===============================================
