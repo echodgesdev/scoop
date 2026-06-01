@@ -21,6 +21,25 @@ import {
 
 const LAND_TIME = 0.22;
 
+// Fake scoop "slosh" — NOT physics. A single loose damped-spring scalar leans
+// the scoop column opposite to the cone's motion (drag), then settles with a
+// soft wobble. The lean is derived from the cone's real per-frame displacement
+// (so it works for keyboard AND touch, which moves x directly).
+//
+// The TRAIL: each scoop up the stack samples that lean from a few physics ticks
+// EARLIER, and its amplitude follows a sideways natural-log ARC — flat at the
+// base (the bottom scoop stays locked to the cone) and bowing out with
+// increasing curvature toward the top, so the column reads as one graceful
+// swoosh trailing behind. The physics tick is a fixed 1/60s, so the tick-based
+// delay is frame-stable.
+const SLOSH_LEAN  = 0.016;  // px of lean per px/s of cone speed
+const SLOSH_MAX   = 10.4;   // cap (px) so fast flicks don't fling scoops off
+const SLOSH_STIFF = 70;     // spring follow strength (lower = looser / less stiff)
+const SLOSH_DAMP  = 0.84;   // velocity kept per tick (higher = floatier / wobblier)
+const SLOSH_LAG   = 2.4;    // ticks of extra delay per scoop above the bottom
+const SLOSH_ARC   = 6;      // log-arc curvature (higher = sharper bow near the top)
+const SLOSH_HIST  = 48;     // lean-history ring buffer length (ticks)
+
 export class Player {
   /** @param {number} x @param {number} y */
   constructor(x, y) {
@@ -30,6 +49,16 @@ export class Player {
     /** @type {{ color: ScoopColor, land: number, slideFromIdx?: number, slideT?: number }[]} */
     this.stack = [];
     this.flash = 0;
+
+    // Fake-slosh state (see SLOSH_* above). _prevX tracks last frame's x to read
+    // the cone's real velocity; slosh/sloshV are the damped-spring lean + its
+    // rate; _sloshHist is a ring buffer of recent lean values (one per physics
+    // tick) so higher scoops can sample an older lean for the trailing tail.
+    this._prevX = x;
+    this.slosh = 0;
+    this.sloshV = 0;
+    this._sloshHist = new Float64Array(SLOSH_HIST);
+    this._sloshHead = 0;
 
     // Brief lean toward a customer during a serve. Set by triggerHandoff();
     // peaks halfway through HANDOFF_DURATION_S and snaps back to 0.
@@ -97,6 +126,29 @@ export class Player {
     this.x = x;
     this.y = y;
     this.vx = 0;
+    // Snap the slosh to rest so a reposition (resize / wave reset) doesn't fling
+    // the scoops.
+    this._prevX = x;
+    this.slosh = 0;
+    this.sloshV = 0;
+    this._sloshHist.fill(0);
+    this._sloshHead = 0;
+  }
+
+  /**
+   * Advance the fake scoop-slosh spring. Driven by the cone's REAL velocity
+   * (per-frame displacement), so it works under every movement scheme. The
+   * column leans opposite to motion, then springs back through 0 with a gentle
+   * wobble when the cone slows or reverses. @param {number} dt @param {number} vx
+   */
+  _tickSlosh(dt, vx) {
+    const target = Math.max(-SLOSH_MAX, Math.min(SLOSH_MAX, -vx * SLOSH_LEAN));
+    this.sloshV += (target - this.slosh) * SLOSH_STIFF * dt;
+    this.sloshV *= Math.pow(SLOSH_DAMP, dt * 60);
+    this.slosh += this.sloshV * dt;
+    // Record this tick's lean so draw() can read an older value for higher scoops.
+    this._sloshHead = (this._sloshHead + 1) % SLOSH_HIST;
+    this._sloshHist[this._sloshHead] = this.slosh;
   }
 
   /**
@@ -114,6 +166,12 @@ export class Player {
       if (s.land > 0) s.land = Math.max(0, s.land - dt);
       if (s.slideT !== undefined && s.slideT < 1) s.slideT = Math.min(1, s.slideT + dt / ROTATE_LOCK_S);
     }
+
+    // Slosh runs every frame (before any early return) off the cone's real
+    // displacement last frame, so it keeps settling even while locked/frozen.
+    const movedVx = dt > 0 ? (this.x - this._prevX) / dt : 0;
+    this._prevX = this.x;
+    this._tickSlosh(dt, movedVx);
 
     if (this.lockT > 0) {
       // Rotation in progress: no movement, no acceleration, friction-snap
@@ -298,6 +356,17 @@ export class Player {
         const p = s.land / LAND_TIME;          // 1 -> 0 as it settles
         drawScale = 1 + 0.28 * p;              // squash-pop on landing
       }
+
+      // Fake slosh trail: the bottom scoop tracks the cone (zero lean, current
+      // tick); each scoop above samples the lean from a few ticks earlier, and
+      // its amplitude follows a sideways natural-log arc — flat at the base,
+      // bowing out more toward the top — so the column trails in one swoosh.
+      const n = this.stack.length;
+      const f = n > 1 ? i / (n - 1) : 1;                 // 0 at bottom .. 1 at top
+      const arc = 1 - Math.log(1 + SLOSH_ARC * (1 - f)) / Math.log(1 + SLOSH_ARC);
+      const lag = Math.min(SLOSH_HIST - 1, Math.round(i * SLOSH_LAG));
+      const laggedLean = this._sloshHist[(this._sloshHead - lag + SLOSH_HIST) % SLOSH_HIST];
+      drawX += laggedLean * arc;
 
       drawScoop(ctx, drawX, drawY, rainbow ? 'rainbow' : s.color, drawScale);
     }
