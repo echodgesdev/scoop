@@ -148,6 +148,20 @@ export class Shop {
     return c;
   }
 
+  /**
+   * Combo breaker (Tipping mode): the chain hit the breaker threshold — empty
+   * the meter so it recharges from zero. Mechanically identical to bankCombo
+   * but a distinct event (mid-wave power-up payout, not the wave-end cashout).
+   * bestCombo is preserved (already banked per serve).
+   * @returns {number} the combo value at the moment it broke
+   */
+  breakCombo() {
+    const c = this.combo;
+    this.combo = 0;
+    this.comboTimer = 0;
+    return c;
+  }
+
   /** @param {number} n */
   addScore(n) { this.score += n; }
 

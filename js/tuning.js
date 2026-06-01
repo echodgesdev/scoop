@@ -71,6 +71,16 @@ export const PATTERN_TIME_END = 6.5;
 
 export const COMBO_DECAY_S = 5;
 
+// === Combo breaker (Tipping mode) ============================================
+// Tipping has no bubble lane, so the score combo doubles as a charge meter:
+// chain serves and when the combo hits this threshold it "breaks" — emptying
+// the meter and firing a SUPERCHARGED (longer-running) power-up. It's the
+// mode's active, skill-expressive payoff (chain serves → earn a power-up) with
+// no new verb. The supercharged power-up runs at DURATION_MULT × the normal
+// timed duration so it clearly out-classes a passive customer tip.
+export const COMBO_BREAKER_THRESHOLD = 8;
+export const COMBO_BREAKER_DURATION_MULT = 2;
+
 // === Health ===================================================================
 export const MAX_HEALTH = 100;
 export const DAMAGE_PER_EXPIRE = 15;

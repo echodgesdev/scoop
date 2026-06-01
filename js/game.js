@@ -17,6 +17,8 @@ import {
   PICKUP_BUBBLE_RADIUS_MULT,
   COMBO_CASHOUT_PER,
   STACK_CASHOUT_PER_SCOOP,
+  COMBO_BREAKER_THRESHOLD,
+  COMBO_BREAKER_DURATION_MULT,
   HEAL_COST,
   LOOTBOX_COST,
   SPAWN_DEMAND_BIAS,
@@ -163,6 +165,9 @@ export class Game {
     this.maxStack = MAX_STACK;
     /** @type {number | null} */
     this.spawnIntervalOverride = null;
+    // Tipping mode: the score combo doubles as a charge meter — at this many
+    // chained serves it "breaks" into a supercharged power-up (debug-tunable).
+    this.comboBreakerThreshold = COMBO_BREAKER_THRESHOLD;
 
     this.waves       = new Waves(() => this.challenges.unlockedSectionIds());
     this.powerups    = new PowerUps();
@@ -321,7 +326,9 @@ export class Game {
         ? this.spawnIntervalOverride
         : this.waves.tuning().spawnInterval,
       onDragGain: g => { this.touchGain = g; },
-      getDragGain: () => this.touchGain
+      getDragGain: () => this.touchGain,
+      onComboBreaker: n => { this.comboBreakerThreshold = Math.max(2, Math.round(n)); },
+      getComboBreaker: () => this.comboBreakerThreshold
     });
 
     // Recipes unlocked / mastered during this play session — drained on
@@ -617,7 +624,7 @@ export class Game {
     this.challenges.resetSession();
 
     this.hud.setScore(this.shop.score);
-    this.hud.setCombo(this.shop.combo, this.shop.comboFraction);
+    this._syncComboHud();
     this.hud.setHealth(this.health / MAX_HEALTH);
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
 
@@ -743,7 +750,7 @@ export class Game {
     const { expired, comboLost } = this.shop.update(dt, { patienceOn });
     if (expired > 0) this._onExpire(expired);
     if (comboLost) this.sound.bad();
-    this.hud.setCombo(this.shop.combo, this.shop.comboFraction);
+    this._syncComboHud();
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
     // The running power-up's countdown lives in the on-canvas "active" slot at
     // the bottom (see _drawActivePowerup).
@@ -848,8 +855,10 @@ export class Game {
    * float into the active slot. Shared by catch (auto mode) and the loot box.
    * @param {import('./types.js').PickupTypeName} type
    * @param {number} x @param {number} y
+   * @param {number} [durationMult] scale the timed power-up's duration (combo
+   *   breaker passes > 1 to supercharge it). Ignored by the instant heart heal.
    */
-  _firePower(type, x, y) {
+  _firePower(type, x, y, durationMult = 1) {
     if (type === PICKUP_TYPE.HEART) {
       if (!this.flags.invincible) {
         this.health = Math.min(MAX_HEALTH, this.health + HEART_HEAL_AMOUNT);
@@ -858,7 +867,7 @@ export class Game {
       this.sound.heart();
     } else {
       this._activateBubble(type, x);
-      this.powerups.trigger(type);
+      this.powerups.trigger(type, durationMult);
       this.sound.powerupTrigger();
     }
     this._powerupUseFx(type, x, y);
@@ -922,7 +931,7 @@ export class Game {
       this.shop.addScore(PERFECT_CATCH_BONUS);
       this.shop.refreshCombo();
       this.hud.setScore(this.shop.score);
-      this.hud.setCombo(this.shop.combo, this.shop.comboFraction);
+      this._syncComboHud();
     }
     this.bus.emit('catch', { scoop, perfect });
   }
@@ -1106,9 +1115,16 @@ export class Game {
     });
 
     this.hud.setScore(this.shop.score);
-    this.hud.setCombo(this.shop.combo, this.shop.comboFraction);
+    this._syncComboHud();
     this.hud.setHealth(this.health / MAX_HEALTH);
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
+
+    // Tipping combo breaker: the serve event above already showed the combo at
+    // its peak; if that pushed the chain to the threshold, break it now into a
+    // supercharged power-up (resets the meter + re-syncs the readout).
+    if (this.gameMode === 'tipping' && this.shop.combo >= this.comboBreakerThreshold) {
+      this._fireComboBreaker(cx, cy);
+    }
 
     if (event === WAVE_EVENT.PHASE_UP) {
       this.bus.emit('phaseUp', /** @type {any} */ ({}));
@@ -1147,6 +1163,55 @@ export class Game {
   }
 
   /**
+   * Push the combo readout to the HUD. In Tipping mode the readout reframes as
+   * the combo-breaker charge meter ("N / threshold"); other modes show plain
+   * "N× combo". Single seam so every combo change updates consistently.
+   */
+  _syncComboHud() {
+    const target = this.gameMode === 'tipping' ? this.comboBreakerThreshold : 0;
+    this.hud.setCombo(this.shop.combo, this.shop.comboFraction, target);
+  }
+
+  /**
+   * Combo breaker (Tipping mode): the serve chain hit the threshold. Empty the
+   * meter and fire a SUPERCHARGED timed power-up (extended duration) as the
+   * earned payoff — a crescendo on a hot streak, not a random pop. No new verb:
+   * it discharges automatically. @param {number} x @param {number} y burst origin
+   */
+  _fireComboBreaker(x, y) {
+    this.shop.breakCombo();
+    const type = this._pickSuperchargeType();
+    this._firePower(type, this.player.x, this.player.stackTopY(), COMBO_BREAKER_DURATION_MULT);
+    // Crescendo over the normal power-up FX: extra ding, shake, confetti burst.
+    this.sound.perfect();
+    this.effects.addShake(12);
+    this.effects.burst(x, y, ['#ffec5c', '#ff6fa3', '#7fe3c4', '#6a8cff', '#fff'], 36);
+    this.effects.popText(x, y - 46, '⚡ COMBO BREAK!', { color: '#ffec5c', size: 30, life: 1.2 });
+    this._syncComboHud();
+  }
+
+  /**
+   * Pick which timed power-up the breaker supercharges — weighted by the bubble
+   * mix (debug weights for ⚡ speed / ❄️ freeze / 🌈 rainbow), uniform if unset.
+   * Heart is excluded: it heals instantly, so a duration multiplier is moot.
+   * @returns {import('./types.js').PickupTypeName}
+   */
+  _pickSuperchargeType() {
+    const w = this.pickups.weights;
+    /** @type {import('./types.js').PickupTypeName[]} */
+    const types = [PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW];
+    const weights = [w[1] || 0, w[2] || 0, w[3] || 0];
+    const total = weights.reduce((a, b) => a + b, 0);
+    if (total <= 0) return types[Math.floor(Math.random() * types.length)];
+    let r = Math.random() * total;
+    for (let i = 0; i < types.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return types[i];
+    }
+    return types[types.length - 1];
+  }
+
+  /**
    * Wave-end cashout. Freezes gameplay (effects keep animating) and runs a
    * payout chain: bank the combo → pop the tray stack top-to-bottom (+scoop
    * each) → pop the banked queue back-to-front (+3 scoops each) → pop the
@@ -1171,7 +1236,7 @@ export class Game {
       this.effects.burst(c.x, c.y, ['#ff6fa3', '#ffd166', '#fff'], 24);
       this.sound.perfect();
     }
-    this.hud.setCombo(this.shop.combo, this.shop.comboFraction);
+    this._syncComboHud();
     this.hud.setScore(this.shop.score);
 
     setTimeout(() => this._cashoutStack(completedWave), combo > 0 ? 500 : 150);
@@ -1319,7 +1384,7 @@ export class Game {
       this.hud.setHealth(this.health / MAX_HEALTH);
     }
     this.bus.emit('expire', { count });
-    this.hud.setCombo(this.shop.combo, this.shop.comboFraction);
+    this._syncComboHud();
     if (this.health <= 0) this._endGame('Out of health! 😱');
   }
 

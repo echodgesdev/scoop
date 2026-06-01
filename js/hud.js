@@ -371,15 +371,24 @@ export class Hud {
 
   /**
    * @param {number} combo
-   * @param {number} [fraction]
+   * @param {number} [fraction] combo-decay bar fill (time left before the chain drops)
+   * @param {number} [breakerTarget] Tipping mode: the combo-breaker threshold.
+   *   When > 0 the readout reframes as a charge meter ("🔥 6 / 8") and pulses
+   *   as it nears the break; 0 (other modes) keeps the plain "N× combo" text.
    */
-  setCombo(combo, fraction = 0) {
+  setCombo(combo, fraction = 0, breakerTarget = 0) {
     if (combo > 1) {
-      this.comboTextEl.textContent = `🔥 ${combo}× combo`;
+      if (breakerTarget > 0) {
+        this.comboTextEl.textContent = `🔥 ${combo} / ${breakerTarget}`;
+        this.comboEl.classList.toggle('near-break', combo >= breakerTarget - 1);
+      } else {
+        this.comboTextEl.textContent = `🔥 ${combo}× combo`;
+        this.comboEl.classList.remove('near-break');
+      }
       this.comboDecayFillEl.style.width = `${Math.max(0, Math.min(1, fraction)) * 100}%`;
       this.comboEl.classList.add('show');
     } else {
-      this.comboEl.classList.remove('show');
+      this.comboEl.classList.remove('show', 'near-break');
     }
   }
 

@@ -37,11 +37,13 @@ export class PowerUps {
   /**
    * Activate (or refresh / replace) a power-up from a pickup catch.
    * @param {PickupTypeName} pickupType
+   * @param {number} [durationMult] scales the base duration (combo-breaker
+   *   supercharge passes > 1 for a longer-running power-up). Default 1.
    */
-  trigger(pickupType) {
+  trigger(pickupType, durationMult = 1) {
     const powerType = pickupToPower(pickupType);
     if (!powerType) return;
-    const duration = DURATIONS[powerType];
+    const duration = DURATIONS[powerType] * durationMult;
     this.current = { type: powerType, t: duration, duration };
   }
 

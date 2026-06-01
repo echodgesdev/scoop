@@ -86,6 +86,21 @@ html, body {
   transition: width 0.1s linear;
 }
 
+/* Tipping combo-breaker: one serve away from the break — pulse the readout
+   and shift the bar to an electric cyan/gold to telegraph the incoming pop. */
+#combo.near-break {
+  color: #ffb703;
+  text-shadow: 0 1px 0 #fff, 0 0 12px rgba(255, 236, 92, 0.95);
+  animation: combo-charge 0.45s ease-in-out infinite alternate;
+}
+#combo.near-break .combo-decay-fill {
+  background: linear-gradient(90deg, #5cd8ff, #fff36a);
+}
+@keyframes combo-charge {
+  from { transform: scale(1); }
+  to   { transform: scale(1.14); }
+}
+
 /* ===== Wave gauge ======================================================== */
 .gauge-row {
   display: flex;
