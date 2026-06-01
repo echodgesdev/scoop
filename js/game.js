@@ -165,9 +165,12 @@ export class Game {
     this.maxStack = MAX_STACK;
     /** @type {number | null} */
     this.spawnIntervalOverride = null;
-    // Tipping mode: the score combo doubles as a charge meter — at this many
-    // chained serves it "breaks" into a supercharged power-up (debug-tunable).
+    // Combo breaker: the score combo doubles as a charge meter — at this many
+    // chained serves it "breaks" into a supercharged power-up. A per-mode
+    // capability (comboBreakerEnabled, set by _applyModeDefaults) defaulted on
+    // for Tipping only; both the toggle and the threshold are debug-tunable.
     this.comboBreakerThreshold = COMBO_BREAKER_THRESHOLD;
+    this.comboBreakerEnabled = false;
 
     this.waves       = new Waves(() => this.challenges.unlockedSectionIds());
     this.powerups    = new PowerUps();
@@ -328,7 +331,9 @@ export class Game {
       onDragGain: g => { this.touchGain = g; },
       getDragGain: () => this.touchGain,
       onComboBreaker: n => { this.comboBreakerThreshold = Math.max(2, Math.round(n)); },
-      getComboBreaker: () => this.comboBreakerThreshold
+      getComboBreaker: () => this.comboBreakerThreshold,
+      onComboBreakerToggle: on => { this.comboBreakerEnabled = on; this._syncComboHud(); },
+      getComboBreakerEnabled: () => this.comboBreakerEnabled
     });
 
     // Recipes unlocked / mastered during this play session — drained on
@@ -787,6 +792,10 @@ export class Game {
    * modes use the standard caps.
    */
   _applyModeDefaults() {
+    // Combo breaker is a capability defaulted per mode — on only for Tipping
+    // (no bubble lane → room for it; redundant in Auto/Banked, which already
+    // have a power-up source). Debug can flip it for any mode afterward.
+    this.comboBreakerEnabled = this.gameMode === 'tipping';
     if (this.gameMode === 'tipping') {
       this.maxStack = TIPPING_MAX_STACK;
       this.field.setMaxLive(TIPPING_MAX_LIVE);
@@ -1119,10 +1128,11 @@ export class Game {
     this.hud.setHealth(this.health / MAX_HEALTH);
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
 
-    // Tipping combo breaker: the serve event above already showed the combo at
-    // its peak; if that pushed the chain to the threshold, break it now into a
-    // supercharged power-up (resets the meter + re-syncs the readout).
-    if (this.gameMode === 'tipping' && this.shop.combo >= this.comboBreakerThreshold) {
+    // Combo breaker: the serve event above already showed the combo at its
+    // peak; if that pushed the chain to the threshold, break it now into a
+    // supercharged power-up (resets the meter + re-syncs the readout). Enabled
+    // per mode (default Tipping-only) — see _applyModeDefaults.
+    if (this.comboBreakerEnabled && this.shop.combo >= this.comboBreakerThreshold) {
       this._fireComboBreaker(cx, cy);
     }
 
@@ -1168,15 +1178,16 @@ export class Game {
    * "N× combo". Single seam so every combo change updates consistently.
    */
   _syncComboHud() {
-    const target = this.gameMode === 'tipping' ? this.comboBreakerThreshold : 0;
+    const target = this.comboBreakerEnabled ? this.comboBreakerThreshold : 0;
     this.hud.setCombo(this.shop.combo, this.shop.comboFraction, target);
   }
 
   /**
-   * Combo breaker (Tipping mode): the serve chain hit the threshold. Empty the
-   * meter and fire a SUPERCHARGED timed power-up (extended duration) as the
-   * earned payoff — a crescendo on a hot streak, not a random pop. No new verb:
-   * it discharges automatically. @param {number} x @param {number} y burst origin
+   * Combo breaker: the serve chain hit the threshold. Empty the meter and fire
+   * a SUPERCHARGED timed power-up (extended duration) as the earned payoff — a
+   * crescendo on a hot streak, not a random pop. No new verb: it discharges
+   * automatically. Gated by comboBreakerEnabled (default Tipping-only).
+   * @param {number} x @param {number} y burst origin
    */
   _fireComboBreaker(x, y) {
     this.shop.breakCombo();
