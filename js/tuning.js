@@ -143,10 +143,13 @@ export const MAX_PU_INVENTORY = 3;
 // Customers sit well below the sand line so their speech bubbles (which
 // extend ~100px above each face) drop into the lower-screen zone instead
 // of overlapping the cone above them.
-// Ground is now ~35% of the canvas (was 18%). Giving the serve/solitaire half
-// real estate rebalances the "this is a reaction game" signal the old layout
-// sent — the customers read as a co-equal play area, not a footer strip.
-export const FLOOR_Y_RATIO = 0.65;
+// Sky/ground split — the fraction of canvas height that is sky (ground begins
+// here). This is the DEFAULT; the horizon is runtime-mutable via the debug "sky
+// height" slider (config.setFloorRatio). Shrunk from 0.65 → 0.55 for mobile: a
+// shorter sky cuts the fall distance (scoops arrive sooner) AND lifts the whole
+// play block up, growing the empty bottom band so a one-handed thumb rests
+// below the customers/orders instead of over them.
+export const FLOOR_Y_RATIO = 0.55;
 // Cone sits deeper in the sand now (center ≈ on the sand line) so it reads as
 // planted in the ground rather than balancing on the surface. Shifts the cone
 // — and the whole stack riding on it — down with it.

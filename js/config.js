@@ -73,14 +73,26 @@ export function lerp(a, b, t) {
   return a + (b - a) * Math.max(0, Math.min(1, t));
 }
 
+// Runtime-mutable sky/ground split (fraction of canvas height that is sky;
+// the ground begins here). Defaults to the tuning constant; the debug "sky
+// height" slider moves the horizon live via Game._setFloorRatio, which
+// re-lays-out so cached positions adopt it. Lower = shorter sky = horizon
+// higher = shorter fall + a bigger empty bottom band (where the thumb rests).
+let _floorRatio = _FLOOR_Y_RATIO;
+/** @param {number} r fraction of canvas height that is sky (ground begins here) */
+export function setFloorRatio(r) { _floorRatio = Math.max(0.3, Math.min(0.8, r)); }
+/** @returns {number} current sky/ground split (0..1) */
+export function getFloorRatio() { return _floorRatio; }
+
 /**
  * Y-coordinate of the sand floor's top edge. Shared by scene (floor + sky
  * gradient end), dayCycle (sun horizon), and stations (customer ground line).
+ * Reads the live ratio so a debug horizon change propagates everywhere.
  * @param {number} boundsHeight
  * @returns {number}
  */
 export function groundYFor(boundsHeight) {
-  return boundsHeight * _FLOOR_Y_RATIO;
+  return boundsHeight * _floorRatio;
 }
 
 /**

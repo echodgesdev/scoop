@@ -23,7 +23,9 @@ import {
   LOOTBOX_COST,
   SPAWN_DEMAND_BIAS,
   WAVE0_DEMAND_BIAS,
-  coneYFor
+  coneYFor,
+  setFloorRatio,
+  getFloorRatio
 } from './config.js';
 import { Player } from './player.js';
 import { ScoopField, isCaught } from './scoops.js';
@@ -67,10 +69,10 @@ const NIGHT_CYCLE_S = 2.0;
 // points a coin tip awards.
 const TIP_COIN_WEIGHT = 0.4;
 const TIP_COIN_POINTS = 50;
-// Tipping plays tighter than the bubble modes — fewer scoops in the air and a
-// shorter cone — so reading the board + stack stays simple. (Debug-tunable.)
+// Tipping plays with a shorter cone (4) but a fuller sky (7 falling scoops) so
+// there's enough to react to while the stack stays simple. (Debug-tunable.)
 const TIPPING_MAX_STACK = 4;
-const TIPPING_MAX_LIVE = 4;
+const TIPPING_MAX_LIVE = 7;
 
 // Power-up indicator animation timings. Catching a timed bubble floats it UP
 // into the "active" slot at the bottom (where its countdown lives); when it
@@ -330,6 +332,8 @@ export class Game {
         : this.waves.tuning().spawnInterval,
       onFallSpeed: m => this.field.setFallScale(m),
       getFallSpeed: () => this.field.fallScale,
+      onHorizon: r => this._setFloorRatio(r),
+      getHorizon: () => getFloorRatio(),
       onDragGain: g => { this.touchGain = g; },
       getDragGain: () => this.touchGain,
       onComboBreaker: n => { this.comboBreakerThreshold = Math.max(2, Math.round(n)); },
@@ -382,6 +386,19 @@ export class Game {
       : virtualDims(name);
     this.bounds.width = d.width;
     this.bounds.height = d.height;
+    this._applyAspect();
+  }
+
+  /**
+   * Debug: move the horizon (sky/ground split). A shorter sky shortens the fall
+   * (scoops arrive sooner) and lifts the whole play block up, growing the empty
+   * bottom band where a one-handed thumb rests. Re-lays-out so the cached cone /
+   * customer / ground positions adopt the new ratio at once. Bounds are
+   * unchanged — this only re-derives positions within them.
+   * @param {number} r fraction of canvas height that is sky
+   */
+  _setFloorRatio(r) {
+    setFloorRatio(r);
     this._applyAspect();
   }
 

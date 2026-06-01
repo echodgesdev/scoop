@@ -46,10 +46,12 @@ export class DebugPanel {
    *   onComboBreakerToggle?: (on: boolean) => void,
    *   getComboBreakerEnabled?: () => boolean,
    *   onFallSpeed?: (m: number) => void,
-   *   getFallSpeed?: () => number
+   *   getFallSpeed?: () => number,
+   *   onHorizon?: (r: number) => void,
+   *   getHorizon?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed, onHorizon, getHorizon } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -89,6 +91,8 @@ export class DebugPanel {
     this.getComboBreakerEnabled = getComboBreakerEnabled || (() => false);
     this.onFallSpeed = onFallSpeed || (() => {});
     this.getFallSpeed = getFallSpeed || (() => 1);
+    this.onHorizon = onHorizon || (() => {});
+    this.getHorizon = getHorizon || (() => 0.55);
     /** @type {{ id: string, label: string, get: () => number, fmt: (n: number) => string }[]} */
     this._sliders = [];
     this.open = false;
@@ -166,10 +170,12 @@ export class DebugPanel {
     const int = n => String(Math.round(n));
     const oneDp = n => n.toFixed(1);
     const twoDp = n => n.toFixed(2);
+    const pct = n => `${Math.round(n * 100)}%`;
     this._wireSlider('debugMaxStack', 'debugMaxStackLabel', this.onMaxStack, this.getMaxStack, int);
     this._wireSlider('debugMaxLive', 'debugMaxLiveLabel', this.onMaxLive, this.getMaxLive, int);
     this._wireSlider('debugSpawnInterval', 'debugSpawnIntervalLabel', this.onSpawnInterval, this.getSpawnInterval, twoDp);
     this._wireSlider('debugFallSpeed', 'debugFallSpeedLabel', this.onFallSpeed, this.getFallSpeed, oneDp);
+    this._wireSlider('debugHorizon', 'debugHorizonLabel', this.onHorizon, this.getHorizon, pct);
     this._wireSlider('debugDragGain', 'debugDragGainLabel', this.onDragGain, this.getDragGain, oneDp);
     this._wireSlider('debugComboBreaker', 'debugComboBreakerLabel', this.onComboBreaker, this.getComboBreaker, int);
 
