@@ -102,14 +102,6 @@ export const COMBO_CASHOUT_PER = 25;        // points per combo point banked
 export const STACK_CASHOUT_PER_SCOOP = 10;  // points per leftover tray scoop
 export const BUBBLE_CASHOUT = STACK_CASHOUT_PER_SCOOP * 3;  // a banked bubble (Banked mode) is worth 3 scoops
 
-// === Between-wave store =======================================================
-// Score IS the currency — spending lowers your run total, so the high score
-// reflects how efficiently you converted survival into points. Costs are flat
-// (tune against typical per-wave income). The store is off by default and
-// toggled from the debug panel while the economy is being explored.
-export const HEAL_COST = 400;       // full heal
-export const LOOTBOX_COST = 250;    // one random unlocked power-up
-
 // === Spawn demand coupling ====================================================
 // Probability that a freshly-spawned scoop is biased toward what waiting
 // customers still need (after subtracting tray inventory). The remaining
@@ -176,11 +168,10 @@ export const MAX_PU_INVENTORY = 3;
 // Customers sit well below the sand line so their speech bubbles (which
 // extend ~100px above each face) drop into the lower-screen zone instead
 // of overlapping the cone above them.
-// Sky/ground split — the fraction of canvas height that is sky (ground begins
-// here). This is the DEFAULT; the horizon is runtime-mutable via the debug "sky
-// height" slider (config.setFloorRatio). Shrunk from 0.65 → 0.55 for mobile: a
-// shorter sky cuts the fall distance (scoops arrive sooner) AND lifts the whole
-// play block up, growing the empty bottom band so a one-handed thumb rests
+// Sky/ground split — the fixed fraction of canvas height that is sky (ground
+// begins here); read via config.groundYFor. Shrunk from 0.65 → 0.55 for mobile:
+// a shorter sky cuts the fall distance (scoops arrive sooner) AND lifts the
+// whole play block up, growing the empty bottom band so a one-handed thumb rests
 // below the customers/orders instead of over them.
 export const FLOOR_Y_RATIO = 0.55;
 // Cone sits deeper in the sand now (center ≈ on the sand line) so it reads as

@@ -35,8 +35,6 @@ export class GameMode {
   // --- power-up handling (Auto default: fire the instant it's caught) --------
   /** @param {PickupTypeName} type @param {number} x @param {number} y */
   onCatch(type, x, y) { this.game._firePower(type, x, y); }
-  /** @param {PickupTypeName} type @param {number} x @param {number} y */
-  onLootboxSpend(type, x, y) { this.game._firePower(type, x, y); }
   /** Spend the next banked power-up (Shift). No queue in the base. */
   onShift() {}
   /** True when there's nothing to spend (drives the Shift "nope" beep). */

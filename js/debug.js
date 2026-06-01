@@ -13,8 +13,6 @@ export class DebugPanel {
    *   onWaveJump?: (n: number) => void,
    *   onTimeJump?: (fraction: number) => void,
    *   getWaveFraction?: () => number,
-   *   onAspectChange?: (name: string) => void,
-   *   getAspect?: () => string,
    *   onDemandBias?: (v: number) => void,
    *   getDemandBias?: () => number,
    *   onPatience?: (sec: number | null) => void,
@@ -28,10 +26,6 @@ export class DebugPanel {
    *   onGameMode?: (name: string) => void,
    *   getGameMode?: () => string,
    *   getModeList?: () => { id: string, label: string }[],
-   *   onStoreToggle?: (on: boolean) => void,
-   *   getStoreEnabled?: () => boolean,
-   *   onTouchScheme?: (name: string) => void,
-   *   getTouchScheme?: () => string,
    *   onDeliveryMode?: (name: string) => void,
    *   getDeliveryMode?: () => string,
    *   onMaxStack?: (n: number) => void,
@@ -40,26 +34,20 @@ export class DebugPanel {
    *   getMaxLive?: () => number,
    *   onSpawnInterval?: (sec: number) => void,
    *   getSpawnInterval?: () => number,
-   *   onDragGain?: (g: number) => void,
-   *   getDragGain?: () => number,
    *   onComboBreaker?: (n: number) => void,
    *   getComboBreaker?: () => number,
    *   onComboBreakerToggle?: (on: boolean) => void,
    *   getComboBreakerEnabled?: () => boolean,
    *   onFallSpeed?: (m: number) => void,
-   *   getFallSpeed?: () => number,
-   *   onHorizon?: (r: number) => void,
-   *   getHorizon?: () => number
+   *   getFallSpeed?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, getModeList, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed, onHorizon, getHorizon } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, getModeList, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
     this.onTimeJump = onTimeJump || (() => {});
     this.getWaveFraction = getWaveFraction || (() => 0);
-    this.onAspectChange = onAspectChange || (() => {});
-    this.getAspect = getAspect || (() => '4:3');
     this.onDemandBias = onDemandBias || (() => {});
     this.getDemandBias = getDemandBias || (() => 0.65);
     this.onPatience = onPatience || (() => {});
@@ -73,10 +61,6 @@ export class DebugPanel {
     this.onGameMode = onGameMode || (() => {});
     this.getGameMode = getGameMode || (() => 'auto');
     this.getModeList = getModeList || (() => []);
-    this.onStoreToggle = onStoreToggle || (() => {});
-    this.getStoreEnabled = getStoreEnabled || (() => false);
-    this.onTouchScheme = onTouchScheme || (() => {});
-    this.getTouchScheme = getTouchScheme || (() => 'relative');
     this.onDeliveryMode = onDeliveryMode || (() => {});
     this.getDeliveryMode = getDeliveryMode || (() => 'any');
     this.onMaxStack = onMaxStack || (() => {});
@@ -85,16 +69,12 @@ export class DebugPanel {
     this.getMaxLive = getMaxLive || (() => 7);
     this.onSpawnInterval = onSpawnInterval || (() => {});
     this.getSpawnInterval = getSpawnInterval || (() => 0.85);
-    this.onDragGain = onDragGain || (() => {});
-    this.getDragGain = getDragGain || (() => 2);
     this.onComboBreaker = onComboBreaker || (() => {});
     this.getComboBreaker = getComboBreaker || (() => 8);
     this.onComboBreakerToggle = onComboBreakerToggle || (() => {});
     this.getComboBreakerEnabled = getComboBreakerEnabled || (() => false);
     this.onFallSpeed = onFallSpeed || (() => {});
     this.getFallSpeed = getFallSpeed || (() => 1);
-    this.onHorizon = onHorizon || (() => {});
-    this.getHorizon = getHorizon || (() => 0.55);
     /** @type {{ id: string, label: string, get: () => number, fmt: (n: number) => string }[]} */
     this._sliders = [];
     this.open = false;
@@ -103,10 +83,7 @@ export class DebugPanel {
     this.panel = /** @type {HTMLElement} */ (document.getElementById('debugPanel'));
     this._wireFlags();
     this._wireGameMode();
-    this._wireStoreToggle();
-    this._wireTouchScheme();
     this._wireGameplay();
-    this._wireAspect();
     this._wireDemandBias();
     this._wirePatience();
     this._wireBubbles();
@@ -152,25 +129,10 @@ export class DebugPanel {
     sel.addEventListener('change', () => this.onGameMode(sel.value));
   }
 
-  /** Between-wave store (loot box) visibility — off by default. */
-  _wireStoreToggle() {
-    const cb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugStoreToggle'));
-    if (!cb) return;
-    cb.checked = this.getStoreEnabled();
-    cb.addEventListener('change', () => this.onStoreToggle(cb.checked));
-  }
-
-  /** Touch movement scheme: relative drag / absolute drag / hold zones. */
-  _wireTouchScheme() {
-    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugTouchScheme'));
-    if (!sel) return;
-    sel.value = this.getTouchScheme();
-    sel.addEventListener('change', () => this.onTouchScheme(sel.value));
-  }
-
   /**
    * Gameplay tuning (all modes): delivery method dropdown + the runtime sliders
-   * (max scoops on cone, max falling scoops, spawn interval, relative-drag gain).
+   * (max scoops on cone, max falling scoops, spawn interval, fall speed, horizon,
+   * combo-breaker threshold). Movement sensitivity lives in the Settings modal.
    */
   _wireGameplay() {
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugDelivery'));
@@ -181,13 +143,10 @@ export class DebugPanel {
     const int = n => String(Math.round(n));
     const oneDp = n => n.toFixed(1);
     const twoDp = n => n.toFixed(2);
-    const pct = n => `${Math.round(n * 100)}%`;
     this._wireSlider('debugMaxStack', 'debugMaxStackLabel', this.onMaxStack, this.getMaxStack, int);
     this._wireSlider('debugMaxLive', 'debugMaxLiveLabel', this.onMaxLive, this.getMaxLive, int);
     this._wireSlider('debugSpawnInterval', 'debugSpawnIntervalLabel', this.onSpawnInterval, this.getSpawnInterval, twoDp);
     this._wireSlider('debugFallSpeed', 'debugFallSpeedLabel', this.onFallSpeed, this.getFallSpeed, oneDp);
-    this._wireSlider('debugHorizon', 'debugHorizonLabel', this.onHorizon, this.getHorizon, pct);
-    this._wireSlider('debugDragGain', 'debugDragGainLabel', this.onDragGain, this.getDragGain, oneDp);
     this._wireSlider('debugComboBreaker', 'debugComboBreakerLabel', this.onComboBreaker, this.getComboBreaker, int);
 
     const breakerCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugComboBreakerToggle'));
@@ -213,14 +172,6 @@ export class DebugPanel {
       if (Number.isFinite(v)) { onInput(v); if (label) label.textContent = fmt(v); }
     });
     this._sliders.push({ id, label: labelId, get, fmt });
-  }
-
-  /** Aspect-ratio selector: switches the locked virtual canvas (4:3 ⇄ 3:4). */
-  _wireAspect() {
-    const select = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugAspect'));
-    if (!select) return;
-    select.value = this.getAspect();
-    select.addEventListener('change', () => this.onAspectChange(select.value));
   }
 
   /** Live demand-bias slider (0..1): lower = more random scoops = tray binds. */
@@ -366,12 +317,8 @@ export class DebugPanel {
     }
     const modeSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugGameMode'));
     if (modeSel) modeSel.value = this.getGameMode();
-    const storeCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugStoreToggle'));
-    if (storeCb) storeCb.checked = this.getStoreEnabled();
     const breakerCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugComboBreakerToggle'));
     if (breakerCb) breakerCb.checked = this.getComboBreakerEnabled();
-    const touchSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugTouchScheme'));
-    if (touchSel) touchSel.value = this.getTouchScheme();
     const delSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugDelivery'));
     if (delSel) delSel.value = this.getDeliveryMode();
     // Re-sync gameplay sliders to live values (they can change between games).

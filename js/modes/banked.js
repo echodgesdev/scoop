@@ -75,9 +75,6 @@ export class BankedMode extends GameMode {
     }
   }
 
-  /** Loot box drops straight into the queue (same as a catch). */
-  onLootboxSpend(type, x, y) { this.onCatch(type, x, y); }
-
   /** Shift: spend the front bubble — fires the effect via the shared engine. */
   onShift() {
     const e = this.queue.shift();

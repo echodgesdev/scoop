@@ -190,16 +190,6 @@ export class Player {
     const maxV  = CONE_MAX_SPEED * speedMult;
     const halfW = CONE_WIDTH / 2;
 
-    // Absolute touch steering: chase the finger's x at up to the speed cap.
-    if (input.moveTargetX != null) {
-      const target = Math.max(halfW, Math.min(bounds.width - halfW, input.moveTargetX));
-      const maxStep = maxV * dt;
-      const dx = target - this.x;
-      this.x += Math.abs(dx) <= maxStep ? dx : Math.sign(dx) * maxStep;
-      this.vx = 0;
-      return;
-    }
-
     // Relative touch steering: apply the dragged delta directly (1:1 × gain),
     // then consume it. Uncapped — small thumb travel moves the cone far, which
     // is the whole point. Cleared each frame so a still finger holds position.

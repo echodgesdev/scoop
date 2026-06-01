@@ -1087,36 +1087,26 @@ button.flash {
   font-size: 18px;
 }
 
-/* =========================================================================
-   Settings button — bottom-right cog, only visible while a menu is up.
-   Mirrors the debug button on the left so the two utility controls bookend
-   the screen. Hidden during gameplay via the body.menu-visible gate.
-   ========================================================================= */
-#settingsBtn {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  z-index: 30;
+/* Pause-menu Settings — full-width row beneath the 3-button grid (Settings is
+   now a menu item, not a floating cog; the home screen + game-over card put it
+   inline in their button stacks). */
+.pause-settings-btn {
+  margin-top: 10px;
+  width: 100%;
   font-family: inherit;
-  font-size: 20px;
-  padding: 6px 12px;
-  border: 3px solid #444;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.85);
+  font-size: 15px;
+  font-weight: bold;
+  padding: 12px 8px;
+  border: 2px solid #888;
+  border-radius: 10px;
+  background: #fff;
+  color: #333;
   cursor: pointer;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.45s ease;
-}
-body.menu-visible #settingsBtn {
-  opacity: 1;
-  pointer-events: auto;
 }
 
-/* Fullscreen toggle — bottom-right, left of the cog. Unlike settings it stays
-   available during gameplay so the player can scale up the letterboxed stage
-   at any time. */
+/* Fullscreen toggle — bottom-right. Unlike the menus it stays available during
+   gameplay so the player can scale up the letterboxed stage at any time. */
 #fullscreenBtn {
   position: absolute;
   bottom: 16px;
@@ -1134,17 +1124,6 @@ body.menu-visible #settingsBtn {
   transition: opacity 0.2s ease;
 }
 #fullscreenBtn:hover { opacity: 1; }
-
-.debug-aspect {
-  margin-top: 10px;
-  font-size: 15px;
-}
-.debug-aspect select {
-  font-family: inherit;
-  font-size: 15px;
-  margin-left: 4px;
-  padding: 2px 4px;
-}
 
 .debug-bias,
 .debug-patience {
@@ -1246,11 +1225,15 @@ body.menu-visible #settingsBtn {
 .settings-row #volumeSlider {
   width: 100%;
 }
-#volumeValue {
+#volumeValue,
+#sensitivityValue {
   font-size: 12px;
   font-weight: bold;
   color: #555;
   align-self: flex-end;
+}
+.settings-row #sensitivitySlider {
+  width: 100%;
 }
 .settings-danger-row {
   margin-top: 18px;
@@ -1467,44 +1450,6 @@ body.menu-visible #settingsBtn {
   font-size: 13px;
   color: #3a2a1a;
   border: 1px solid #b85;
-}
-
-/* Between-wave store. */
-.wt-store {
-  margin: 14px 0 4px 0;
-  padding: 10px 14px;
-  background: rgba(6, 214, 160, 0.14);
-  border: 2px solid #06d6a0;
-  border-radius: 10px;
-}
-.wt-store.hidden { display: none; }
-.wt-store-score {
-  font-weight: bold;
-  font-size: 14px;
-  color: #2a6a55;
-  margin-bottom: 8px;
-}
-.wt-store-items {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-.wt-store-items button {
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: bold;
-  padding: 10px 8px;
-  border: none;
-  border-radius: 10px;
-  background: #fff;
-  color: #333;
-  cursor: pointer;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
-}
-.wt-store-items button:disabled {
-  opacity: 0.4;
-  cursor: default;
-  box-shadow: none;
 }
 
 .wt-buttons {

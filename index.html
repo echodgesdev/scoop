@@ -58,10 +58,6 @@
             <!-- Options are populated from the mode registry (modes/index.js) by debug.js. -->
             <select id="debugGameMode"></select>
           </label>
-          <label class="debug-row">
-            <input type="checkbox" id="debugStoreToggle" />
-            <span>Show between-wave store (loot box)</span>
-          </label>
         </div>
       </details>
 
@@ -91,14 +87,6 @@
             <label>Scoop fall speed ×: <span id="debugFallSpeedLabel">1.0</span></label>
             <input type="range" id="debugFallSpeed" min="0.5" max="3" step="0.1" value="1.0" />
           </div>
-          <div class="debug-slider">
-            <label>Sky height (horizon): <span id="debugHorizonLabel">55%</span></label>
-            <input type="range" id="debugHorizon" min="0.35" max="0.7" step="0.01" value="0.55" />
-          </div>
-          <div class="debug-slider">
-            <label>Relative drag force: <span id="debugDragGainLabel">2.0</span></label>
-            <input type="range" id="debugDragGain" min="0.5" max="5" step="0.1" value="2.0" />
-          </div>
           <label class="debug-row">
             <input type="checkbox" id="debugComboBreakerToggle" />
             <span>Combo breaker (chain serves → supercharged power-up)</span>
@@ -124,23 +112,6 @@
         <div class="debug-section-body">
           <label class="debug-row"><input type="checkbox" data-flag="showHitboxes" /><span>Show hitboxes</span></label>
           <label class="debug-row"><input type="checkbox" data-flag="showFps" /><span>Show FPS</span></label>
-          <label class="debug-field">Aspect:
-            <select id="debugAspect">
-              <option value="auto">Auto (fill screen)</option>
-              <option value="3:4">3:4 (portrait)</option>
-              <option value="9:16">9:16 (tall)</option>
-              <option value="4:3">4:3 (landscape)</option>
-              <option value="3:2">3:2 (35mm)</option>
-              <option value="16:9">16:9 (wide)</option>
-            </select>
-          </label>
-          <label class="debug-field">Touch:
-            <select id="debugTouchScheme">
-              <option value="relative">Relative drag</option>
-              <option value="absolute">Drag (absolute)</option>
-              <option value="holdzones">Hold zones</option>
-            </select>
-          </label>
         </div>
       </details>
 
@@ -197,6 +168,7 @@
       <button id="howBtn" class="secondary">📋 How to Play</button>
       <button id="recipesBtn" class="secondary">📖 Recipes</button>
       <button id="challengesBtn" class="secondary">🎯 Challenges</button>
+      <button id="settingsBtn" class="secondary">⚙️ Settings</button>
     </div>
     <p id="title-best"></p>
   </div>
@@ -225,13 +197,6 @@
       <div class="wt-subtitle"></div>
       <div class="wt-challenges"></div>
       <div class="wt-rewards hidden"></div>
-      <div class="wt-store hidden">
-        <div class="wt-store-score"></div>
-        <div class="wt-store-items">
-          <button class="wt-heal-btn secondary"></button>
-          <button class="wt-loot-btn secondary"></button>
-        </div>
-      </div>
       <div class="wt-buttons">
         <button class="wt-recipes-btn secondary">📖 Recipes</button>
         <button class="wt-play-btn"><span class="wt-play-label">Next Wave in 3…</span></button>
@@ -249,12 +214,12 @@
         <button class="wt-play-btn" id="pauseResumeBtn">▶ Resume</button>
         <button class="wt-challenges-btn secondary" id="pauseChallengesBtn">🎯 Challenges</button>
       </div>
+      <button class="secondary pause-settings-btn" id="pauseSettingsBtn">⚙️ Settings</button>
     </div>
   </div>
 
   <button id="pauseBtn" title="Pause (Esc)">⏸</button>
   <button id="fullscreenBtn" title="Fullscreen">⛶</button>
-  <button id="settingsBtn" title="Settings">⚙️</button>
   <div id="settingsOverlay" class="hidden">
     <div class="settings-modal">
       <h2>⚙️ Settings</h2>
@@ -262,6 +227,11 @@
         <label for="volumeSlider">Sound Effects</label>
         <input type="range" id="volumeSlider" min="0" max="100" value="100" />
         <span id="volumeValue">100%</span>
+      </div>
+      <div class="settings-row">
+        <label for="sensitivitySlider">Movement Sensitivity</label>
+        <input type="range" id="sensitivitySlider" min="0.5" max="5" step="0.1" value="2" />
+        <span id="sensitivityValue">2.0×</span>
       </div>
       <div class="settings-row settings-danger-row">
         <button id="resetProgressBtn" class="danger">Reset Challenges &amp; Recipes</button>

@@ -67,8 +67,6 @@ export const POWERUP_TYPE = Object.freeze({
 // in modes/; see modes/index.js.)
 /** Tray→customer delivery rule. @type {Readonly<{ANY:'any',SEQUENTIAL:'sequential',WHOLE:'whole'}>} */
 export const DELIVERY_MODE = Object.freeze({ ANY: 'any', SEQUENTIAL: 'sequential', WHOLE: 'whole' });
-/** Touch steering scheme. @type {Readonly<{RELATIVE:'relative',ABSOLUTE:'absolute',HOLDZONES:'holdzones'}>} */
-export const TOUCH_SCHEME = Object.freeze({ RELATIVE: 'relative', ABSOLUTE: 'absolute', HOLDZONES: 'holdzones' });
 
 // Recipe templates and per-wave pools used to live here, but recipes are
 // now defined in recipes.js by their specific color combo + group. Per-wave
@@ -85,26 +83,16 @@ export function lerp(a, b, t) {
   return a + (b - a) * Math.max(0, Math.min(1, t));
 }
 
-// Runtime-mutable sky/ground split (fraction of canvas height that is sky;
-// the ground begins here). Defaults to the tuning constant; the debug "sky
-// height" slider moves the horizon live via Game._setFloorRatio, which
-// re-lays-out so cached positions adopt it. Lower = shorter sky = horizon
-// higher = shorter fall + a bigger empty bottom band (where the thumb rests).
-let _floorRatio = _FLOOR_Y_RATIO;
-/** @param {number} r fraction of canvas height that is sky (ground begins here) */
-export function setFloorRatio(r) { _floorRatio = Math.max(0.3, Math.min(0.8, r)); }
-/** @returns {number} current sky/ground split (0..1) */
-export function getFloorRatio() { return _floorRatio; }
-
 /**
  * Y-coordinate of the sand floor's top edge. Shared by scene (floor + sky
  * gradient end), dayCycle (sun horizon), and stations (customer ground line).
- * Reads the live ratio so a debug horizon change propagates everywhere.
+ * The sky/ground split is a fixed layout constant (FLOOR_Y_RATIO in tuning.js);
+ * the runtime horizon override was removed.
  * @param {number} boundsHeight
  * @returns {number}
  */
 export function groundYFor(boundsHeight) {
-  return boundsHeight * _floorRatio;
+  return boundsHeight * _FLOOR_Y_RATIO;
 }
 
 /**
@@ -159,8 +147,6 @@ export {
   COMBO_CASHOUT_PER,
   STACK_CASHOUT_PER_SCOOP,
   BUBBLE_CASHOUT,
-  HEAL_COST,
-  LOOTBOX_COST,
   MAX_PU_INVENTORY,
   SPAWN_DEMAND_BIAS,
   WAVE0_DEMAND_BIAS,

@@ -19,7 +19,8 @@ export class Hud {
     recipesOverlayEl, challengesOverlayEl, settingsOverlayEl,
     waveTransitionOverlayEl, pauseOverlayEl, challengeToastEl,
     recipes, challenges, sound, onStart, onHowToPlay,
-    getVolume, onSetVolume, onResetProgress, onPauseToggle
+    getVolume, onSetVolume, getSensitivity, onSetSensitivity,
+    onResetProgress, onPauseToggle
   }) {
     this.scoreEl = scoreEl;
     this.comboEl = comboEl;
@@ -52,8 +53,6 @@ export class Hud {
     this._wtInterrupted = false;
     /** @type {() => void} */
     this._wtResume = () => {};
-    /** @type {any} Between-wave store callbacks/getters; null when no store. */
-    this._store = null;
     // Whether the one-time mouse-move-cancels-countdown listener is attached.
     this._wtMouseWired = false;
 
@@ -69,6 +68,10 @@ export class Hud {
     this.getVolume = getVolume || (() => 1);
     /** @type {(v: number) => void} */
     this.onSetVolume = onSetVolume || (() => {});
+    /** @type {() => number} relative-drag gain ("movement sensitivity") */
+    this.getSensitivity = getSensitivity || (() => 2);
+    /** @type {(g: number) => void} */
+    this.onSetSensitivity = onSetSensitivity || (() => {});
     /** @type {() => void} */
     this.onResetProgress = onResetProgress || (() => {});
     /** @type {() => void} — opens (or closes) the pause menu from the in-game ⏸ button. */
@@ -123,13 +126,19 @@ export class Hud {
     const closeChallengesBtn = document.getElementById('closeChallengesBtn');
     if (closeChallengesBtn) closeChallengesBtn.addEventListener('click', () => this.hideChallenges());
 
-    // Settings: the cog button is outside the overlay (visible whenever the
-    // menu is up), so its listener only needs to be attached once. Same for
-    // the modal's controls.
+    // Settings now lives as a menu item (home screen + game-over card + pause
+    // menu) rather than a floating cog. Each is wired once via the dataset
+    // guard; the home/game-over button (#settingsBtn) is recreated on every
+    // overlay rewrite, so it re-wires itself then.
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn && !settingsBtn.dataset.wired) {
       settingsBtn.addEventListener('click', () => this.showSettings());
       settingsBtn.dataset.wired = '1';
+    }
+    const pauseSettingsBtn = document.getElementById('pauseSettingsBtn');
+    if (pauseSettingsBtn && !pauseSettingsBtn.dataset.wired) {
+      pauseSettingsBtn.addEventListener('click', () => this.showSettings());
+      pauseSettingsBtn.dataset.wired = '1';
     }
     const closeSettingsBtn = document.getElementById('closeSettingsBtn');
     if (closeSettingsBtn && !closeSettingsBtn.dataset.wired) {
@@ -147,6 +156,18 @@ export class Hud {
         }
       });
       volumeSlider.dataset.wired = '1';
+    }
+    const sensSlider = /** @type {HTMLInputElement | null} */ (document.getElementById('sensitivitySlider'));
+    const sensLabel  = /** @type {HTMLElement | null} */ (document.getElementById('sensitivityValue'));
+    if (sensSlider && !sensSlider.dataset.wired) {
+      sensSlider.addEventListener('input', () => {
+        const g = parseFloat(sensSlider.value);
+        if (Number.isFinite(g)) {
+          this.onSetSensitivity(g);
+          if (sensLabel) sensLabel.textContent = `${g.toFixed(1)}×`;
+        }
+      });
+      sensSlider.dataset.wired = '1';
     }
     // In-game ⏸ button (bottom-right, visible only during play). One-shot
     // wiring — clicking it opens the pause menu via the game-side toggle.
@@ -455,8 +476,7 @@ export class Hud {
   /**
    * Toggles body.menu-visible. Used by CSS to fade the HUD out while the
    * start/game-over overlay is up and fade it back in when the player
-   * resumes. Also drives the settings button's visibility — it's only
-   * useful on menu screens.
+   * resumes, and to hide the in-game ⏸ button on menu screens.
    * @param {boolean} visible
    */
   _setMenuVisible(visible) {
@@ -475,6 +495,13 @@ export class Hud {
       const pct = Math.round(this.getVolume() * 100);
       slider.value = String(pct);
       if (label) label.textContent = `${pct}%`;
+    }
+    const sens = /** @type {HTMLInputElement | null} */ (document.getElementById('sensitivitySlider'));
+    const sensLabel = /** @type {HTMLElement | null} */ (document.getElementById('sensitivityValue'));
+    if (sens) {
+      const g = this.getSensitivity();
+      sens.value = String(g);
+      if (sensLabel) sensLabel.textContent = `${g.toFixed(1)}×`;
     }
     this.settingsOverlayEl.classList.remove('hidden');
   }
@@ -531,21 +558,20 @@ export class Hud {
    * starts a 3-second countdown to Resume. Any button click cancels the
    * countdown and converts the centre button to "Play".
    *
-   * @param {{ completedWave: number, onResume: () => void, store?: any }} opts
+   * @param {{ completedWave: number, onResume: () => void }} opts
    */
-  showWaveTransition({ completedWave, onResume, store = null }) {
+  showWaveTransition({ completedWave, onResume }) {
     if (!this.waveTransitionOverlayEl || !this.challenges) {
       // No overlay markup — resume immediately so the player isn't stuck.
       onResume();
       return;
     }
     this._wtResume = onResume;
-    this._store = store;
     this._wtInterrupted = false;
     this._wtClearCountdown();
 
     // Any mouse movement during the transition cancels the auto-countdown and
-    // hands control to the Play button — so browsing the store isn't rushed.
+    // hands control to the Play button — so reading the recap isn't rushed.
     if (!this._wtMouseWired) {
       this._wtMouseWired = true;
       window.addEventListener('mousemove', () => this._onWtMouseMove());
@@ -588,7 +614,6 @@ export class Hud {
     // Show overlay, then begin the cross-off sequence.
     this.waveTransitionOverlayEl.classList.remove('hidden');
     this._wireWaveTransitionButtons();
-    this._renderStore();
     this._animateCrossOffs(challengesEl, earnedIds, () => this._afterCrossOffs(rewardsEl, challengesEl));
   }
 
@@ -709,7 +734,7 @@ export class Hud {
     }
     const playLabel = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-play-label'));
     if (!playLabel) return;
-    let secondsLeft = 8;  // generous — there's a store to browse now
+    let secondsLeft = 8;  // generous — gives time to read the cross-offs / rewards
     const tick = () => {
       if (this._wtInterrupted) {
         this._wtClearCountdown();
@@ -788,60 +813,11 @@ export class Hud {
       });
       /** @type {HTMLElement} */ (challengesBtn).dataset.wired = '1';
     }
-
-    // Store buttons. A purchase stops the auto-countdown so the player can keep
-    // shopping, then re-renders the row (new score + affordability).
-    const healBtn = this.waveTransitionOverlayEl.querySelector('.wt-heal-btn');
-    const lootBtn = this.waveTransitionOverlayEl.querySelector('.wt-loot-btn');
-    const buy = (fn) => {
-      if (!this._store) return;
-      const r = fn();
-      if (r && r.ok) {
-        this._wtInterrupted = true;
-        this._wtClearCountdown();
-        this._showWtPlayButton();
-      }
-      this._renderStore();
-    };
-    if (healBtn && !(/** @type {HTMLElement} */ (healBtn).dataset.wired)) {
-      healBtn.addEventListener('click', () => buy(() => this._store.onBuyHeal()));
-      /** @type {HTMLElement} */ (healBtn).dataset.wired = '1';
-    }
-    if (lootBtn && !(/** @type {HTMLElement} */ (lootBtn).dataset.wired)) {
-      lootBtn.addEventListener('click', () => buy(() => this._store.onBuyLootbox()));
-      /** @type {HTMLElement} */ (lootBtn).dataset.wired = '1';
-    }
   }
 
   hideWaveTransition() {
     this._wtClearCountdown();
     if (this.waveTransitionOverlayEl) this.waveTransitionOverlayEl.classList.add('hidden');
-  }
-
-  /** Refresh the between-wave store row: score wallet + Heal/Loot button states. */
-  _renderStore() {
-    const root = this.waveTransitionOverlayEl;
-    if (!root) return;
-    const storeEl = root.querySelector('.wt-store');
-    const store = this._store;
-    if (!storeEl) return;
-    if (!store) { storeEl.classList.add('hidden'); return; }
-    storeEl.classList.remove('hidden');
-
-    const score = store.getScore();
-    const scoreEl = root.querySelector('.wt-store-score');
-    if (scoreEl) scoreEl.textContent = `Spend points: ${score}`;
-
-    const healBtn = /** @type {HTMLButtonElement | null} */ (root.querySelector('.wt-heal-btn'));
-    if (healBtn) {
-      healBtn.textContent = `❤️ Full Heal — ${store.healCost}`;
-      healBtn.disabled = score < store.healCost || store.getHealthFull();
-    }
-    const lootBtn = /** @type {HTMLButtonElement | null} */ (root.querySelector('.wt-loot-btn'));
-    if (lootBtn) {
-      lootBtn.textContent = `🎁 Loot Box — ${store.lootCost}`;
-      lootBtn.disabled = score < store.lootCost;
-    }
   }
 
   /** Title screen: surface the current best so there's something to beat. */
@@ -929,6 +905,7 @@ export class Hud {
         <button id="recipesBtn" class="secondary${flashCls}">📖 Recipes</button>
         <button id="startBtn">▶ Play Again</button>
         <button id="challengesBtn" class="secondary">🎯 Challenges</button>
+        <button id="settingsBtn" class="secondary">⚙️ Settings</button>
       </div>
     `;
     this._wireMenuButtons();

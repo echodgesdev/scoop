@@ -12,12 +12,9 @@ export class Input {
   constructor() {
     this.left = false;
     this.right = false;
-    // Touch steering. Absolute scheme: chase moveTargetX at up to max speed
-    // (null = inactive). Relative scheme: moveDelta accumulates virtual-x to
-    // apply directly this frame, then the player consumes (zeroes) it. Hold-zone
-    // scheme uses left/right like the keyboard. Only one is active at a time.
-    /** @type {number | null} */
-    this.moveTargetX = null;
+    // Relative touch steering: moveDelta accumulates virtual-x to apply directly
+    // this frame, then the player consumes (zeroes) it each frame. left/right are
+    // the held keyboard arrows. (Absolute / hold-zone touch schemes were removed.)
     this.moveDelta = 0;
     // Which input was used most recently — drives input-aware tutorial wording
     // (tap/swipe vs key names). Set true by the touch layer, false on keydown.

@@ -18,15 +18,10 @@ import {
   STACK_CASHOUT_PER_SCOOP,
   COMBO_BREAKER_THRESHOLD,
   COMBO_BREAKER_DURATION_MULT,
-  HEAL_COST,
-  LOOTBOX_COST,
   SPAWN_DEMAND_BIAS,
   WAVE0_DEMAND_BIAS,
   coneYFor,
-  setFloorRatio,
-  getFloorRatio,
-  DELIVERY_MODE,
-  TOUCH_SCHEME
+  DELIVERY_MODE
 } from './config.js';
 import { Player } from './player.js';
 import { ScoopField, isCaught } from './scoops.js';
@@ -46,7 +41,7 @@ import { ProjectileField, projectileHits } from './projectiles.js';
 import { EventBus } from './events.js';
 import { Recipes } from './recipes.js';
 import { Challenges } from './challenges.js';
-import { virtualDims, responsiveDims, fitRect } from './viewport.js';
+import { responsiveDims, fitRect } from './viewport.js';
 import { makeMode, MODE_LIST, DEFAULT_MODE } from './modes/index.js';
 import { TouchControls } from './touch.js';
 
@@ -83,12 +78,10 @@ export class Game {
     this.canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
     this.ctx = /** @type {CanvasRenderingContext2D} */ (this.canvas.getContext('2d'));
     // #stage is the container the canvas + HUD live in; its on-screen rect is
-    // recomputed in _resize. In 'auto' mode (the default) the virtual canvas
-    // matches the viewport aspect so it fills the screen on mobile; a forced
-    // aspect (debug) locks a fixed preset and letterboxes instead.
+    // recomputed in _resize. The virtual canvas always tracks the viewport
+    // aspect (clamped to portrait) so it fills the screen on mobile — there's
+    // no forced-aspect / letterbox mode anymore.
     this.stage = document.getElementById('stage');
-    this.autoAspect = true;
-    this.aspect = 'auto';
     const _d = responsiveDims(window.innerWidth, window.innerHeight);
     /** @type {{ width: number, height: number }} Virtual (logical) play area. */
     this.bounds = { width: _d.width, height: _d.height };
@@ -133,6 +126,8 @@ export class Game {
       onHowToPlay: () => this.start(true),  // replays the tutorial on demand
       getVolume:  () => this.sound.volume,
       onSetVolume: v => this.sound.setVolume(v),
+      getSensitivity: () => this.touchGain,
+      onSetSensitivity: g => this.setTouchGain(g),
       onResetProgress: () => this._resetProgress(),
       onPauseToggle: () => this._togglePause()
     });
@@ -198,43 +193,21 @@ export class Game {
     this.input.onDebugDamage = () => this._debugDamage();
     this.input.onPause = () => this._togglePause();
 
-    // Movement scheme for the touch layer (debug-switchable A/B). 'relative' is
-    // the default — small thumb travel moves the cone far (gain), least
-    // fatiguing. 'absolute' = cone tracks the finger; 'holdzones' = press the
-    // left/right edge thirds to drive. Discrete verbs (tap/swipe) are identical
-    // across all three; only steering differs.
-    this.touchScheme = TOUCH_SCHEME.RELATIVE;
-    this.touchGain = 2.0;
+    // Relative drag is the only touch-steering scheme: small thumb travel moves
+    // the cone far, scaled by touchGain (the "Movement sensitivity" Settings
+    // slider). It's the least-fatiguing one-handed control; the discrete verbs
+    // (tap to serve, swipe up/down) are independent of it. Keyboard stays live.
+    this.touchGain = this._loadTouchGain();
 
     // Native touch layer (also handles mouse/pen). Reports raw gestures; the
-    // handlers below interpret them per touchScheme. Keyboard stays fully live.
+    // handlers below apply relative steering + map the verbs.
     this.touch = new TouchControls(this.canvas, {
       toVirtual: (cx, cy) => this._toVirtual(cx, cy),
-      onHold: vx => {
-        this.input.lastWasTouch = true;
-        if (this.touchScheme === TOUCH_SCHEME.HOLDZONES) {
-          const third = this.bounds.width / 3;
-          this.input.left = vx < third;
-          this.input.right = vx > this.bounds.width - third;
-        }
-      },
-      onHoldEnd: () => {
-        if (this.touchScheme === TOUCH_SCHEME.HOLDZONES) { this.input.left = false; this.input.right = false; }
-      },
-      onMove: (vx, dvx) => {
-        if (this.touchScheme === TOUCH_SCHEME.RELATIVE) this.input.moveDelta += dvx * this.touchGain;
-        else if (this.touchScheme === TOUCH_SCHEME.ABSOLUTE) this.input.moveTargetX = vx;
-        // holdzones: dragging doesn't steer (the edge-hold does)
-      },
-      onMoveEnd: () => { this.input.moveTargetX = null; },
-      onTap: (vx, vy) => {
-        // In hold-zones the edge thirds are move pads, so only middle taps serve.
-        if (this.touchScheme === TOUCH_SCHEME.HOLDZONES) {
-          const third = this.bounds.width / 3;
-          if (vx < third || vx > this.bounds.width - third) return;
-        }
-        this._onTouchTap(vx, vy);
-      },
+      onHold: () => { this.input.lastWasTouch = true; },
+      onHoldEnd: () => {},
+      onMove: (_vx, dvx) => { this.input.moveDelta += dvx * this.touchGain; },
+      onMoveEnd: () => {},
+      onTap: (vx, vy) => this._onTouchTap(vx, vy),
       onSwipeUp: () => this._pop(),
       onSwipeDown: () => this._rotate()
     });
@@ -266,8 +239,6 @@ export class Game {
       patternTimer: true, invincible: false, pickupKeys: false,
       showHitboxes: false, showFps: false
     };
-    // Between-wave store (loot box) — off by default; toggled from the debug panel.
-    this.storeEnabled = false;
     // Debug patience override (seconds). null = follow the wave ramp.
     /** @type {number | null} */
     this.patienceOverride = null;
@@ -276,8 +247,6 @@ export class Game {
       onWaveJump: n => this._jumpToWave(n),
       onTimeJump: f => this._jumpToTime(f),
       getWaveFraction: () => this.waves.waveFraction,
-      onAspectChange: name => this._setAspect(name),
-      getAspect: () => this.aspect,
       onDemandBias: v => this.field.setDemandBias(v),
       getDemandBias: () => this.field.demandBias,
       onPatience: sec => { this.patienceOverride = sec; },
@@ -300,17 +269,6 @@ export class Game {
       },
       getGameMode: () => this.gameMode,
       getModeList: () => MODE_LIST,
-      onStoreToggle: on => { this.storeEnabled = on; },
-      getStoreEnabled: () => this.storeEnabled,
-      onTouchScheme: name => {
-        this.touchScheme = name;
-        // Clear any in-flight steering state so schemes don't bleed together.
-        this.input.moveTargetX = null;
-        this.input.moveDelta = 0;
-        this.input.left = false;
-        this.input.right = false;
-      },
-      getTouchScheme: () => this.touchScheme,
       onDeliveryMode: name => { this.deliveryMode = name; },
       getDeliveryMode: () => this.deliveryMode,
       onMaxStack: n => { this.maxStack = Math.max(1, Math.round(n)); },
@@ -323,10 +281,6 @@ export class Game {
         : this.waves.tuning().spawnInterval,
       onFallSpeed: m => this.field.setFallScale(m),
       getFallSpeed: () => this.field.fallScale,
-      onHorizon: r => this._setFloorRatio(r),
-      getHorizon: () => getFloorRatio(),
-      onDragGain: g => { this.touchGain = g; },
-      getDragGain: () => this.touchGain,
       onComboBreaker: n => { this.comboBreakerThreshold = Math.max(2, Math.round(n)); },
       getComboBreaker: () => this.comboBreakerThreshold,
       onComboBreakerToggle: on => { this.comboBreakerEnabled = on; this._syncComboHud(); },
@@ -351,9 +305,9 @@ export class Game {
   }
 
   /**
-   * Size the canvas backing store to the current aspect's virtual resolution,
-   * reposition every actor against the new bounds, then re-letterbox. Called
-   * on construction and whenever the debug aspect selector changes.
+   * Size the canvas backing store to the virtual resolution, reposition every
+   * actor against the bounds, then fit the stage to the viewport. Called once on
+   * construction; ongoing viewport changes go through _resize.
    */
   _applyAspect() {
     this.canvas.width = this.bounds.width;
@@ -362,35 +316,6 @@ export class Game {
     this.stations.layout(this.bounds);
     this.shop.layout(this.bounds.width);
     this._resize();
-  }
-
-  /**
-   * Debug: switch aspect. 'auto' (default) tracks the viewport so the canvas
-   * fills the screen; any other name locks that fixed preset (letterboxed).
-   * @param {string} name
-   */
-  _setAspect(name) {
-    this.aspect = name;
-    this.autoAspect = name === 'auto';
-    const d = this.autoAspect
-      ? responsiveDims(window.innerWidth, window.innerHeight)
-      : virtualDims(name);
-    this.bounds.width = d.width;
-    this.bounds.height = d.height;
-    this._applyAspect();
-  }
-
-  /**
-   * Debug: move the horizon (sky/ground split). A shorter sky shortens the fall
-   * (scoops arrive sooner) and lifts the whole play block up, growing the empty
-   * bottom band where a one-handed thumb rests. Re-lays-out so the cached cone /
-   * customer / ground positions adopt the new ratio at once. Bounds are
-   * unchanged — this only re-derives positions within them.
-   * @param {number} r fraction of canvas height that is sky
-   */
-  _setFloorRatio(r) {
-    setFloorRatio(r);
-    this._applyAspect();
   }
 
   /**
@@ -561,26 +486,23 @@ export class Game {
   }
 
   /**
-   * Position #stage over the viewport. In 'auto' mode the virtual canvas is
-   * re-derived from the viewport aspect (so it fills the screen edge-to-edge on
-   * mobile); when the dims change the backing store is resized and actors are
-   * repositioned. A forced aspect just letterboxes the fixed preset. fitRect
-   * with a matching aspect yields a full-bleed rect; with a portrait cap on a
-   * wide desktop it centers the column.
+   * Re-derive the virtual canvas from the viewport aspect (so it fills the
+   * screen edge-to-edge on mobile); when the dims change the backing store is
+   * resized and actors are repositioned. Then fit #stage over the viewport —
+   * fitRect with a matching aspect yields a full-bleed rect; with the portrait
+   * cap on a wide desktop it centers the column.
    */
   _resize() {
     if (!this.stage) return;
-    if (this.autoAspect) {
-      const d = responsiveDims(window.innerWidth, window.innerHeight);
-      if (d.width !== this.bounds.width || d.height !== this.bounds.height) {
-        this.bounds.width = d.width;
-        this.bounds.height = d.height;
-        this.canvas.width = d.width;
-        this.canvas.height = d.height;
-        this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
-        this.stations.layout(this.bounds);
-        this.shop.layout(this.bounds.width);
-      }
+    const d = responsiveDims(window.innerWidth, window.innerHeight);
+    if (d.width !== this.bounds.width || d.height !== this.bounds.height) {
+      this.bounds.width = d.width;
+      this.bounds.height = d.height;
+      this.canvas.width = d.width;
+      this.canvas.height = d.height;
+      this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+      this.stations.layout(this.bounds);
+      this.shop.layout(this.bounds.width);
     }
     const r = fitRect(window.innerWidth, window.innerHeight, this.bounds.width, this.bounds.height);
     this.stage.style.left = `${r.left}px`;
@@ -618,8 +540,7 @@ export class Game {
     this.nightT = 0;
     this.activeBubble = null;
     this.puLeaving.length = 0;
-    this.input.moveTargetX = null;  // drop any stale touch-steer state
-    this.input.moveDelta = 0;
+    this.input.moveDelta = 0;  // drop any stale touch-steer state
     // Rebuild the mode strategy + its tutorial for a fresh run.
     this.mode = makeMode(this.gameMode, this);
     this.mode.reset();
@@ -659,6 +580,21 @@ export class Game {
   setShowTutorial(v) {
     this.showTutorial = v;
     try { localStorage.setItem('scoop.showTutorial', v ? '1' : '0'); } catch {}
+  }
+
+  // Movement sensitivity = the relative-drag gain, persisted. The Settings
+  // slider drives setTouchGain; both clamp to the slider's range.
+  _loadTouchGain() {
+    try {
+      const v = parseFloat(localStorage.getItem('scoop.touchGain') || '');
+      return Number.isFinite(v) ? Math.max(0.5, Math.min(5, v)) : 2.0;
+    } catch { return 2.0; }
+  }
+
+  /** @param {number} g */
+  setTouchGain(g) {
+    this.touchGain = Math.max(0.5, Math.min(5, g));
+    try { localStorage.setItem('scoop.touchGain', String(this.touchGain)); } catch {}
   }
 
   /** @param {DOMHighResTimeStamp} t */
@@ -1279,48 +1215,8 @@ export class Game {
     this.inWaveTransition = true;
     this.hud.showWaveTransition({
       completedWave,
-      onResume: () => this._endWaveTransition(),
-      // Between-wave store — gated behind the debug "show store" toggle (off by
-      // default). Spend the cashout windfall on survival (heal) or a random
-      // power-up (loot box). Passing null hides the store row entirely.
-      store: this.storeEnabled ? {
-        healCost: HEAL_COST,
-        lootCost: LOOTBOX_COST,
-        getScore: () => this.shop.score,
-        getHealthFull: () => this.health >= MAX_HEALTH,
-        onBuyHeal: () => this._buyHeal(),
-        onBuyLootbox: () => this._buyLootbox()
-      } : null
+      onResume: () => this._endWaveTransition()
     });
-  }
-
-  /** Store: spend score to refill health. @returns {{ ok: boolean, score: number, healthFull: boolean }} */
-  _buyHeal() {
-    const full = this.health >= MAX_HEALTH;
-    if (this.shop.score < HEAL_COST || full) return { ok: false, score: this.shop.score, healthFull: full };
-    this.shop.score -= HEAL_COST;
-    this.health = MAX_HEALTH;
-    this.hud.setScore(this.shop.score);
-    this.hud.setHealth(this.health / MAX_HEALTH);
-    this.sound.heart();
-    return { ok: true, score: this.shop.score, healthFull: true };
-  }
-
-  /**
-   * Store: spend score for a random unlocked power-up, handed to the active
-   * PowerupMode (Auto fires it now; Banked drops it into the queue).
-   * @returns {{ ok: boolean, score: number, lootType?: string }}
-   */
-  _buyLootbox() {
-    if (this.shop.score < LOOTBOX_COST) return { ok: false, score: this.shop.score };
-    let pool = this.challenges.unlockedPowerupTypes();
-    if (!pool || pool.length === 0) pool = [PICKUP_TYPE.HEART];  // baseline before any unlocks
-    const type = pool[Math.floor(Math.random() * pool.length)];
-    this.shop.score -= LOOTBOX_COST;
-    // Auto fires it now; Banked drops it into the queue.
-    this.mode.onLootboxSpend(type, this.player.x, this.player.stackTopY());
-    this.hud.setScore(this.shop.score);
-    return { ok: true, score: this.shop.score, lootType: type };
   }
 
   _endWaveTransition() {
