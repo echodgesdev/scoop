@@ -20,7 +20,7 @@ export class Hud {
     waveTransitionOverlayEl, pauseOverlayEl, challengeToastEl,
     recipes, challenges, sound, onStart, onHowToPlay,
     getVolume, onSetVolume, getSensitivity, onSetSensitivity,
-    onResetProgress, onPauseToggle
+    getHaptics, onSetHaptics, onResetProgress, onPauseToggle
   }) {
     this.scoreEl = scoreEl;
     this.comboEl = comboEl;
@@ -72,6 +72,10 @@ export class Hud {
     this.getSensitivity = getSensitivity || (() => 2);
     /** @type {(g: number) => void} */
     this.onSetSensitivity = onSetSensitivity || (() => {});
+    /** @type {() => boolean} vibration (haptics) enabled */
+    this.getHaptics = getHaptics || (() => false);
+    /** @type {(v: boolean) => void} */
+    this.onSetHaptics = onSetHaptics || (() => {});
     /** @type {() => void} */
     this.onResetProgress = onResetProgress || (() => {});
     /** @type {() => void} — opens (or closes) the pause menu from the in-game ⏸ button. */
@@ -168,6 +172,11 @@ export class Hud {
         }
       });
       sensSlider.dataset.wired = '1';
+    }
+    const hapticsToggle = /** @type {HTMLInputElement | null} */ (document.getElementById('hapticsToggle'));
+    if (hapticsToggle && !hapticsToggle.dataset.wired) {
+      hapticsToggle.addEventListener('change', () => this.onSetHaptics(hapticsToggle.checked));
+      hapticsToggle.dataset.wired = '1';
     }
     // In-game ⏸ button (bottom-right, visible only during play). One-shot
     // wiring — clicking it opens the pause menu via the game-side toggle.
@@ -503,6 +512,8 @@ export class Hud {
       sens.value = String(g);
       if (sensLabel) sensLabel.textContent = `${g.toFixed(1)}×`;
     }
+    const haptics = /** @type {HTMLInputElement | null} */ (document.getElementById('hapticsToggle'));
+    if (haptics) haptics.checked = this.getHaptics();
     this.settingsOverlayEl.classList.remove('hidden');
   }
 

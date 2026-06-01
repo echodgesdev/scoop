@@ -31,6 +31,7 @@ import { Waves, WAVE_EVENT } from './waves.js';
 import { Hud } from './hud.js';
 import { Input } from './input.js';
 import { Sound } from './audio.js';
+import { Haptics } from './haptics.js';
 import { Effects } from './effects.js';
 import { DebugPanel } from './debug.js';
 import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
@@ -128,11 +129,14 @@ export class Game {
       onSetVolume: v => this.sound.setVolume(v),
       getSensitivity: () => this.touchGain,
       onSetSensitivity: g => this.setTouchGain(g),
+      getHaptics: () => this.haptics.enabled,
+      onSetHaptics: v => this.haptics.setEnabled(v),
       onResetProgress: () => this._resetProgress(),
       onPauseToggle: () => this._togglePause()
     });
     this.input   = new Input();
     this.sound   = new Sound();
+    this.haptics = new Haptics();
     this.effects = new Effects();
     /** @type {EventBus<GameEventMap>} */
     this.bus = new EventBus();
@@ -428,6 +432,7 @@ export class Game {
       if (perfect) {
         const top = { x: scoop.x, y: this.player.stackTopY() };
         this.sound.perfect();
+        this.haptics.catch_();
         this.effects.burst(top.x, top.y, ['#fff', this.shop.hex(scoop.color)], 10);
         this.effects.popText(top.x, top.y - 24, 'Perfect!', { color: '#ffec5c', size: 22, life: 0.7 });
         this.player.triggerFlash(0.25);
@@ -438,6 +443,7 @@ export class Game {
 
     this.bus.on('trayFull', () => {
       this.sound.bad();
+      this.haptics.error();
       this.effects.addShake(8);
       this.hurt = 0.2;
     });
@@ -453,15 +459,18 @@ export class Game {
       this.player.triggerFlash();
       this.effects.addShake(6);
       this.sound.match();
+      this.haptics.serve();
     });
 
     this.bus.on('serveFail', () => {
       this.sound.bad();
+      this.haptics.error();
       this.effects.addShake(4);
     });
 
     this.bus.on('expire', () => {
       this.sound.expire();
+      this.haptics.expire();
       this.effects.addShake(12);
       this.hurt = 0.35;
     });
@@ -469,6 +478,7 @@ export class Game {
     this.bus.on('phaseUp', () => {
       this.hud.flashPhaseUp();
       this.sound.phaseUp();
+      this.haptics.phaseUp();
       this.effects.addShake(4);
       const c = this.hud.gaugeCenter();
       if (c) this.effects.burst(c.x, c.y, ['#ffd166', '#fff'], 14);
@@ -480,6 +490,7 @@ export class Game {
       this.hud.setGauge(this.waves.wave, 1);
       this.hud.flashWaveUp();
       this.sound.levelUp();
+      this.haptics.wave();
       this.effects.addShake(14);
       const c = this.hud.gaugeCenter();
       if (c) this.effects.burst(c.x, c.y, ['#ffec5c', '#ffd166', '#ff6fa3', '#7fe3c4'], 60);
@@ -774,6 +785,7 @@ export class Game {
       this.powerups.trigger(type, durationMult);
       this.sound.powerupTrigger();
     }
+    this.haptics.powerup();
     this._powerupUseFx(type, x, y);
   }
 

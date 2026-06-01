@@ -1222,6 +1222,17 @@ button.flash {
   font-weight: bold;
   color: #6a4a2a;
 }
+/* Checkbox rows (e.g. Vibration) read better as a single inline line. */
+.settings-row-check {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.settings-row-check input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+}
 .settings-row #volumeSlider {
   width: 100%;
 }
