@@ -11,6 +11,9 @@ import {
   PATTERN_TIME_START,
   PATTERN_TIME_END,
   COLOR_KEYS,
+  ORDER_SIZE_WEIGHTS,
+  DISCOVERY_BIAS_START,
+  DISCOVERY_BIAS_END,
   lerp
 } from './config.js';
 import { recipesForWave } from './recipes.js';
@@ -44,9 +47,14 @@ export class Waves {
    *   Returns the set of section ids the player has unlocked via
    *   challenges. If omitted, all wave-pool sections are available
    *   (legacy behaviour).
+   * @param {(recipeId: string) => boolean} [isDiscovered]
+   *   True if the player has already completed the given recipe at least once.
+   *   Drives the new-recipe discovery bias in pickOrder. Defaults to "nothing
+   *   discovered" (so the bias, if it fires, simply picks among all candidates).
    */
-  constructor(getUnlockedSections) {
+  constructor(getUnlockedSections, isDiscovered) {
     this.getUnlockedSections = getUnlockedSections || (() => null);
+    this.isDiscovered = isDiscovered || (() => false);
     /** @type {Set<ScoopColor>} Colors served in Wave 0 (completion + no-repeat). */
     this.servedColors = new Set();
     this.reset();
@@ -178,16 +186,23 @@ export class Waves {
   }
 
   /**
-   * Roll a random recipe from this wave's pool of *active* recipes. Each
-   * recipe brings its own point value and combo weight (from its group).
+   * Roll the next customer order. Two-stage, so the order-SIZE mix is controlled
+   * independently of how many recipes of each size exist:
+   *   1. Roll a size by the per-wave ORDER_SIZE_WEIGHTS, restricted to the sizes
+   *      actually present in this wave's (section-gated) pool, then renormalized.
+   *   2. Among recipes of that size, apply the wave-scaled discovery bias —
+   *      with probability DISCOVERY_BIAS_*(wave), prefer one the player has not
+   *      yet discovered — then pick uniformly. Each recipe carries its own point
+   *      value and combo weight (from its group).
    * @returns {{ recipe: string, colors: ScoopColor[], value: number, weight: number }}
    */
   pickOrder() {
+    const wave = /** @type {number} */ (this.wave);
     const unlocked = this.getUnlockedSections() || undefined;
-    let pool = recipesForWave(/** @type {number} */ (this.wave), unlocked);
+    let pool = recipesForWave(wave, unlocked);
     // Wave 0: never hand out a color the player has already served, so each of
     // the five junior flavors comes up exactly once.
-    if (this.wave === 0 && this.servedColors.size > 0) {
+    if (wave === 0 && this.servedColors.size > 0) {
       const filtered = pool.filter(r => !r.colors.every(c => this.servedColors.has(c)));
       if (filtered.length > 0) pool = filtered;
     }
@@ -196,7 +211,43 @@ export class Waves {
       // unlocked, so this branch should only fire if WAVE_GROUPS is broken.
       return { recipe: 'pink', colors: ['pink'], value: 60, weight: 1 };
     }
-    const r = pool[Math.floor(Math.random() * pool.length)];
+
+    // 1. Bucket the pool by size and roll a size by the per-wave weights,
+    //    considering only sizes that have recipes available right now.
+    /** @type {Map<number, typeof pool>} */
+    const bySize = new Map();
+    for (const r of pool) {
+      const bucket = bySize.get(r.size);
+      if (bucket) bucket.push(r);
+      else bySize.set(r.size, [r]);
+    }
+    const sizes = [...bySize.keys()];
+    const weights = ORDER_SIZE_WEIGHTS[Math.min(wave, ORDER_SIZE_WEIGHTS.length - 1)] || {};
+    let chosenSize = sizes[0];
+    const sizeWeights = sizes.map(s => Math.max(0, weights[s] != null ? weights[s] : 1));
+    const total = sizeWeights.reduce((a, b) => a + b, 0);
+    if (total > 0) {
+      let roll = Math.random() * total;
+      for (let i = 0; i < sizes.length; i++) {
+        roll -= sizeWeights[i];
+        if (roll <= 0) { chosenSize = sizes[i]; break; }
+      }
+    } else {
+      chosenSize = sizes[Math.floor(Math.random() * sizes.length)];
+    }
+    let candidates = bySize.get(chosenSize) || pool;
+
+    // 2. Discovery bias (waves 1+): bigger waves favor surfacing recipes the
+    //    player hasn't made yet, so the catalog keeps opening up.
+    if (wave > 0) {
+      const bias = lerp(DISCOVERY_BIAS_START, DISCOVERY_BIAS_END, Math.min(1, (wave - 1) / WAVE_RAMP));
+      if (bias > 0 && Math.random() < bias) {
+        const undiscovered = candidates.filter(r => !this.isDiscovered(r.id));
+        if (undiscovered.length > 0) candidates = undiscovered;
+      }
+    }
+
+    const r = candidates[Math.floor(Math.random() * candidates.length)];
     return {
       recipe: r.id,
       colors: r.colors.slice(),

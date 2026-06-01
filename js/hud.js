@@ -256,7 +256,7 @@ export class Hud {
 
   /** @param {{ type: string, param?: string }} ch */
   _challengeIcon(ch) {
-    if (ch.type === 'pop_bubbles_type') {
+    if (ch.type === 'use_powerup_type') {
       switch (ch.param) {
         case 'heart':   return '❤️';
         case 'feather': return '⚡';
@@ -269,8 +269,8 @@ export class Hud {
       case 'master_recipes':    return '⭐';
       case 'complete_section':  return '📚';
       case 'serve_customers':   return '🍦';
-      case 'pop_bubbles_wave':
-      case 'pop_bubbles_total': return '💥';
+      case 'use_powerup_wave':
+      case 'use_powerup_total': return '⚡';
       case 'combo_reach':       return '🔥';
       case 'wave_reach':        return '🌊';
       default:                  return '•';

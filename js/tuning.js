@@ -119,6 +119,39 @@ export const SPAWN_DEMAND_BIAS = 0.65;
 // so a new player reliably catches the flavor in front of them.
 export const WAVE0_DEMAND_BIAS = 0.75;
 
+// === Order size mix ==========================================================
+// Relative spawn weights for order SIZE (#scoops), per wave. pickOrder rolls a
+// size by these weights (restricted to the sizes actually present in the wave's
+// section-gated pool, then renormalized), THEN picks a recipe of that size.
+// This decouples how OFTEN a size shows up from how MANY recipes of that size
+// exist — so 3-scoop can be the rich, dominant core while 4-scoop stays a rare
+// treat and 1-scoop tapers off late. Indexed by wave; waves past the end clamp
+// to the last row. (Cap is 4 — there is no 5-scoop content.)
+/** @type {Record<number, number>[]} */
+export const ORDER_SIZE_WEIGHTS = [
+  { 1: 1 },                          // wave 0 — tutorial: singles only
+  { 1: 1 },                          // wave 1 — pool is singles only
+  { 1: 50, 2: 50 },                  // wave 2 — doubles arrive
+  { 1: 30, 2: 45, 3: 25 },           // wave 3
+  { 1: 22, 2: 40, 3: 38 },           // wave 4 — 3-scoop core opens
+  { 1: 15, 2: 32, 3: 53 },           // wave 5
+  { 1: 12, 2: 26, 3: 62 },           // wave 6 — full 3-scoop core
+  { 1: 10, 2: 24, 3: 60, 4: 6 },     // wave 7 — first 4-scoop, kept rare
+  { 1: 8,  2: 22, 3: 62, 4: 8 },     // wave 8
+  { 1: 7,  2: 19, 3: 64, 4: 10 },    // wave 9
+  { 1: 6,  2: 18, 3: 66, 4: 10 }     // wave 10+ — 3-scoop dominant, 4-scoop a treat
+];
+
+// === New-recipe discovery bias ===============================================
+// Probability that a spawn deliberately targets a not-yet-discovered recipe (of
+// the rolled size), so the player keeps meeting new recipes instead of re-
+// rolling ones they've already made. Ramps UP with wave (over WAVE_RAMP) because
+// later waves have the most undiscovered recipes to surface — the opposite of
+// the old pure-uniform pick, where a growing pool made discovery progressively
+// less likely.
+export const DISCOVERY_BIAS_START = 0.25;  // wave 1
+export const DISCOVERY_BIAS_END = 0.6;     // wave WAVE_RAMP and beyond
+
 // Per-recipe combo weight is now defined per-group in recipes.js — each
 // recipe inherits its weight from the group it belongs to.
 

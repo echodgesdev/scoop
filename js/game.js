@@ -181,7 +181,10 @@ export class Game {
     this.comboBreakerThreshold = COMBO_BREAKER_THRESHOLD;
     this.comboBreakerEnabled = false;
 
-    this.waves       = new Waves(() => this.challenges.unlockedSectionIds());
+    this.waves       = new Waves(
+      () => this.challenges.unlockedSectionIds(),
+      id => this.recipes.isDiscovered(id)
+    );
     this.powerups    = new PowerUps();
     this.player      = new Player(0, 0);
     this.field       = new ScoopField();
@@ -798,9 +801,9 @@ export class Game {
    * @param {boolean} [viaShot] true when popped by a slingshot projectile
    */
   _onPickup(pickup, viaShot = false) {
-    // Challenge tracking: every popped bubble counts (catch hitbox OR slingshot
-    // projectile both route here).
-    this.challenges.recordBubblePop(pickup.type);
+    // Power-up "use" is tracked at the single fire seam (_firePower) so it
+    // counts across every mode + source — not here, where it would miss tips
+    // and combo-breakers and double-count Banked catches that aren't spent yet.
     this.bus.emit('pickup', { pickup });  // white burst at the catch point
     // The mode decides fire-now (Auto) vs bank-for-later (Banked).
     this.powerupMode.onCatch(pickup.type, this.player.x, this.player.stackTopY());
@@ -888,6 +891,10 @@ export class Game {
    *   breaker passes > 1 to supercharge it). Ignored by the instant heart heal.
    */
   _firePower(type, x, y, durationMult = 1) {
+    // Single seam for "a power-up was used" — every mode + source (catch, Banked
+    // spend, tip, combo-breaker, loot box) flows through here, so this is the
+    // one place challenge tracking counts it.
+    this.challenges.recordPowerupUsed(type);
     if (type === PICKUP_TYPE.HEART) {
       if (!this.flags.invincible) {
         this.health = Math.min(MAX_HEALTH, this.health + HEART_HEAL_AMOUNT);

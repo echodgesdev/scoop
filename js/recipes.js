@@ -21,17 +21,22 @@ const FLAVOR_NAMES = {
  * combo-weight bump for its recipes — values increase down the list so
  * harder recipes pay more.
  */
+// Cone size caps at 4 scoops. The catalog is dense at the 3-scoop core (the
+// designed "most of the late game" tier — fully saturated to all 35 combos),
+// with 4-scoop kept to a small, rare set of distinct patterns. (There is no
+// 5-scoop content; the two former 5-scoop groups were repurposed into the
+// mixed-count 4-scoop patterns Two Pair / Triple Threat.)
 export const GROUPS = [
-  { id: 'JUNIOR_SCOOP',         name: 'Junior Scoop',          size: 1, value: 60,   weight: 1 },
-  { id: 'DAILY_DOUBLE',         name: 'Daily Double',          size: 2, value: 140,  weight: 1 },
-  { id: 'YIN_YANG',             name: 'Yin & Yang',            size: 2, value: 180,  weight: 1 },
-  { id: 'THREES_COMPANY',       name: "Three's Company",       size: 3, value: 280,  weight: 2 },
-  { id: 'BEST_TWO_OF_THREE',    name: 'Best Two Out Of Three', size: 3, value: 320,  weight: 2 },
-  { id: 'HOLY_TRINITY',         name: 'Holy Trinity',          size: 3, value: 400,  weight: 2 },
-  { id: 'FAB_FOUR',             name: 'Fab Four',              size: 4, value: 600,  weight: 3 },
-  { id: 'ROYAL_FLUSH',          name: 'Royal Flush',           size: 4, value: 700,  weight: 3 },
-  { id: 'DIABETES',             name: 'Diabetes',              size: 5, value: 1000, weight: 4 },
-  { id: 'RAINBOW',              name: 'Rainbow',               size: 5, value: 1500, weight: 5 }
+  { id: 'JUNIOR_SCOOP',         name: 'Junior Scoop',          size: 1, value: 60,  weight: 1 },
+  { id: 'DAILY_DOUBLE',         name: 'Daily Double',          size: 2, value: 140, weight: 1 },
+  { id: 'YIN_YANG',             name: 'Yin & Yang',            size: 2, value: 180, weight: 1 },
+  { id: 'THREES_COMPANY',       name: "Three's Company",       size: 3, value: 280, weight: 2 },
+  { id: 'BEST_TWO_OF_THREE',    name: 'Best Two Out Of Three', size: 3, value: 320, weight: 2 },
+  { id: 'HOLY_TRINITY',         name: 'Holy Trinity',          size: 3, value: 400, weight: 2 },
+  { id: 'FAB_FOUR',             name: 'Fab Four',              size: 4, value: 600, weight: 3 },
+  { id: 'ROYAL_FLUSH',          name: 'Royal Flush',           size: 4, value: 700, weight: 3 },
+  { id: 'TWO_PAIR',             name: 'Two Pair',              size: 4, value: 640, weight: 3 },
+  { id: 'TRIPLE_THREAT',        name: 'Triple Threat',         size: 4, value: 560, weight: 3 }
 ];
 
 const GROUP_BY_ID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
@@ -117,7 +122,7 @@ function generateActiveRecipes() {
   // 2. Daily Double — every 2-same (5)
   for (const c of COLOR_KEYS) add(GROUP_BY_ID.DAILY_DOUBLE, [c, c]);
 
-  // 3. Yin & Yang — 7 of the 10 possible 2-diff pairs
+  // 3. Yin & Yang — all 10 of the 2-diff pairs (the 2-scoop tier is saturated)
   /** @type {ScoopColor[][]} */
   const yyAll = [];
   for (let i = 0; i < COLOR_KEYS.length; i++) {
@@ -125,12 +130,12 @@ function generateActiveRecipes() {
       yyAll.push([COLOR_KEYS[i], COLOR_KEYS[j]]);
     }
   }
-  for (const c of trim(yyAll, 7)) add(GROUP_BY_ID.YIN_YANG, c);
+  for (const c of yyAll) add(GROUP_BY_ID.YIN_YANG, c);
 
   // 4. Three's Company — every 3-same (5)
   for (const c of COLOR_KEYS) add(GROUP_BY_ID.THREES_COMPANY, [c, c, c]);
 
-  // 5. Best Two Out Of Three — 10 of the 20 possible AAB combos
+  // 5. Best Two Out Of Three — ALL 20 AAB combos (3-scoop tier saturated)
   /** @type {ScoopColor[][]} */
   const b2o3All = [];
   for (const a of COLOR_KEYS) {
@@ -138,9 +143,9 @@ function generateActiveRecipes() {
       if (a !== b) b2o3All.push([a, a, b]);
     }
   }
-  for (const c of trim(b2o3All, 10)) add(GROUP_BY_ID.BEST_TWO_OF_THREE, c);
+  for (const c of b2o3All) add(GROUP_BY_ID.BEST_TWO_OF_THREE, c);
 
-  // 6. Holy Trinity — 5 of the 10 possible 3-all-diff
+  // 6. Holy Trinity — ALL 10 of the 3-all-diff combos (3-scoop tier saturated)
   /** @type {ScoopColor[][]} */
   const htAll = [];
   for (let i = 0; i < COLOR_KEYS.length; i++) {
@@ -150,7 +155,9 @@ function generateActiveRecipes() {
       }
     }
   }
-  for (const c of trim(htAll, 5)) add(GROUP_BY_ID.HOLY_TRINITY, c);
+  for (const c of htAll) add(GROUP_BY_ID.HOLY_TRINITY, c);
+  // 3-scoop is now fully saturated: 5 (Three's Company) + 20 (Best Two Of
+  // Three) + 10 (Holy Trinity) = all 35 distinct 3-scoop multisets.
 
   // 7. Fab Four — every 4-all-diff (5; this is C(5,4) which is the natural max)
   for (let leaveOut = 0; leaveOut < COLOR_KEYS.length; leaveOut++) {
@@ -161,11 +168,27 @@ function generateActiveRecipes() {
   // 8. Royal Flush — every 4-same (5)
   for (const c of COLOR_KEYS) add(GROUP_BY_ID.ROYAL_FLUSH, [c, c, c, c]);
 
-  // 9. Diabetes — every 5-same (5)
-  for (const c of COLOR_KEYS) add(GROUP_BY_ID.DIABETES, [c, c, c, c, c]);
+  // 9. Two Pair — 4-scoop AABB (two colors, two scoops each). 10 possible;
+  //    trimmed to a small, rare set (4-scoop is meant to be an occasional treat).
+  /** @type {ScoopColor[][]} */
+  const twoPairAll = [];
+  for (let i = 0; i < COLOR_KEYS.length; i++) {
+    for (let j = i + 1; j < COLOR_KEYS.length; j++) {
+      twoPairAll.push([COLOR_KEYS[i], COLOR_KEYS[i], COLOR_KEYS[j], COLOR_KEYS[j]]);
+    }
+  }
+  for (const c of trim(twoPairAll, 6)) add(GROUP_BY_ID.TWO_PAIR, c);
 
-  // 10. Rainbow — the single 5-all-diff combo (every color, once)
-  add(GROUP_BY_ID.RAINBOW, /** @type {ScoopColor[]} */ (COLOR_KEYS.slice()));
+  // 10. Triple Threat — 4-scoop AAAB (three of one + one other). 20 possible;
+  //     trimmed to a small, rare set.
+  /** @type {ScoopColor[][]} */
+  const tripleAll = [];
+  for (const a of COLOR_KEYS) {
+    for (const b of COLOR_KEYS) {
+      if (a !== b) tripleAll.push([a, a, a, b]);
+    }
+  }
+  for (const c of trim(tripleAll, 6)) add(GROUP_BY_ID.TRIPLE_THREAT, c);
 
   return recipes;
 }
@@ -173,8 +196,8 @@ function generateActiveRecipes() {
 export const ALL_RECIPES = generateActiveRecipes();
 
 // Wave -> set of accessible group ids. Waves 1-3 ramp through 1/2-scoop;
-// 4-6 introduce the 3-scoop core; 7-10 stagger the rare 4 and 5 combos so
-// the player meets one new group per wave through the late game.
+// 4-6 introduce the 3-scoop core; 7-10 stagger the four 4-scoop groups so the
+// player meets one new (rare) 4-scoop pattern per wave through the late game.
 const _CORE = ['JUNIOR_SCOOP', 'DAILY_DOUBLE', 'YIN_YANG', 'THREES_COMPANY', 'BEST_TWO_OF_THREE', 'HOLY_TRINITY'];
 /** @type {(string[] | null)[]} */
 const WAVE_GROUPS = [
@@ -187,8 +210,8 @@ const WAVE_GROUPS = [
   _CORE,
   [..._CORE, 'FAB_FOUR'],
   [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH'],
-  [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH', 'DIABETES'],
-  [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH', 'DIABETES', 'RAINBOW']
+  [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH', 'TWO_PAIR'],
+  [..._CORE, 'FAB_FOUR', 'ROYAL_FLUSH', 'TWO_PAIR', 'TRIPLE_THREAT']
 ];
 
 /**
@@ -244,6 +267,15 @@ export class Recipes {
   reset() {
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     this.counts = this._load();
+  }
+
+  /**
+   * Has this recipe been completed at least once? Drives the spawn discovery
+   * bias (Waves.pickOrder favors undiscovered recipes on bigger waves).
+   * @param {string} id canonical recipe id (recipeIdFor)
+   */
+  isDiscovered(id) {
+    return (this.counts[id] || 0) > 0;
   }
 
   /**
