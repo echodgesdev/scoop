@@ -27,6 +27,7 @@ export class DebugPanel {
    *   getTutorialFlag?: () => boolean,
    *   onGameMode?: (name: string) => void,
    *   getGameMode?: () => string,
+   *   getModeList?: () => { id: string, label: string }[],
    *   onStoreToggle?: (on: boolean) => void,
    *   getStoreEnabled?: () => boolean,
    *   onTouchScheme?: (name: string) => void,
@@ -51,7 +52,7 @@ export class DebugPanel {
    *   getHorizon?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed, onHorizon, getHorizon } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onAspectChange, getAspect, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, getModeList, onStoreToggle, getStoreEnabled, onTouchScheme, getTouchScheme, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onDragGain, getDragGain, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed, onHorizon, getHorizon } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -71,6 +72,7 @@ export class DebugPanel {
     this.getTutorialFlag = getTutorialFlag || (() => false);
     this.onGameMode = onGameMode || (() => {});
     this.getGameMode = getGameMode || (() => 'auto');
+    this.getModeList = getModeList || (() => []);
     this.onStoreToggle = onStoreToggle || (() => {});
     this.getStoreEnabled = getStoreEnabled || (() => false);
     this.onTouchScheme = onTouchScheme || (() => {});
@@ -133,10 +135,19 @@ export class DebugPanel {
     });
   }
 
-  /** Game-mode dropdown: Auto Trigger ⇄ Banked Inventory power-up handling. */
+  /**
+   * Game-mode dropdown — options are built from the mode registry (getModeList),
+   * so adding/removing a mode in modes/index.js updates this list automatically.
+   */
   _wireGameMode() {
     const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugGameMode'));
     if (!sel) return;
+    const modes = this.getModeList();
+    if (modes.length) {
+      sel.innerHTML = modes
+        .map(m => `<option value="${m.id}">${m.label}</option>`)
+        .join('');
+    }
     sel.value = this.getGameMode();
     sel.addEventListener('change', () => this.onGameMode(sel.value));
   }

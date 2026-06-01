@@ -55,11 +55,8 @@
         <summary>Game mode</summary>
         <div class="debug-section-body">
           <label class="debug-field">Mode:
-            <select id="debugGameMode">
-              <option value="auto">Auto Trigger</option>
-              <option value="banked">Banked Inventory</option>
-              <option value="tipping">Tipping (no bubbles)</option>
-            </select>
+            <!-- Options are populated from the mode registry (modes/index.js) by debug.js. -->
+            <select id="debugGameMode"></select>
           </label>
           <label class="debug-row">
             <input type="checkbox" id="debugStoreToggle" />

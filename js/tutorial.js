@@ -1,23 +1,19 @@
 // @ts-check
-import { CONE_HEIGHT, PICKUP_TYPE, POWERUP_TYPE, GAME_MODE } from './config.js';
-import { STATE } from './shop.js';
+import { CONE_HEIGHT, PICKUP_TYPE } from './config.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
 /**
- * The tutorial is a thin HINT OVERLAY on the real Wave 0 — it doesn't freeze the
- * player, stage customers, or suppress the falling field. Wave 0 (junior flavors
- * only, one of each to clear) is a genuine playable wave; the tutorial just
- * watches real game state and draws contextual prompts.
+ * Shared base for the per-mode tutorials. The tutorial is a thin HINT OVERLAY on
+ * the real Wave 0 — it doesn't freeze the player, stage customers, or suppress
+ * the falling field; Wave 0 (junior flavors only, one of each to clear) is a
+ * genuine playable wave, and the tutorial just watches live game state and draws
+ * contextual prompts.
  *
- * It's swapped by game mode via createTutorial(); the modes differ in how stack
- * management + power-ups read:
- *   Auto    — feather (⚡) demo bubble; catching fires it instantly. ↓ rotates.
- *   Banked  — catch banks → ⇧ Shift to spend. ↓ rotates.
- *   Tipping — no bubbles; power-ups come from customer tips. ↑/Space discards the
- *             top scoop (no rotate); the buried-color fix is "toss the top".
+ * Each game mode subclasses this in its own modes/<id>.js (overriding the
+ * power-up hint + the buried-color fix) and returns it from makeTutorial().
  */
-class TutorialBase {
+export class TutorialBase {
   constructor() {
     this.active = false;
     this.powerLessonDone = false;
@@ -132,80 +128,4 @@ class TutorialBase {
     ctx.fillText(text, x, y);
     ctx.restore();
   }
-}
-
-/** Auto Trigger tutorial: catching a bubble fires it on the spot. */
-class AutoTutorial extends TutorialBase {
-  /** @param {Game} game */
-  _updatePowerLesson(game) {
-    if (!this.powerLessonDone && game.powerups.active(POWERUP_TYPE.SPEED)) {
-      this.powerLessonDone = true;
-    }
-  }
-
-  /** @param {Game} game */
-  _powerHint(game) {
-    if (this.powerLessonDone) return null;
-    if (this._featherPresent(game)) {
-      return this._touch(game)
-        ? 'Swipe up to pop the ⚡ — it fires instantly!'
-        : 'Space to pop the ⚡ — it fires instantly!';
-    }
-    return null;
-  }
-}
-
-/** Banked Inventory tutorial: catching banks the bubble; ⇧ Shift spends it. */
-class BankedTutorial extends TutorialBase {
-  /** @param {Game} game */
-  _updatePowerLesson(game) {
-    if (this.powerLessonDone) return;
-    if (!game.powerupMode.queueEmpty()) this._banked = true;
-    // Lesson lands once they've banked one and then spent it (speed running).
-    if (this._banked && game.powerups.active(POWERUP_TYPE.SPEED)) this.powerLessonDone = true;
-  }
-
-  /** @param {Game} game */
-  _powerHint(game) {
-    if (this.powerLessonDone) return null;
-    const touch = this._touch(game);
-    if (!game.powerupMode.queueEmpty()) {
-      return touch ? 'Tap the queue to use your power-up!' : '⇧ Shift — use your banked power-up!';
-    }
-    if (!this._banked && this._featherPresent(game)) {
-      return touch ? 'Swipe up to pop the ⚡ and bank it!' : 'Space to pop the ⚡ and bank it!';
-    }
-    return null;
-  }
-}
-
-/**
- * Tipping tutorial: no bubbles — power-ups arrive as customer tips, and the
- * top scoop is discarded with the upward gesture (no rotate verb).
- */
-class TippingTutorial extends TutorialBase {
-  /** Buried wanted color: toss the top off (upward) rather than rotate. */
-  _buriedHint(touch) {
-    return touch ? 'Swipe up to toss the top scoop' : 'Space — toss the top scoop';
-  }
-
-  /**
-   * Surface the tip concept whenever a waiting customer is carrying one.
-   * @param {Game} game
-   */
-  _powerHint(game) {
-    const tipped = game.shop.list.some(c => c.state === STATE.WAITING && c.tip);
-    return tipped ? 'Finish a customer with a token — they tip you a reward!' : null;
-  }
-}
-
-/**
- * Pick the tutorial that matches the active game mode.
- * @param {string} mode one of GAME_MODE (auto | banked | tipping)
- * @returns {TutorialBase}
- */
-export function createTutorial(mode) {
-  if (mode === GAME_MODE.BANKED) return new BankedTutorial();
-  if (mode === GAME_MODE.TIPPING) return new TippingTutorial();
-  return new AutoTutorial();
 }

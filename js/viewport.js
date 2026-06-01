@@ -33,7 +33,7 @@ export const ASPECTS = {
   '16:9': { width: 1664, height: 936 }   // landscape (widescreen)
 };
 
-export const DEFAULT_ASPECT = '3:4';
+export const DEFAULT_ASPECT = '9:16';
 
 /** @param {string} name @returns {Dims} */
 export function virtualDims(name) {

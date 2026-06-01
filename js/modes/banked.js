@@ -1,27 +1,52 @@
 // @ts-check
-import { PowerupMode } from './powerup-mode.js';
-import { MAX_PU_INVENTORY, BUBBLE_CASHOUT } from './config.js';
-import { PICKUP_RING_COLOR } from './pickups.js';
+import { GameMode } from './game-mode.js';
+import { TutorialBase } from '../tutorial.js';
+import { MAX_PU_INVENTORY, BUBBLE_CASHOUT, POWERUP_TYPE } from '../config.js';
+import { PICKUP_RING_COLOR } from '../pickups.js';
 
-/** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
-/** @typedef {import('./types.js').Bounds} Bounds */
+/** @typedef {import('../game.js').Game} Game */
+/** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../types.js').Bounds} Bounds */
 
 // Slide-off duration for an evicted bubble (visible "you lost this" beat).
 const LEAVE_S = 0.3;
-// Delay between queue pops during wave-end cashout — matches the stack-pop
-// cadence in Game._cashoutStack so the payout reads as one continuous chain.
+// Delay between queue pops during wave-end cashout — matches Game._cashoutStack
+// so the payout reads as one continuous chain.
 const CASHOUT_STEP_MS = 140;
 
+/** Banked Inventory tutorial: catching banks the bubble; ⇧ Shift spends it. */
+class BankedTutorial extends TutorialBase {
+  /** @param {Game} game */
+  _updatePowerLesson(game) {
+    if (this.powerLessonDone) return;
+    if (!game.mode.queueEmpty()) this._banked = true;
+    if (this._banked && game.powerups.active(POWERUP_TYPE.SPEED)) this.powerLessonDone = true;
+  }
+
+  /** @param {Game} game */
+  _powerHint(game) {
+    if (this.powerLessonDone) return null;
+    const touch = this._touch(game);
+    if (!game.mode.queueEmpty()) {
+      return touch ? 'Tap the queue to use your power-up!' : '⇧ Shift — use your banked power-up!';
+    }
+    if (!this._banked && this._featherPresent(game)) {
+      return touch ? 'Swipe up to pop the ⚡ and bank it!' : 'Space to pop the ⚡ and bank it!';
+    }
+    return null;
+  }
+}
+
 /**
- * Banked Inventory mode: a caught bubble is stored in a FIFO queue (capped at
- * MAX_PU_INVENTORY) instead of firing. Shift spends the front one — that's when
- * Game._firePower actually runs the effect, so the shared active-slot visual is
- * identical to Auto mode. Catching while full evicts the oldest (with a visible
- * cue). The queue draws as a row of sockets along the bottom; wave-end cashout
- * pays out each banked bubble.
+ * Banked Inventory: a caught bubble is stored in a FIFO queue (capped at
+ * MAX_PU_INVENTORY) instead of firing; Shift (or a tap on the queue strip)
+ * spends the front one — that's when the shared Game._firePower runs the
+ * effect, so the active-slot visual is identical to Auto. The queue draws as a
+ * row of sockets along the bottom (so the active slot sits higher), and wave-end
+ * cashout pays out each banked bubble.
  */
-export class BankedPowerupMode extends PowerupMode {
-  /** @param {import('./game.js').Game} game */
+export class BankedMode extends GameMode {
+  /** @param {Game} game */
   constructor(game) {
     super(game);
     /** @type {{ type: PickupTypeName, scale: number }[]} */
@@ -30,8 +55,10 @@ export class BankedPowerupMode extends PowerupMode {
     this.leaving = [];
   }
 
-  reset() { this.queue.length = 0; this.leaving.length = 0; }
+  get id() { return 'banked'; }
+  get label() { return 'Banked Inventory'; }
 
+  reset() { this.queue.length = 0; this.leaving.length = 0; }
   queueEmpty() { return this.queue.length === 0; }
 
   /** @param {PickupTypeName} type */
@@ -58,6 +85,17 @@ export class BankedPowerupMode extends PowerupMode {
     this.game._firePower(e.type, this.game.player.x, this.game.player.stackTopY());
   }
 
+  /** A tap on the queue strip (when non-empty) spends instead of serving. */
+  onTapSpend(vx, vy) {
+    if (this.queueEmpty()) return false;
+    if (vy <= this.game.bounds.height - 90) return false;
+    this.game._useShift();
+    return true;
+  }
+
+  /** Active-power-up slot sits higher to leave room for the queue row beneath it. */
+  activeSlotY(bounds) { return bounds.height - 118; }
+
   /** @param {number} dt */
   step(dt) {
     const k = Math.min(1, dt * 14);
@@ -68,9 +106,7 @@ export class BankedPowerupMode extends PowerupMode {
     }
   }
 
-  /**
-   * @param {CanvasRenderingContext2D} ctx @param {Bounds} bounds
-   */
+  /** @param {CanvasRenderingContext2D} ctx @param {Bounds} bounds */
   drawQueueSlots(ctx, bounds) {
     const hasAny = this.queue.length > 0;
     const r = this._slotPos(0).r;
@@ -142,9 +178,11 @@ export class BankedPowerupMode extends PowerupMode {
     step();
   }
 
+  makeTutorial() { return new BankedTutorial(); }
+
   /**
-   * Screen-space center + radius of queue slot i, a horizontal row centered
-   * along the bottom of the stage (below the running-power-up active slot).
+   * Screen-space center + radius of queue slot i — a horizontal row centered
+   * along the bottom of the stage (below the active-power-up slot).
    * @param {number} i
    */
   _slotPos(i) {
