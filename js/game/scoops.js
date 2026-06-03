@@ -9,13 +9,12 @@ import {
   MAX_LIVE_SCOOPS,
   SCOOP_DISSOLVE_S
 } from './config.js';
-import { drawScoop } from './player.js';
 
-/** @typedef {import('./types.js').ScoopColor} ScoopColor */
-/** @typedef {import('./types.js').Scoop} Scoop */
-/** @typedef {import('./types.js').Bounds} Bounds */
-/** @typedef {import('./types.js').Hitbox} Hitbox */
-/** @typedef {import('./types.js').Tuning} Tuning */
+/** @typedef {import('../types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../types.js').Scoop} Scoop */
+/** @typedef {import('../types.js').Bounds} Bounds */
+/** @typedef {import('../types.js').Hitbox} Hitbox */
+/** @typedef {import('../types.js').Tuning} Tuning */
 
 /** @returns {ScoopColor} */
 function randomColor() {
@@ -138,33 +137,6 @@ export class ScoopField {
       // Safety net for any scoop that somehow slips past (e.g. an off-screen
       // missY on a tiny aspect): cull below the floor.
       if (s.y > bounds.height + 40) this.scoops.splice(i, 1);
-    }
-  }
-
-  /**
-   * Pass `rainbow` to repaint every scoop as rainbow (purely visual).
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {boolean} [rainbow]
-   */
-  draw(ctx, rainbow = false) {
-    for (const s of this.scoops) {
-      if (s.dissolve === undefined) {
-        drawScoop(ctx, s.x, s.y, rainbow ? 'rainbow' : s.color);
-        continue;
-      }
-      // Dissolve: fade out + shrink, with an expanding white poof ring so the
-      // miss reads as the scoop fizzling into the sand rather than vanishing.
-      const p = Math.min(1, s.dissolve / SCOOP_DISSOLVE_S);
-      ctx.save();
-      ctx.globalAlpha = 1 - p;
-      drawScoop(ctx, s.x, s.y, rainbow ? 'rainbow' : s.color, 1 - 0.4 * p);
-      ctx.globalAlpha = (1 - p) * 0.6;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, SCOOP_RADIUS * (1 + 0.7 * p), 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
     }
   }
 

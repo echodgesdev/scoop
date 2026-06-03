@@ -1,6 +1,5 @@
 // @ts-check
 import {
-  COLORS,
   CONE_WIDTH,
   CONE_HEIGHT,
   CONE_MAX_SPEED,
@@ -12,32 +11,33 @@ import {
   HANDOFF_DURATION_S
 } from './config.js';
 
-/** @typedef {import('./types.js').ScoopColor} ScoopColor */
-/** @typedef {import('./types.js').Bounds} Bounds */
-/** @typedef {import('./types.js').Hitbox} Hitbox */
-/** @typedef {import('./input.js').Input} Input */
+/** @typedef {import('../types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../types.js').Bounds} Bounds */
+/** @typedef {import('../types.js').Hitbox} Hitbox */
+/** @typedef {import('../engine/input.js').Input} Input */
 
-const LAND_TIME = 0.22;
+// Time a freshly-caught scoop spends "landing" (squash-pop). Read by the view
+// to size the squash; lives here because push() stamps it onto each scoop.
+export const LAND_TIME = 0.22;
 
 // Fake scoop "slosh" — NOT physics. A single loose damped-spring scalar leans
 // the scoop column opposite to the cone's motion (drag), then settles with a
 // soft wobble. The lean is derived from the cone's real per-frame displacement
-// (so it works for keyboard AND touch, which moves x directly).
-//
-// The TRAIL: each scoop up the stack samples that lean from a few physics ticks
-// EARLIER, and its amplitude follows a sideways natural-log ARC — flat at the
-// base (the bottom scoop stays locked to the cone) and bowing out with
-// increasing curvature toward the top, so the column reads as one graceful
-// swoosh trailing behind. The physics tick is a fixed 1/60s, so the tick-based
-// delay is frame-stable.
+// (so it works for keyboard AND touch, which moves x directly). The per-tick
+// lean history is recorded into a ring buffer so the VIEW can give higher scoops
+// an older lean (the trailing "swoosh"); SLOSH_HIST is its length, exported so
+// the view indexes the same buffer.
 const SLOSH_LEAN  = 0.016;  // px of lean per px/s of cone speed
 const SLOSH_MAX   = 10.4;   // cap (px) so fast flicks don't fling scoops off
 const SLOSH_STIFF = 70;     // spring follow strength (lower = looser / less stiff)
 const SLOSH_DAMP  = 0.84;   // velocity kept per tick (higher = floatier / wobblier)
-const SLOSH_LAG   = 2.4;    // ticks of extra delay per scoop above the bottom
-const SLOSH_ARC   = 6;      // log-arc curvature (higher = sharper bow near the top)
-const SLOSH_HIST  = 48;     // lean-history ring buffer length (ticks)
+export const SLOSH_HIST = 48;  // lean-history ring buffer length (ticks)
 
+/**
+ * The cone the player drives. PURE MODEL: state, movement, and tray queries —
+ * no rendering. The drawing lives in view/playerView.js, which reads this
+ * object's position, stack, slosh history, handoff lean, and flash.
+ */
 export class Player {
   /** @param {number} x @param {number} y */
   constructor(x, y) {
@@ -51,7 +51,7 @@ export class Player {
     // Fake-slosh state (see SLOSH_* above). _prevX tracks last frame's x to read
     // the cone's real velocity; slosh/sloshV are the damped-spring lean + its
     // rate; _sloshHist is a ring buffer of recent lean values (one per physics
-    // tick) so higher scoops can sample an older lean for the trailing tail.
+    // tick) so the view can sample an older lean for the trailing tail.
     this._prevX = x;
     this.slosh = 0;
     this.sloshV = 0;
@@ -110,7 +110,7 @@ export class Player {
     this.sloshV += (target - this.slosh) * SLOSH_STIFF * dt;
     this.sloshV *= Math.pow(SLOSH_DAMP, dt * 60);
     this.slosh += this.sloshV * dt;
-    // Record this tick's lean so draw() can read an older value for higher scoops.
+    // Record this tick's lean so the view can read an older value for higher scoops.
     this._sloshHead = (this._sloshHead + 1) % SLOSH_HIST;
     this._sloshHist[this._sloshHead] = this.slosh;
   }
@@ -209,11 +209,7 @@ export class Player {
     return true;
   }
 
-  /**
-   * Remove one scoop per color in the list (consumes a served order). While
-   * the rainbow power-up is active, every scoop counts as anything — just pop
-   * `colors.length` items off the top of the tray.
-   */
+  /** Empty the tray (consumes a served order / wave reset). */
   clearStack() {
     this.stack = [];
   }
@@ -227,126 +223,4 @@ export class Player {
   triggerFlash(duration = 0.4) {
     this.flash = duration;
   }
-
-  /**
-   * Pass `rainbow` to repaint every tray scoop as rainbow (purely visual).
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {boolean} [rainbow]
-   */
-  draw(ctx, rainbow = false) {
-    // Handoff lean: a sin-bumped offset toward the customer that snaps back
-    // by the end of HANDOFF_DURATION_S. Applied via translate so the cone
-    // and every scoop on it move together, like a coordinated "reach".
-    ctx.save();
-    if (this.handoffT < HANDOFF_DURATION_S) {
-      const p = this.handoffT / HANDOFF_DURATION_S;
-      const ease = Math.sin(p * Math.PI);
-      ctx.translate(this.handoffDx * ease, this.handoffDy * ease);
-    }
-    this._drawCone(ctx);
-    for (let i = 0; i < this.stack.length; i++) {
-      const s = this.stack[i];
-      const pos = this.scoopPosition(i);
-      let drawX = pos.x;
-      let drawY = pos.y;
-      const p = s.land / LAND_TIME;            // 1 -> 0 as it settles
-      const drawScale = 1 + 0.28 * p;          // squash-pop on landing
-
-      // Fake slosh trail: the bottom scoop tracks the cone (zero lean, current
-      // tick); each scoop above samples the lean from a few ticks earlier, and
-      // its amplitude follows a sideways natural-log arc — flat at the base,
-      // bowing out more toward the top — so the column trails in one swoosh.
-      const n = this.stack.length;
-      const f = n > 1 ? i / (n - 1) : 1;                 // 0 at bottom .. 1 at top
-      const arc = 1 - Math.log(1 + SLOSH_ARC * (1 - f)) / Math.log(1 + SLOSH_ARC);
-      const lag = Math.min(SLOSH_HIST - 1, Math.round(i * SLOSH_LAG));
-      const laggedLean = this._sloshHist[(this._sloshHead - lag + SLOSH_HIST) % SLOSH_HIST];
-      drawX += laggedLean * arc;
-
-      drawScoop(ctx, drawX, drawY, rainbow ? 'rainbow' : s.color, drawScale);
-
-      // Highlight the top scoop — the one a tap hands to the customer — with the
-      // same amber outline + glow as the "selected" customer speech bubble. The
-      // matching outline pairs "this scoop ↔ that customer" so the player can see
-      // exactly what they're about to deliver.
-      if (i === this.stack.length - 1) {
-        this._drawTopRing(ctx, drawX, drawY, SCOOP_RADIUS * drawScale);
-      }
-    }
-    ctx.restore();
-  }
-
-  /**
-   * Amber selection ring around the top (next-to-be-delivered) scoop. Mirrors
-   * the active customer bubble's outline in stations.js (#ffb703 stroke +
-   * #ffd166 glow) so the "I'm giving you this" read is unmistakable.
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {number} x @param {number} y @param {number} r drawn scoop radius
-   */
-  _drawTopRing(ctx, x, y, r) {
-    ctx.save();
-    ctx.shadowColor = '#ffd166';
-    ctx.shadowBlur = 16;
-    ctx.strokeStyle = '#ffb703';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(x, y, r + 2.5, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /** @param {CanvasRenderingContext2D} ctx */
-  _drawCone(ctx) {
-    const cx = this.x;
-    const cy = this.y;
-    ctx.save();
-    if (this.flash > 0) {
-      ctx.shadowColor = '#ffec5c';
-      ctx.shadowBlur = 30;
-    }
-    ctx.fillStyle = '#d18a4a';
-    ctx.strokeStyle = '#8a5a2a';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(cx - CONE_WIDTH / 2, cy - CONE_HEIGHT / 2);
-    ctx.lineTo(cx + CONE_WIDTH / 2, cy - CONE_HEIGHT / 2);
-    ctx.lineTo(cx, cy + CONE_HEIGHT / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
-const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'];
-
-/**
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} x
- * @param {number} y
- * @param {ScoopColor | 'rainbow'} colorKey
- * @param {number} [scale]
- */
-export function drawScoop(ctx, x, y, colorKey, scale = 1) {
-  const r = SCOOP_RADIUS * scale;
-  ctx.save();
-  if (colorKey === 'rainbow') {
-    const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-    RAINBOW_STOPS.forEach((c, i) => grad.addColorStop(i / (RAINBOW_STOPS.length - 1), c));
-    ctx.fillStyle = grad;
-  } else {
-    ctx.fillStyle = COLORS[colorKey];
-  }
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-  ctx.beginPath();
-  ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
 }

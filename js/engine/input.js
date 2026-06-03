@@ -1,5 +1,5 @@
 // @ts-check
-/** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
 
 /**
  * Keyboard input. Left/Right are polled (held) for movement; Pop, Deliver,

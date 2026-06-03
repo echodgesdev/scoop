@@ -3,9 +3,9 @@ import { PICKUP_TYPE } from '../config.js';
 import { STATE } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
 
-/** @typedef {import('../game.js').Game} Game */
-/** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
-/** @typedef {import('../types.js').Bounds} Bounds */
+/** @typedef {import('../../game.js').Game} Game */
+/** @typedef {import('../../types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../../types.js').Bounds} Bounds */
 
 // Tipping plays with a shorter cone (4) but a fuller sky (7 falling scoops).
 const TIPPING_MAX_STACK = 4;

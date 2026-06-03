@@ -23,9 +23,9 @@ import { recipesForWave } from './recipes.js';
 // the campaign waves use.
 const WAVE0_GOAL = COLOR_KEYS.length;
 
-/** @typedef {import('./types.js').ScoopColor} ScoopColor */
-/** @typedef {import('./types.js').WaveEventName} WaveEventName */
-/** @typedef {import('./types.js').Tuning} Tuning */
+/** @typedef {import('../types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../types.js').WaveEventName} WaveEventName */
+/** @typedef {import('../types.js').Tuning} Tuning */
 
 export const WAVE_EVENT = Object.freeze({
   PHASE_UP: 'phaseUp',

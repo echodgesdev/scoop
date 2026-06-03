@@ -7,10 +7,10 @@ import {
   CONE_EMBED_PX as _CONE_EMBED_PX
 } from './tuning.js';
 
-/** @typedef {import('./types.js').ScoopColor} ScoopColor */
-/** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
-/** @typedef {import('./types.js').PowerUpTypeName} PowerUpTypeName */
-/** @typedef {import('./types.js').RecipeId} RecipeId */
+/** @typedef {import('../types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../types.js').PowerUpTypeName} PowerUpTypeName */
+/** @typedef {import('../types.js').RecipeId} RecipeId */
 
 export const COLORS = Object.freeze({
   pink: '#ff6fa3',

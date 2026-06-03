@@ -9,11 +9,11 @@ import {
   DELIVERY_MODE
 } from './config.js';
 
-/** @typedef {import('./types.js').ScoopColor} ScoopColor */
-/** @typedef {import('./types.js').Customer} Customer */
-/** @typedef {import('./types.js').Order} Order */
-/** @typedef {import('./types.js').CustomerState} CustomerState */
-/** @typedef {import('./types.js').WaveEventName} WaveEventName */
+/** @typedef {import('../types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../types.js').Customer} Customer */
+/** @typedef {import('../types.js').Order} Order */
+/** @typedef {import('../types.js').CustomerState} CustomerState */
+/** @typedef {import('../types.js').WaveEventName} WaveEventName */
 /** @typedef {import('./waves.js').Waves} Waves */
 
 const ARRIVE_OFFSET = 150;   // px below the counter that customers slide in from
@@ -68,11 +68,11 @@ export class Shop {
     this.scripted = false;
     // Tipping mode: returns a tip (PickupTypeName | 'coin') for a new customer,
     // or null for no tip. Game wires this; default = never tip.
-    /** @type {() => (import('./types.js').PickupTypeName | 'coin' | null)} */
+    /** @type {() => (import('../types.js').PickupTypeName | 'coin' | null)} */
     this.tipRoller = () => null;
   }
 
-  /** @param {() => (import('./types.js').PickupTypeName | 'coin' | null)} fn */
+  /** @param {() => (import('../types.js').PickupTypeName | 'coin' | null)} fn */
   setTipRoller(fn) {
     this.tipRoller = fn;
   }
@@ -412,7 +412,7 @@ export class Shop {
    * @param {ScoopColor} topColor
    * @param {boolean} [rainbow] wildcard: fills the next slot regardless of color
    * @param {'any'|'sequential'} [mode]
-   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('./types.js').PickupTypeName|'coin'|null) }}
+   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').PickupTypeName|'coin'|null) }}
    */
   serveOne(index, topColor, rainbow = false, mode = DELIVERY_MODE.ANY) {
     const c = this.customers[index];
@@ -440,7 +440,7 @@ export class Shop {
    * @param {number} index
    * @param {ScoopColor[]} trayColors
    * @param {boolean} [rainbow] wildcard: only the count must match
-   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('./types.js').PickupTypeName|'coin'|null) }}
+   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').PickupTypeName|'coin'|null) }}
    */
   serveWhole(index, trayColors, rainbow = false) {
     const c = this.customers[index];

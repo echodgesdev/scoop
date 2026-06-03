@@ -1,5 +1,5 @@
 // @ts-check
-import { groundYFor } from './config.js';
+import { groundYFor } from '../game/config.js';
 
 /**
  * Sky + sun pass. Drawn FIRST in the frame so everything else paints on top.

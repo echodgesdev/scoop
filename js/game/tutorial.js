@@ -1,7 +1,7 @@
 // @ts-check
 import { CONE_HEIGHT } from './config.js';
 
-/** @typedef {import('./game.js').Game} Game */
+/** @typedef {import('../game.js').Game} Game */
 
 /**
  * Shared base for the per-mode tutorials. The tutorial is a thin HINT OVERLAY on

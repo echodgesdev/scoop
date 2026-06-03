@@ -1,10 +1,10 @@
 // @ts-check
-import { COLORS } from './config.js';
-import { RECIPE_TARGET, GROUPS } from './recipes.js';
+import { COLORS } from '../game/config.js';
+import { RECIPE_TARGET, GROUPS } from '../game/recipes.js';
 
 const GROUP_BY_ID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
 
-/** @typedef {import('./recipes.js').Recipes} Recipes */
+/** @typedef {import('../game/recipes.js').Recipes} Recipes */
 
 const BEST_KEY = 'scoop.best';
 
@@ -36,9 +36,9 @@ export class Hud {
     this.challengeToastEl = challengeToastEl;
     /** @type {Recipes} */
     this.recipes = recipes;
-    /** @type {import('./challenges.js').Challenges} */
+    /** @type {import('../game/challenges.js').Challenges} */
     this.challenges = challenges;
-    /** @type {import('./audio.js').Sound} */
+    /** @type {import('../engine/audio.js').Sound} */
     this.sound = sound;
 
     // Toast queue: challenges that just hit their requirement during play.

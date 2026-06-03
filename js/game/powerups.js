@@ -8,8 +8,8 @@ import {
   RAINBOW_DURATION_S
 } from './config.js';
 
-/** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
-/** @typedef {import('./types.js').PowerUpTypeName} PowerUpTypeName */
+/** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../types.js').PowerUpTypeName} PowerUpTypeName */
 
 /** @type {Record<PowerUpTypeName, number>} */
 const DURATIONS = {

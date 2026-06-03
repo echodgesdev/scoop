@@ -1,6 +1,6 @@
 // @ts-check
-import { STATE } from './shop.js';
-import { drawScoop } from './player.js';
+import { STATE } from '../game/shop.js';
+import { drawScoop } from './playerView.js';
 import {
   PICKUP_ICONS,
   PICKUP_RING_COLOR,
@@ -13,7 +13,7 @@ import {
   SERVED_FLIGHT_ARC,
   CUSTOMER_FACE_OFFSET_PX,
   groundYFor
-} from './config.js';
+} from '../game/config.js';
 
 // Customers are now scaled to read at parity with the cone (face ≈ cone width,
 // bigger than a falling scoop) so the serve half holds visual weight equal to

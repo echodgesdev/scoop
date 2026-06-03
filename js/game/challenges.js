@@ -1,7 +1,7 @@
 // @ts-check
 import { GROUPS } from './recipes.js';
 
-/** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
 /** @typedef {import('./recipes.js').Recipes} Recipes */
 
 const STORAGE_KEY = 'scoop.challenges';

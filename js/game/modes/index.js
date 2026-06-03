@@ -1,7 +1,7 @@
 // @ts-check
 import { TippingMode } from './tipping.js';
 
-/** @typedef {import('../game.js').Game} Game */
+/** @typedef {import('../../game.js').Game} Game */
 
 /**
  * Tipping is the game's only mode. This file stays as the single seam game.js

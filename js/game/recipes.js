@@ -1,5 +1,5 @@
 // @ts-check
-/** @typedef {import('./types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../types.js').ScoopColor} ScoopColor */
 
 const STORAGE_KEY = 'scoop.recipes';
 export const RECIPE_TARGET = 10; // serves to "master" a recipe

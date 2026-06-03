@@ -1,4 +1,12 @@
 // @ts-check
+// Composition root. The codebase is split into layers by folder:
+//   engine/ — game-agnostic runtime (loop bits, input, touch, audio, haptics,
+//             viewport, event bus)
+//   game/   — simulation + rules + data (player, scoops, shop, waves, powerups,
+//             recipes, challenges, day cycle, modes, config, tuning)
+//   view/   — rendering (scene, stations, effects, HUD)
+// This file wires them together: builds the actors, runs the loop, routes input,
+// orchestrates the draw, and maps domain events → sound/haptics/effects/HUD.
 import {
   MAX_HEALTH,
   DAMAGE_PER_EXPIRE,
@@ -24,27 +32,29 @@ import {
   WAVE0_DEMAND_BIAS,
   coneYFor,
   DELIVERY_MODE
-} from './config.js';
-import { Player } from './player.js';
-import { ScoopField, isCaught } from './scoops.js';
-import { Shop, REACH } from './shop.js';
-import { Stations } from './stations.js';
-import { Waves, WAVE_EVENT } from './waves.js';
-import { Hud } from './hud.js';
-import { Input } from './input.js';
-import { Sound } from './audio.js';
-import { Haptics } from './haptics.js';
-import { Effects } from './effects.js';
+} from './game/config.js';
+import { Player } from './game/player.js';
+import { ScoopField, isCaught } from './game/scoops.js';
+import { Shop, REACH } from './game/shop.js';
+import { Stations } from './view/stations.js';
+import { Waves, WAVE_EVENT } from './game/waves.js';
+import { Hud } from './view/hud.js';
+import { Input } from './engine/input.js';
+import { Sound } from './engine/audio.js';
+import { Haptics } from './engine/haptics.js';
+import { Effects } from './view/effects.js';
 import { DebugPanel } from './debug.js';
-import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
-import { dayCycleState, nightCycleState } from './dayCycle.js';
-import { PowerUps } from './powerups.js';
-import { EventBus } from './events.js';
-import { Recipes } from './recipes.js';
-import { Challenges } from './challenges.js';
-import { responsiveDims, fitRect } from './viewport.js';
-import { makeMode } from './modes/index.js';
-import { TouchControls } from './touch.js';
+import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './view/scene.js';
+import { drawPlayer } from './view/playerView.js';
+import { drawField } from './view/scoopsView.js';
+import { dayCycleState, nightCycleState } from './game/dayCycle.js';
+import { PowerUps } from './game/powerups.js';
+import { EventBus } from './engine/events.js';
+import { Recipes } from './game/recipes.js';
+import { Challenges } from './game/challenges.js';
+import { responsiveDims, fitRect } from './engine/viewport.js';
+import { makeMode } from './game/modes/index.js';
+import { TouchControls } from './engine/touch.js';
 
 /** @typedef {import('./types.js').GameEventMap} GameEventMap */
 /** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
@@ -1219,8 +1229,8 @@ export class Game {
       drawOcean(ctx, this.bounds, dayState, this.clock);
     }
 
-    this.field.draw(ctx, rainbow);
-    this.player.draw(ctx, rainbow);
+    drawField(ctx, this.field, rainbow);
+    drawPlayer(ctx, this.player, rainbow);
     const pausePatience = this.powerups.pauseActive || !this.flags.patternTimer;
     this.stations.draw(ctx, this.shop.list, {
       activeIndex:    this.shop.customerAt(this.player.x),
