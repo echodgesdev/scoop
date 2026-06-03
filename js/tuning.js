@@ -206,22 +206,3 @@ export const MINI_CONE_H = 50;
 // Scaled with the larger face; puts the cone tip just below the chin, with
 // the scoop-stack growing up beside the face.
 export const MINI_CONE_FACE_OFFSET_PX = 46;
-
-// === Slingshot (space) =======================================================
-// Space launches the bottom tray scoop straight up as a smaller projectile.
-// It pops bubbles on collision (firing the same _onPickup path as a normal
-// catch), then disappears. Misses fly off the top of the screen. The
-// reduced scale signals that the scoop has transformed — it's no longer a
-// stack scoop, it's a shot.
-export const PROJECTILE_SPEED = 800;    // px/s upward
-export const PROJECTILE_SCALE = 0.55;   // fraction of tray-scoop radius
-
-// === Stack rotate (down arrow) ===============================================
-// Pressing Down rotates the tray: top wraps to bottom, others shift up. The
-// movement lock is the cost — while rotating you can't move, catch, pop, or
-// deliver. The window is short, but in a falling-scoop game, half a second
-// of paralysis is real pressure: bad scoops accumulate that you can't dodge.
-export const ROTATE_LOCK_S = 0.22;
-// Lateral bow-out of the wrap-around scoop as it travels top → bottom. Makes
-// the rotation read clearly instead of the scoop teleporting through the cone.
-export const ROTATE_ARC_OUT_PX = 60;

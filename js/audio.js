@@ -66,12 +66,6 @@ export class Sound {
 
   catch_()  { this._tone(660, 0, 0.09, 'triangle', 0.18); }
 
-  /** Slingshot launch — a quick upward "fwip". */
-  shoot() {
-    this._tone(420, 0,     0.04, 'square', 0.16);
-    this._tone(840, 0.025, 0.06, 'square', 0.13);
-  }
-
   /** A shot connecting with a bubble — a snappy descending "pop". */
   bubblePop() {
     this._tone(1400, 0,    0.035, 'triangle', 0.20);

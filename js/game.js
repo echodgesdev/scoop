@@ -10,7 +10,6 @@ import {
   PICKUP_TYPE,
   POWERUP_TYPE,
   CUSTOMER_FACE_OFFSET_PX,
-  PROJECTILE_SPEED,
   SCOOP_RADIUS,
   PICKUP_RADIUS,
   PICKUP_BUBBLE_RADIUS_MULT,
@@ -38,12 +37,11 @@ import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
 import { dayCycleState, nightCycleState } from './dayCycle.js';
 import { PowerUps } from './powerups.js';
 import { PickupField, pickupCaught, PICKUP_ICONS, PICKUP_RING_COLOR } from './pickups.js';
-import { ProjectileField, projectileHits } from './projectiles.js';
 import { EventBus } from './events.js';
 import { Recipes } from './recipes.js';
 import { Challenges } from './challenges.js';
 import { responsiveDims, fitRect } from './viewport.js';
-import { makeMode, MODE_LIST, DEFAULT_MODE } from './modes/index.js';
+import { makeMode } from './modes/index.js';
 import { TouchControls } from './touch.js';
 
 /** @typedef {import('./types.js').GameEventMap} GameEventMap */
@@ -147,13 +145,11 @@ export class Game {
     /** @type {EventBus<GameEventMap>} */
     this.bus = new EventBus();
 
-    // Game mode (debug-switchable). `gameMode` is the source-of-truth id;
-    // `this.mode` is the resolved strategy instance (its own file in modes/) that
-    // owns board size, power-up source + handling, the tray verbs, the active
-    // slot, and the tutorial. game.js DELEGATES to this.mode — it never branches
-    // on the id. Set below, after the actors exist, via makeMode().
-    this.gameMode = DEFAULT_MODE;
-    // Delivery method (debug-switchable, all modes): how a tray serves an order.
+    // The game mode (Tipping) lives in its own file (modes/tipping.js) and owns
+    // board size, the tip-sourced power-ups, the tray verbs, the active slot, and
+    // the tutorial. game.js DELEGATES to this.mode — it never branches on a mode
+    // id. Resolved below (via makeMode) once the actors it reaches into exist.
+    // Delivery method (debug-switchable): how a tray serves an order.
     // 'any' = top scoop fills any remaining color (default); 'sequential' = top
     // must be the next color in order; 'whole' = the whole tray must equal the
     // order, delivered in one action.
@@ -176,12 +172,11 @@ export class Game {
     this.player      = new Player(0, 0);
     this.field       = new ScoopField();
     this.pickups     = new PickupField(() => this.mode.bubbleTypes());
-    this.projectiles = new ProjectileField();
     this.shop        = new Shop(this.waves);
     this.stations    = new Stations();
-    // Resolve the mode strategy now that the actors it reaches into exist, then
-    // its tutorial. _applyModeConfig pushes its board size + breaker capability.
-    this.mode        = makeMode(this.gameMode, this);
+    // Resolve the mode now that the actors it reaches into exist, then its
+    // tutorial. _applyModeConfig pushes its board size + breaker capability.
+    this.mode        = makeMode(this);
     this.tutorial    = this.mode.makeTutorial();
 
     // Couple supply to demand: the scoop field biases its incoming queue
@@ -197,29 +192,28 @@ export class Game {
 
     this.input.onPop = () => this._pop();
     this.input.onDeliver = () => this._deliver();
-    this.input.onRotate = () => this._rotate();
     this.input.onUsePower = type => this._usePower(type);
-    this.input.onShift = () => this._useShift();
     this.input.onDebugDamage = () => this._debugDamage();
     this.input.onPause = () => this._togglePause();
 
     // Relative drag is the only touch-steering scheme: small thumb travel moves
     // the cone far, scaled by touchGain (the "Movement sensitivity" Settings
     // slider). It's the least-fatiguing one-handed control; the discrete verbs
-    // (tap to serve, swipe up/down) are independent of it. Keyboard stays live.
+    // (tap to serve, swipe up to toss) are independent of it. Keyboard stays live.
     this.touchGain = this._loadTouchGain();
 
     // Native touch layer (also handles mouse/pen). Reports raw gestures; the
-    // handlers below apply relative steering + map the verbs.
+    // handlers below apply relative steering + map the verbs. The down-swipe is
+    // unused in Tipping (no rotate verb), so it's a no-op.
     this.touch = new TouchControls(this.canvas, {
       toVirtual: (cx, cy) => this._toVirtual(cx, cy),
       onHold: () => { this.input.lastWasTouch = true; },
       onHoldEnd: () => {},
       onMove: (_vx, dvx) => { this.input.moveDelta += dvx * this.touchGain; },
       onMoveEnd: () => {},
-      onTap: (vx, vy) => this._onTouchTap(vx, vy),
+      onTap: () => this._deliver(),
       onSwipeUp: () => this._pop(),
-      onSwipeDown: () => this._rotate()
+      onSwipeDown: () => {}
     });
 
     // Power-ups fire the instant a bubble is caught (no banking, no manual
@@ -272,16 +266,6 @@ export class Game {
       getBubbleWeights: () => this.pickups.weights,
       onTutorialFlag: v => this.setShowTutorial(v),
       getTutorialFlag: () => this.showTutorial,
-      onGameMode: name => {
-        // Swap the strategy live so testers can flip modes mid-run. The shared
-        // active bubble persists (it's Game-owned); the new mode starts fresh.
-        this.gameMode = name;
-        this.mode = makeMode(name, this);
-        this.mode.reset();
-        this._applyModeConfig();  // re-apply the new mode's settings
-      },
-      getGameMode: () => this.gameMode,
-      getModeList: () => MODE_LIST,
       onDeliveryMode: name => { this.deliveryMode = name; },
       getDeliveryMode: () => this.deliveryMode,
       onMaxStack: n => { this.maxStack = Math.max(1, Math.round(n)); },
@@ -345,16 +329,6 @@ export class Game {
       x: (clientX - rect.left) / w * this.bounds.width,
       y: (clientY - rect.top) / h * this.bounds.height
     };
-  }
-
-  /**
-   * Touch tap → serve, unless the active mode consumes it first (Banked spends
-   * the front power-up on a tap of its queue strip).
-   * @param {number} vx @param {number} vy
-   */
-  _onTouchTap(vx, vy) {
-    if (this.mode.onTapSpend(vx, vy)) return;
-    this._deliver();
   }
 
   _toggleFullscreen() {
@@ -540,7 +514,6 @@ export class Game {
     this.player.clearStack();
     this.field.reset();
     this.pickups.reset();
-    this.projectiles.reset();
     this.powerups.reset();
     this.effects.reset();
     this.stations.layout(this.bounds);
@@ -562,8 +535,8 @@ export class Game {
     this.activeBubble = null;
     this.puLeaving.length = 0;
     this.input.moveDelta = 0;  // drop any stale touch-steer state
-    // Rebuild the mode strategy + its tutorial for a fresh run.
-    this.mode = makeMode(this.gameMode, this);
+    // Rebuild the mode + its tutorial for a fresh run.
+    this.mode = makeMode(this);
     this.mode.reset();
     this.tutorial = this.mode.makeTutorial();
     this._applyModeConfig();  // apply the active mode's board size + capabilities
@@ -689,38 +662,22 @@ export class Game {
     // ground line), so the fizzle reads as the scoop landing/melting into the
     // floor rather than vanishing at the cone tip.
     const missY = this.stations.groundY + SCOOP_RADIUS * 2;
-    // While the cone is rotating, scoops pass through — the player is "busy"
-    // and can't intercept. This is the second half of the rotate cost:
-    // bad scoops keep falling while you can't dodge.
-    const locked = this.player.locked;
 
     // The falling field + bubbles run during the tutorial now — Wave 0 is a
     // real, playable wave; the tutorial only overlays hints on top of it.
     this.field.update(dt, this.bounds, tuning, missY, scoop => {
-      if (locked) return false;
       if (!isCaught(scoop, hitbox)) return false;
       const perfect = Math.abs(scoop.x - hitbox.x) <= PERFECT_CATCH_BAND;
       this._onCatch(scoop, perfect);
       return true;
     });
 
-    // Pickup collision uses the *expanded* hitbox — cone + every scoop in
-    // the tray. Tall stack = more vertical reach for high-floating bubbles.
+    // Pickup collision uses the *expanded* hitbox — cone + every scoop in the
+    // tray. (Tipping spawns no bubbles, so this only fires if a mode ever does.)
     const pickupBox = this.player.pickupHitbox();
     this.pickups.update(dt, this.bounds, pickup => {
-      if (locked) return false;
       if (!pickupCaught(pickup, pickupBox)) return false;
       this._onPickup(pickup);
-      return true;
-    });
-
-    // Slingshot projectiles fly upward. Each one pops the first bubble it
-    // touches (same _onPickup path as a normal catch) and is consumed by
-    // the collision; misses cull when they leave the top of the screen.
-    this.projectiles.update(dt, this.bounds, proj => {
-      const hit = this.pickups.tryHit(p => projectileHits(proj, p));
-      if (!hit) return false;
-      this._onPickup(hit, true);
       return true;
     });
 
@@ -728,7 +685,6 @@ export class Game {
     this._syncDayHint();
 
     this._stepActive(dt);
-    this.mode.step(dt);  // banked-queue animations (no-op in other modes)
 
     // Patience is frozen during the tutorial so the staged customer never bails.
     const patienceOn = this.flags.patternTimer && !this.powerups.pauseActive && !this.tutorial.active;
@@ -742,28 +698,20 @@ export class Game {
   }
 
   /**
-   * Catching a bubble fires its power-up immediately — no banking, no manual
-   * spend. Heart heals on the spot and is *orthogonal* (it never disturbs a
-   * running timed power-up). The three timed types replace whatever is
-   * currently running (mutual exclusion via PowerUps.trigger) and float up into
-   * the active slot.
+   * Catching a power-up bubble. Tipping spawns none (power-ups arrive as tips),
+   * so this is effectively inert today; kept as the catch seam the pickup field
+   * calls. Power-up "use" is tracked at the single fire seam (_firePower).
    * @param {{ type: import('./types.js').PickupTypeName, x: number, y: number }} pickup
-   * @param {boolean} [viaShot] true when popped by a slingshot projectile
    */
-  _onPickup(pickup, viaShot = false) {
-    // Power-up "use" is tracked at the single fire seam (_firePower) so it
-    // counts across every mode + source — not here, where it would miss tips
-    // and combo-breakers and double-count Banked catches that aren't spent yet.
+  _onPickup(pickup) {
     this.bus.emit('pickup', { pickup });  // white burst at the catch point
-    // The mode decides fire-now (Auto) vs bank-for-later (Banked).
     this.mode.onCatch(pickup.type, this.player.x, this.player.stackTopY());
   }
 
   /**
-   * Apply the active mode's load-time settings (board size + combo-breaker
-   * capability). The single place mode defaults land; debug sliders can still
-   * override afterward. Called on construction, each game start, and a live
-   * mode switch.
+   * Apply the mode's load-time settings (board size + combo-breaker capability).
+   * The single place mode defaults land; debug sliders can still override
+   * afterward. Called on construction and each game start.
    */
   _applyModeConfig() {
     this.maxStack = this.mode.maxStack;
@@ -772,29 +720,18 @@ export class Game {
   }
 
   /**
-   * Shift: spend the front banked power-up. No-op in modes without a queue;
-   * an empty queue gives a "nope" beep.
-   */
-  _useShift() {
-    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
-    if (this.mode.queueEmpty()) { this.sound.bad(); return; }
-    this.mode.onShift();
-  }
-
-  /**
    * Apply a power-up's effect at (x, y): heart heals instantly and is
    * orthogonal (never disturbs a running timed power-up); the three timed types
    * replace whatever is running (mutual exclusion via PowerUps.trigger) and
-   * float into the active slot. Shared by catch (auto mode) and the loot box.
+   * float into the active slot. Driven by tip grants + the combo breaker.
    * @param {import('./types.js').PickupTypeName} type
    * @param {number} x @param {number} y
    * @param {number} [durationMult] scale the timed power-up's duration (combo
    *   breaker passes > 1 to supercharge it). Ignored by the instant heart heal.
    */
   _firePower(type, x, y, durationMult = 1) {
-    // Single seam for "a power-up was used" — every mode + source (catch, Banked
-    // spend, tip, combo-breaker, loot box) flows through here, so this is the
-    // one place challenge tracking counts it.
+    // Single seam for "a power-up was used" — every source (tip, combo-breaker)
+    // flows through here, so this is the one place challenge tracking counts it.
     this.challenges.recordPowerupUsed(type);
     if (type === PICKUP_TYPE.HEART) {
       if (!this.flags.invincible) {
@@ -874,30 +811,6 @@ export class Game {
     this.bus.emit('catch', { scoop, perfect });
   }
 
-  /**
-   * Down arrow: rotate the tray one slot. Top wraps to bottom; everything
-   * else shifts up. The cone locks (no movement, no catches, no other verbs)
-   * for ROTATE_LOCK_S — that's the cost of reordering.
-   */
-  _rotate() {
-    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
-    if (this.player.locked) return;
-    // The mode maps the "down" gesture to its verb (rotate, or nothing).
-    this.mode.onSwipeDown(this);
-  }
-
-  /** The rotate mechanic — modes with the rotate verb delegate here. */
-  _rotateStack() {
-    if (this.player.rotateDown()) {
-      // Light "whoosh" — reuse the catch chime so it sits in the same audio
-      // family as the other tray-manipulation verbs.
-      this.sound.catch_();
-    } else {
-      // Too few scoops to rotate.
-      this.sound.bad();
-    }
-  }
-
   /** Spit out the top scoop (discard) — the Tipping upward gesture. */
   _discardTop() {
     const stack = this.player.stack;
@@ -909,40 +822,14 @@ export class Game {
     this.sound.catch_();
   }
 
-  /**
-   * The upward gesture (swipe up / Space). The mode maps it to its verb —
-   * slingshot (Auto/Banked) or toss-the-top discard (Tipping).
-   */
+  /** The upward gesture (swipe up / Space): the mode tosses the top scoop. */
   _pop() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
-    if (this.player.locked) return;
     this.mode.onSwipeUp(this);
-  }
-
-  /**
-   * Slingshot mechanic — modes with the slingshot verb delegate here. Launches
-   * the bottom tray scoop straight up as a projectile (it can pop bubbles the
-   * cone+stack can't reach); the bottom scoop is consumed whether or not it
-   * hits. Empty tray → "nope" beep so the player isn't fighting silent input.
-   */
-  _slingshot() {
-    if (this.player.stack.length === 0) {
-      this.sound.bad();
-      return;
-    }
-    const bottom = this.player.stack[0];
-    const pos = this.player.scoopPosition(0);
-    this.player.popBottom();
-    this.projectiles.launch(pos.x, pos.y, -PROJECTILE_SPEED, bottom.color);
-    this.sound.shoot();
-    // Small burst at the launch point — same color family as the projectile
-    // so the "fired" beat reads cleanly.
-    this.effects.burst(pos.x, pos.y, [this.shop.hex(bottom.color), '#fff'], 8);
   }
 
   _deliver() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
-    if (this.player.locked) return;
     const index = this.shop.customerAt(this.player.x);
     if (index < 0) {
       this.sound.bad();
@@ -1192,15 +1079,14 @@ export class Game {
 
   /**
    * Cashout step 2: pop the active power-up bubble for show (no points), then
-   * let the mode cash out any banked queue (Banked mode), and finally open the
-   * wave-transition overlay. Auto mode's cashout is instant.
+   * open the wave-transition overlay.
    */
   _cashoutActive(completedWave) {
     if (!this.running) { this.inCashout = false; return; }
-    const finish = () => this.mode.cashout(() => {
+    const finish = () => {
       this.inCashout = false;
       this._beginWaveTransition(completedWave);
-    });
+    };
     if (this.activeBubble) {
       const pos = this._activeSlotPos();
       this.effects.burst(pos.x, pos.y, [PICKUP_RING_COLOR[this.activeBubble.type], '#fff'], 22);
@@ -1337,8 +1223,6 @@ export class Game {
     this.field.draw(ctx, rainbow);
     this.pickups.draw(ctx);
     this.player.draw(ctx, rainbow);
-    // Projectiles drawn after the cone so they look like they just left it.
-    this.projectiles.draw(ctx);
     const pausePatience = this.powerups.pauseActive || !this.flags.patternTimer;
     this.stations.draw(ctx, this.shop.list, {
       activeIndex:    this.shop.customerAt(this.player.x),
@@ -1388,9 +1272,7 @@ export class Game {
     }
     ctx.restore();
 
-    // Banked queue row (Banked mode only) + the active running-power-up
-    // indicator above it. Both screen-fixed.
-    this.mode.drawQueueSlots(ctx, this.bounds);
+    // The active running-power-up indicator (screen-fixed).
     this._drawActivePowerup(ctx);
 
     // FPS overlay is screen-fixed (drawn after the shake transform is popped).

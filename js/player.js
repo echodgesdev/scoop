@@ -9,9 +9,7 @@ import {
   SCOOP_RADIUS,
   SCOOP_SPACING,
   HANDOFF_REACH,
-  HANDOFF_DURATION_S,
-  ROTATE_LOCK_S,
-  ROTATE_ARC_OUT_PX
+  HANDOFF_DURATION_S
 } from './config.js';
 
 /** @typedef {import('./types.js').ScoopColor} ScoopColor */
@@ -46,7 +44,7 @@ export class Player {
     this.x = x;
     this.y = y;
     this.vx = 0;
-    /** @type {{ color: ScoopColor, land: number, slideFromIdx?: number, slideT?: number }[]} */
+    /** @type {{ color: ScoopColor, land: number }[]} */
     this.stack = [];
     this.flash = 0;
 
@@ -66,43 +64,9 @@ export class Player {
     this.handoffDy = 0;
     this.handoffT = HANDOFF_DURATION_S; // start "done" — no lean at game start
 
-    // Rotate lock. While > 0 the cone is "busy" — no movement, no catches,
-    // no pop, no deliver, no further rotate. Each scoop also has slideT /
-    // slideFromIdx so we can animate it from its previous slot.
-    this.lockT = 0;
-
-    // Hard movement freeze (tutorial intro). Unlike lockT it doesn't tick down;
-    // the game clears it when control is handed over.
+    // Hard movement freeze (tutorial intro). Doesn't tick down; the game clears
+    // it when control is handed over.
     this.frozen = false;
-  }
-
-  /** True while a rotation is in progress; gates movement, catches, and verbs. */
-  get locked() { return this.lockT > 0; }
-
-  /**
-   * Rotate the tray one slot: the top scoop wraps around to the bottom,
-   * every other scoop shifts up by one. Movement and catches lock for
-   * ROTATE_LOCK_S — that's the cost. Returns false if the tray is too
-   * small to rotate or a rotate is already in progress.
-   */
-  rotateDown() {
-    if (this.locked) return false;
-    if (this.stack.length < 2) return false;
-
-    const n = this.stack.length;
-    const top = /** @type {{ color: ScoopColor, land: number }} */ (this.stack.pop());
-    this.stack.unshift(top);
-
-    // Mark each scoop with where it came from so draw() can interpolate.
-    // - Index 0 (the new bottom) was the old top (n-1); arcs around.
-    // - Indices 1..n-1 shifted up from i-1; slide straight up one slot.
-    for (let i = 0; i < this.stack.length; i++) {
-      this.stack[i].slideFromIdx = i === 0 ? n - 1 : i - 1;
-      this.stack[i].slideT = 0;
-    }
-
-    this.lockT = ROTATE_LOCK_S;
-    return true;
   }
 
   /**
@@ -158,28 +122,19 @@ export class Player {
    * @param {number} [speedMult]
    */
   update(dt, input, bounds, speedMult = 1) {
-    // Always tick passive timers (flash, handoff lean, land squash). Even
-    // during a rotate-lock, the visual decay should continue.
+    // Always tick passive timers (flash, handoff lean, land squash) so visual
+    // decay continues even while frozen.
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt);
     if (this.handoffT < HANDOFF_DURATION_S) this.handoffT += dt;
     for (const s of this.stack) {
       if (s.land > 0) s.land = Math.max(0, s.land - dt);
-      if (s.slideT !== undefined && s.slideT < 1) s.slideT = Math.min(1, s.slideT + dt / ROTATE_LOCK_S);
     }
 
     // Slosh runs every frame (before any early return) off the cone's real
-    // displacement last frame, so it keeps settling even while locked/frozen.
+    // displacement last frame, so it keeps settling even while frozen.
     const movedVx = dt > 0 ? (this.x - this._prevX) / dt : 0;
     this._prevX = this.x;
     this._tickSlosh(dt, movedVx);
-
-    if (this.lockT > 0) {
-      // Rotation in progress: no movement, no acceleration, friction-snap
-      // to zero so the cone visibly sits still.
-      this.vx = 0;
-      this.lockT = Math.max(0, this.lockT - dt);
-      return;
-    }
 
     if (this.frozen) {
       // Tutorial freeze: passive timers above still ran; just don't move.
@@ -275,19 +230,6 @@ export class Player {
   }
 
   /**
-   * Eject the *bottom* (oldest) scoop. The rest slide down by one slot —
-   * the small re-trigger of the land animation reads the shift. This is
-   * the everyday pop verb under top-down delivery: old commitments become
-   * cheap to dump while fresh catches stay protected.
-   */
-  popBottom() {
-    if (this.stack.length === 0) return false;
-    this.stack.shift();
-    for (const s of this.stack) s.land = Math.max(s.land, 0.12);
-    return true;
-  }
-
-  /**
    * Remove one scoop per color in the list (consumes a served order). While
    * the rainbow power-up is active, every scoop counts as anything — just pop
    * `colors.length` items off the top of the tray.
@@ -324,28 +266,11 @@ export class Player {
     this._drawCone(ctx);
     for (let i = 0; i < this.stack.length; i++) {
       const s = this.stack[i];
-      let drawX, drawY, drawScale;
-
-      if (s.slideT !== undefined && s.slideT < 1) {
-        // Rotation animation: lerp from old slot to new slot. The wrap-
-        // around scoop (was top, now bottom) bows out to the right so the
-        // path reads as "around the cone" instead of teleporting through.
-        const from = this.scoopPosition(/** @type {number} */ (s.slideFromIdx));
-        const to   = this.scoopPosition(i);
-        const t = s.slideT;
-        const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        const wrapping = (s.slideFromIdx !== undefined) && s.slideFromIdx > i;
-        const bowX = wrapping ? Math.sin(t * Math.PI) * ROTATE_ARC_OUT_PX : 0;
-        drawX = from.x + (to.x - from.x) * e + bowX;
-        drawY = from.y + (to.y - from.y) * e;
-        drawScale = 1;
-      } else {
-        const pos = this.scoopPosition(i);
-        drawX = pos.x;
-        drawY = pos.y;
-        const p = s.land / LAND_TIME;          // 1 -> 0 as it settles
-        drawScale = 1 + 0.28 * p;              // squash-pop on landing
-      }
+      const pos = this.scoopPosition(i);
+      let drawX = pos.x;
+      let drawY = pos.y;
+      const p = s.land / LAND_TIME;            // 1 -> 0 as it settles
+      const drawScale = 1 + 0.28 * p;          // squash-pop on landing
 
       // Fake slosh trail: the bottom scoop tracks the cone (zero lean, current
       // tick); each scoop above samples the lean from a few ticks earlier, and

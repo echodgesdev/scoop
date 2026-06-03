@@ -137,23 +137,6 @@ export class PickupField {
     for (const p of this.items) drawPickup(ctx, p);
   }
 
-  /**
-   * Remove and return the first pickup that matches `predicate`. Iterated
-   * back-to-front so newest-spawned bubbles get tested first — they're the
-   * ones most likely to be in front of an in-flight projectile. Used by
-   * the slingshot to pop a bubble on projectile collision.
-   * @param {(p: Pickup) => boolean} predicate
-   * @returns {Pickup | null}
-   */
-  tryHit(predicate) {
-    for (let i = this.items.length - 1; i >= 0; i--) {
-      if (predicate(this.items[i])) {
-        return this.items.splice(i, 1)[0];
-      }
-    }
-    return null;
-  }
-
   /** @param {Bounds} bounds */
   _spawn(bounds) {
     // Only spawn from the player's unlocked set, with weights re-normalised

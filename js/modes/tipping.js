@@ -1,11 +1,11 @@
 // @ts-check
-import { GameMode } from './game-mode.js';
-import { TutorialBase } from '../tutorial.js';
 import { PICKUP_TYPE } from '../config.js';
 import { STATE } from '../shop.js';
+import { TutorialBase } from '../tutorial.js';
 
 /** @typedef {import('../game.js').Game} Game */
 /** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../types.js').Bounds} Bounds */
 
 // Tipping plays with a shorter cone (4) but a fuller sky (7 falling scoops).
 const TIPPING_MAX_STACK = 4;
@@ -33,21 +33,35 @@ class TippingTutorial extends TutorialBase {
 }
 
 /**
- * Tipping: no bubble lane at all — power-ups come from customer TIPS (and the
- * combo breaker). A tighter board, the combo breaker on by default, the upward
- * gesture tosses the top scoop, and the down gesture is unused (no rotate).
- * Power-up handling is the inherited fire-on-catch default; it only ever runs
- * via tips/breaker/loot box calling the shared Game._firePower.
+ * Tipping — the game's one and only mode. Power-ups come from customer TIPS (and
+ * the combo breaker), not a bubble lane: a tighter board, the combo breaker on,
+ * the upward gesture tosses the top scoop, no rotate. game.js owns the shared
+ * machinery (catching, serving, the active-slot visual, _firePower, the combo
+ * breaker, day/night, …) and DELEGATES to this object via modes/index.js.
  */
-export class TippingMode extends GameMode {
+export class TippingMode {
+  /** @param {Game} game */
+  constructor(game) {
+    this.game = game;
+  }
+
   get id() { return 'tipping'; }
-  get label() { return 'Tipping (no bubbles)'; }
+  get label() { return 'Tipping'; }
   get maxStack() { return TIPPING_MAX_STACK; }
   get maxLive() { return TIPPING_MAX_LIVE; }
+  /** The combo breaker is part of Tipping's identity. */
   get comboBreaker() { return true; }
 
-  // No bubble lane — power-ups arrive as tips.
+  /** No bubble lane — power-ups arrive as tips. @returns {PickupTypeName[]} */
   bubbleTypes() { return []; }
+
+  /**
+   * A caught bubble would fire instantly. Tipping spawns no bubbles, so this is
+   * inert in practice — power-ups run via grantTip / the combo breaker calling
+   * the shared Game._firePower. Kept for the catch contract game.js expects.
+   * @param {PickupTypeName} type @param {number} x @param {number} y
+   */
+  onCatch(type, x, y) { this.game._firePower(type, x, y); }
 
   /**
    * Roll a tip for a freshly-spawned customer. Frequency comes from the bubble
@@ -57,8 +71,8 @@ export class TippingMode extends GameMode {
   rollTip() {
     const g = this.game;
     const avgGap = (g.pickups.spawnMin + g.pickups.spawnMax) / 2;
-    // Tips are the only power-up source in Tipping, so keep them common — a
-    // healthy share of customers carry one (clamped so it never feels constant).
+    // Tips are the only power-up source, so keep them common — a healthy share
+    // of customers carry one (clamped so it never feels constant).
     const chance = Math.max(0.3, Math.min(0.9, 5 / Math.max(0.5, avgGap)));
     if (Math.random() > chance) return null;
     const w = g.pickups.weights;
@@ -76,7 +90,7 @@ export class TippingMode extends GameMode {
 
   /**
    * Grant a customer's tip on order completion: coin = bonus points; a power-up
-   * tip auto-fires (same as a caught bubble in Auto).
+   * tip auto-fires (the shared engine runs the timed effect / heal).
    * @param {PickupTypeName | 'coin'} tip @param {number} x @param {number} y
    */
   grantTip(tip, x, y) {
@@ -92,9 +106,18 @@ export class TippingMode extends GameMode {
     }
   }
 
-  // Upward gesture tosses the top scoop; the down gesture does nothing.
+  /** Up gesture / Space: toss the top scoop (Tipping has no rotate verb). */
   onSwipeUp() { this.game._discardTop(); }
-  onSwipeDown() {}
+
+  /**
+   * Resting Y of the on-canvas active-power-up slot — ~15% up from the bottom.
+   * The bubble's entrance arcs up and pauses ~10% higher before settling here.
+   * @param {Bounds} bounds
+   */
+  activeSlotY(bounds) { return bounds.height * 0.85; }
+
+  /** Nothing mode-owned to reset between runs. */
+  reset() {}
 
   makeTutorial() { return new TippingTutorial(); }
 }

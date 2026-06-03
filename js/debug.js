@@ -23,9 +23,6 @@ export class DebugPanel {
    *   getBubbleWeights?: () => number[],
    *   onTutorialFlag?: (v: boolean) => void,
    *   getTutorialFlag?: () => boolean,
-   *   onGameMode?: (name: string) => void,
-   *   getGameMode?: () => string,
-   *   getModeList?: () => { id: string, label: string }[],
    *   onDeliveryMode?: (name: string) => void,
    *   getDeliveryMode?: () => string,
    *   onMaxStack?: (n: number) => void,
@@ -42,7 +39,7 @@ export class DebugPanel {
    *   getFallSpeed?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onGameMode, getGameMode, getModeList, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -58,9 +55,6 @@ export class DebugPanel {
     this.getBubbleWeights = getBubbleWeights || (() => [0.35, 0.3, 0.2, 0.15]);
     this.onTutorialFlag = onTutorialFlag || (() => {});
     this.getTutorialFlag = getTutorialFlag || (() => false);
-    this.onGameMode = onGameMode || (() => {});
-    this.getGameMode = getGameMode || (() => 'auto');
-    this.getModeList = getModeList || (() => []);
     this.onDeliveryMode = onDeliveryMode || (() => {});
     this.getDeliveryMode = getDeliveryMode || (() => 'any');
     this.onMaxStack = onMaxStack || (() => {});
@@ -82,7 +76,6 @@ export class DebugPanel {
     this.button = /** @type {HTMLElement} */ (document.getElementById('debugBtn'));
     this.panel = /** @type {HTMLElement} */ (document.getElementById('debugPanel'));
     this._wireFlags();
-    this._wireGameMode();
     this._wireGameplay();
     this._wireDemandBias();
     this._wirePatience();
@@ -110,23 +103,6 @@ export class DebugPanel {
       el.checked = !!this.flags[key];
       el.addEventListener('change', () => { this.flags[key] = el.checked; });
     });
-  }
-
-  /**
-   * Game-mode dropdown — options are built from the mode registry (getModeList),
-   * so adding/removing a mode in modes/index.js updates this list automatically.
-   */
-  _wireGameMode() {
-    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugGameMode'));
-    if (!sel) return;
-    const modes = this.getModeList();
-    if (modes.length) {
-      sel.innerHTML = modes
-        .map(m => `<option value="${m.id}">${m.label}</option>`)
-        .join('');
-    }
-    sel.value = this.getGameMode();
-    sel.addEventListener('change', () => this.onGameMode(sel.value));
   }
 
   /**
@@ -315,8 +291,6 @@ export class DebugPanel {
         if (key) el.checked = !!this.flags[key];
       });
     }
-    const modeSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugGameMode'));
-    if (modeSel) modeSel.value = this.getGameMode();
     const breakerCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugComboBreakerToggle'));
     if (breakerCb) breakerCb.checked = this.getComboBreakerEnabled();
     const delSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugDelivery'));
