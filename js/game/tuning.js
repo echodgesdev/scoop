@@ -14,8 +14,8 @@ export const PHASE_ACTIVE = [1, 2, 3, 3];
 export const PHASE_GOAL = [3, 5, 8, 13];
 export const WAVE_CELEBRATE_S = 1.4;
 
-// Per-recipe point values are now defined per-group in recipes.js — each
-// recipe inherits its value from the group it belongs to.
+// Per-recipe point values are defined per-group in recipes.js — each recipe
+// inherits its value from the group it belongs to.
 
 // === Power-ups ================================================================
 // Power-ups arrive as customer tips (and the combo breaker) — there's no bubble
@@ -42,10 +42,9 @@ export const SPAWN_INTERVAL_START = 0.85;
 export const SPAWN_INTERVAL_END = 0.42;
 export const FALL_SPEED_MULT_END = 2.2;
 // Time-to-cone, not just speed: scoops fall ~0.65·H (≈990px on a phone) to reach
-// the cone, so at the old 130–270 px/s a wave-1 scoop took 4–8s to arrive — dead
-// air you feel acutely holding a phone. Raised so a wave-1 scoop lands in ~2–4s
-// while still leaving a readable window. Fine-tune live via the debug fall-speed
-// multiplier (ScoopField.fallScale).
+// the cone, so a too-slow fall is dead air you feel acutely holding a phone.
+// Tuned so a wave-1 scoop lands in ~2–4s while still leaving a readable window.
+// Fine-tune live via the debug fall-speed multiplier (ScoopField.fallScale).
 export const SCOOP_FALL_MIN = 240;
 export const SCOOP_FALL_RANGE = 200;
 // Hard cap on simultaneously-falling scoops. When at the cap the spawner idles
@@ -62,13 +61,13 @@ export const PATTERN_TIME_END = 6.5;
 
 export const COMBO_DECAY_S = 5;
 
-// === Combo breaker (Tipping mode) ============================================
-// Tipping has no bubble lane, so the score combo doubles as a charge meter:
-// chain serves and when the combo hits this threshold it "breaks" — emptying
-// the meter and firing a SUPERCHARGED (longer-running) power-up. It's the
-// mode's active, skill-expressive payoff (chain serves → earn a power-up) with
-// no new verb. The supercharged power-up runs at DURATION_MULT × the normal
-// timed duration so it clearly out-classes a passive customer tip.
+// === Combo breaker ===========================================================
+// The score combo doubles as a charge meter: chain serves and when the combo
+// hits this threshold it "breaks" — emptying the meter and firing a SUPERCHARGED
+// (longer-running) power-up. It's the active, skill-expressive payoff (chain
+// serves → earn a power-up) with no new verb. The supercharged power-up runs at
+// DURATION_MULT × the normal timed duration so it clearly out-classes a passive
+// customer tip.
 export const COMBO_BREAKER_THRESHOLD = 8;
 export const COMBO_BREAKER_DURATION_MULT = 2;
 
@@ -123,14 +122,12 @@ export const ORDER_SIZE_WEIGHTS = [
 // Probability that a spawn deliberately targets a not-yet-discovered recipe (of
 // the rolled size), so the player keeps meeting new recipes instead of re-
 // rolling ones they've already made. Ramps UP with wave (over WAVE_RAMP) because
-// later waves have the most undiscovered recipes to surface — the opposite of
-// the old pure-uniform pick, where a growing pool made discovery progressively
-// less likely.
+// later waves have the most undiscovered recipes to surface.
 export const DISCOVERY_BIAS_START = 0.25;  // wave 1
 export const DISCOVERY_BIAS_END = 0.6;     // wave WAVE_RAMP and beyond
 
-// Per-recipe combo weight is now defined per-group in recipes.js — each
-// recipe inherits its weight from the group it belongs to.
+// Per-recipe combo weight is defined per-group in recipes.js — each recipe
+// inherits its weight from the group it belongs to.
 
 // === Top-down delivery =======================================================
 // Each accepted partial serve (one scoop handed to a customer who still

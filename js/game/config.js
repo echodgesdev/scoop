@@ -61,26 +61,9 @@ export const POWERUP_TYPE = Object.freeze({
   RAINBOW: 'rainbow'
 });
 
-// Power-up visuals — icon + ring color per type. Power-ups arrive as customer
-// tips (and the combo breaker); these maps drive the on-cone active indicator
-// and the tip token. The type names stay "feather"/"pause" for code stability,
-// but the icons are chosen for legibility (⚡ reads "fast", ❄️ "frozen"). 'coin'
-// is the points tip — '$' renders everywhere where the coin emoji does not.
-export const PICKUP_ICONS = {
-  heart:   '❤️',
-  feather: '⚡',
-  pause:   '❄️',
-  rainbow: '🌈',
-  coin:    '$'
-};
-
-export const PICKUP_RING_COLOR = {
-  heart:   '#ff6fa3',
-  feather: '#bfdcff',
-  pause:   '#c9b6ff',
-  rainbow: '#ffd166',
-  coin:    '#ffd700'
-};
+// Power-up VISUALS (icons + ring colors) live in view/powerupVisuals.js — the
+// one place to touch when we move from emoji to sprites. Config keeps only the
+// domain mapping below.
 
 // Which timed power-up a caught/granted type runs. Heart is absent — it heals
 // instantly and never occupies the active slot. Read by the active-slot sim
@@ -93,14 +76,8 @@ export const PICKUP_TO_POWER = {
 
 // Stringly-typed config values, centralized as frozen enums so a typo is a
 // missing property (loud — undefined) instead of a silently-false comparison.
-// (Game MODES are no longer config flags — each mode is its own strategy file
-// in modes/; see modes/index.js.)
 /** Tray→customer delivery rule. @type {Readonly<{ANY:'any',SEQUENTIAL:'sequential',WHOLE:'whole'}>} */
 export const DELIVERY_MODE = Object.freeze({ ANY: 'any', SEQUENTIAL: 'sequential', WHOLE: 'whole' });
-
-// Recipe templates and per-wave pools used to live here, but recipes are
-// now defined in recipes.js by their specific color combo + group. Per-wave
-// access is exposed via recipesForWave() in that module.
 
 // === Math util ================================================================
 /**
@@ -116,8 +93,7 @@ export function lerp(a, b, t) {
 /**
  * Y-coordinate of the sand floor's top edge. Shared by scene (floor + sky
  * gradient end), dayCycle (sun horizon), and stations (customer ground line).
- * The sky/ground split is a fixed layout constant (FLOOR_Y_RATIO in tuning.js);
- * the runtime horizon override was removed.
+ * The sky/ground split is the fixed layout constant FLOOR_Y_RATIO (tuning.js).
  * @param {number} boundsHeight
  * @returns {number}
  */

@@ -14,9 +14,8 @@
  *   String tag for a timed power-up (note: 'heart' is instant, not a power-up).
  *
  * @typedef {string} RecipeId
- *   Canonical color-multiset id (e.g. 'pink+pink', 'choco+mint+pink'). Kept
- *   as a typedef alias for documentation; recipes are now defined by their
- *   specific color combo + group, not by a fixed set of templates.
+ *   Canonical color-multiset id (e.g. 'pink+pink', 'choco+mint+pink'). A
+ *   documentation alias; each recipe is defined by its color combo + group.
  *
  * @typedef {'arriving'|'delay'|'waiting'|'leaving'} CustomerState
  *

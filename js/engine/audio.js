@@ -72,7 +72,7 @@ export class Sound {
     this._tone(900,  0.03, 0.06,  'triangle', 0.15);
   }
 
-  /** Spending a banked power-up — a confident rising "power-on" sweep. */
+  /** A power-up firing — a confident rising "power-on" sweep. */
   powerupTrigger() {
     this._tone(392, 0,    0.08, 'sawtooth', 0.16);
     this._tone(587, 0.05, 0.10, 'sawtooth', 0.16);

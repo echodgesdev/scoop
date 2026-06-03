@@ -95,7 +95,7 @@ export class TutorialBase {
 
   /**
    * A big, glowing, gently-bobbing prompt pill with a caret pointing at its
-   * target — readable at arm's length and visually alive, vs. the old flat chip.
+   * target — readable at arm's length and visually alive.
    * @param {CanvasRenderingContext2D} ctx
    * @param {number} x @param {number} y centre of the pill (target anchor)
    * @param {string} text

@@ -3,16 +3,15 @@
  * Native single-touch controls (Pointer Events — also covers mouse/pen, so it
  * works on desktop too). One active pointer at a time.
  *
- * This layer is movement-scheme-AGNOSTIC: it just reports raw gesture events and
- * lets the host decide what they mean. That lets Game switch steering schemes
- * (absolute drag / relative drag / hold-zones) without touching this file.
+ * This layer is MEANING-AGNOSTIC: it reports raw gesture events and lets the host
+ * decide what they mean, so steering/verb changes never touch this file.
  *
- *   onHold(vx)        pointer went down at virtual-x vx (hold-zones steer start)
+ *   onHold(vx)        pointer went down at virtual-x vx
  *   onMove(vx, dvx)   drag update — absolute vx and the per-event virtual delta
  *   onMoveEnd()       drag released
- *   onHoldEnd()       pointer released (always — hold-zones steer stop)
- *   onTap(vx, vy)     quick touch with no drag (serve / queue)
- *   onSwipeUp()/onSwipeDown()   a fast vertical flick (slingshot / rotate)
+ *   onHoldEnd()       pointer released (always)
+ *   onTap(vx, vy)     quick touch with no drag
+ *   onSwipeUp()/onSwipeDown()   a fast vertical flick
  *
  * Keyboard stays fully intact alongside this.
  */

@@ -114,7 +114,7 @@ export class Hud {
 
     const howBtn = document.getElementById('howBtn');
     if (howBtn) {
-      // Replaces the old wall of text — launches the interactive tutorial.
+      // Launches the interactive tutorial.
       howBtn.addEventListener('click', () => this.onHowToPlay());
     }
 
@@ -130,9 +130,8 @@ export class Hud {
     const closeChallengesBtn = document.getElementById('closeChallengesBtn');
     if (closeChallengesBtn) closeChallengesBtn.addEventListener('click', () => this.hideChallenges());
 
-    // Settings now lives as a menu item (home screen + game-over card + pause
-    // menu) rather than a floating cog. Each is wired once via the dataset
-    // guard; the home/game-over button (#settingsBtn) is recreated on every
+    // Settings is a menu item on three overlays (home, game-over card, pause).
+    // Each wires once via the dataset guard; #settingsBtn is recreated on every
     // overlay rewrite, so it re-wires itself then.
     const settingsBtn = document.getElementById('settingsBtn');
     if (settingsBtn && !settingsBtn.dataset.wired) {

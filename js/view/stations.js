@@ -1,9 +1,8 @@
 // @ts-check
 import { STATE } from '../game/shop.js';
 import { drawScoop } from './playerView.js';
+import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
-  PICKUP_ICONS,
-  PICKUP_RING_COLOR,
   SCOOP_RADIUS,
   MINI_SCOOP_RADIUS,
   MINI_CONE_OFFSET_X,

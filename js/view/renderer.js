@@ -3,9 +3,8 @@ import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
 import { dayCycleState, nightCycleState } from '../game/dayCycle.js';
 import { drawField } from './scoopsView.js';
 import { drawPlayer } from './playerView.js';
+import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
-  PICKUP_ICONS,
-  PICKUP_RING_COLOR,
   PICKUP_TO_POWER,
   SCOOP_RADIUS,
   CUSTOMER_FACE_OFFSET_PX
@@ -22,7 +21,7 @@ const ACTIVE_PAUSE_FRAC = 0.6;   // arc-frac..this: slight hold at the waypoint
 
 /**
  * Draw one full frame. READS the game (its actors, effects, flags, banner, …)
- * and paints — never mutates. Mirrors the old Game._draw.
+ * and paints — never mutates.
  * @param {CanvasRenderingContext2D} ctx
  * @param {Game} game
  */

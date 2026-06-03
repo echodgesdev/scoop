@@ -16,8 +16,8 @@ const TIP_COIN_WEIGHT = 0.4;
 const TIP_COIN_POINTS = 50;
 
 /**
- * Tipping tutorial: no bubbles — power-ups arrive as customer tips, and the top
- * scoop is tossed with the upward gesture (no rotate verb).
+ * Tipping tutorial: power-ups arrive as customer tips, and the top scoop is
+ * tossed with the upward gesture (no rotate verb).
  */
 class TippingTutorial extends TutorialBase {
   /** Buried wanted color: toss the top off (upward) rather than rotate. */
@@ -34,10 +34,10 @@ class TippingTutorial extends TutorialBase {
 
 /**
  * Tipping — the game's one and only mode. Power-ups come from customer TIPS (and
- * the combo breaker), not a bubble lane: a tighter board, the combo breaker on,
- * the upward gesture tosses the top scoop, no rotate. game.js owns the shared
- * machinery (catching, serving, the active-slot visual, _firePower, the combo
- * breaker, day/night, …) and DELEGATES to this object via modes/index.js.
+ * the combo breaker): a tighter board, the combo breaker on, the upward gesture
+ * tosses the top scoop, no rotate. game.js owns the shared machinery (catching,
+ * serving, the active-slot visual, _firePower, the combo breaker, day/night, …)
+ * and DELEGATES to this object via modes/index.js.
  */
 export class TippingMode {
   /** @param {Game} game */

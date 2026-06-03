@@ -14,7 +14,7 @@ export class Input {
     this.right = false;
     // Relative touch steering: moveDelta accumulates virtual-x to apply directly
     // this frame, then the player consumes (zeroes) it each frame. left/right are
-    // the held keyboard arrows. (Absolute / hold-zone touch schemes were removed.)
+    // the held keyboard arrows.
     this.moveDelta = 0;
     // Which input was used most recently — drives input-aware tutorial wording
     // (tap/swipe vs key names). Set true by the touch layer, false on keydown.

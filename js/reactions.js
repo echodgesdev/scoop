@@ -64,8 +64,8 @@ export function wireReactions(game) {
   });
 
   game.bus.on('waveUp', () => {
-    // The "WAVE N!" banner moved to the next-wave START (see the night-cycle
-    // completion in Game._frame) so it lands after the recap modal, not before it.
+    // The "WAVE N!" banner fires at the next-wave start (Game._frame, on
+    // night-cycle completion), not here.
     game.hud.setGauge(game.waves.wave, 1);
     game.hud.flashWaveUp();
     game.sound.levelUp();

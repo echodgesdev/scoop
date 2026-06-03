@@ -270,7 +270,3 @@ export class Waves {
     };
   }
 }
-
-// Per-recipe color generation lives in recipes.js now — orders carry their
-// own pre-baked color list, so the template-based helpers that used to live
-// here are no longer needed.

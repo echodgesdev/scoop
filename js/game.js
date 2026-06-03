@@ -7,10 +7,10 @@
 //   view/   — rendering: renderer.js (the frame), playerView, scoopsView, scene,
 //             stations, effects, HUD
 //   reactions.js — domain events → sound/haptics/effects/HUD glue
-// This file owns the remaining glue: builds the actors, drives the Loop with
+// This file owns the glue: builds the actors, drives the Loop with
 // _stepping/_step/_frame, routes input, and runs the wave-flow state machine
-// (start → cashout → transition → night cycle). Drawing and reactions are
-// delegated; it no longer renders or wires juice directly.
+// (start → cashout → transition → night cycle). Drawing (view/renderer.js) and
+// reactions (reactions.js) are delegated.
 import {
   MAX_HEALTH,
   DAMAGE_PER_EXPIRE,
@@ -20,7 +20,6 @@ import {
   PERFECT_CATCH_BONUS,
   HEART_HEAL_AMOUNT,
   PICKUP_TYPE,
-  PICKUP_RING_COLOR,
   PICKUP_TO_POWER,
   PICKUP_WEIGHTS,
   PICKUP_SPAWN_MIN_S,
@@ -48,6 +47,7 @@ import { Haptics } from './engine/haptics.js';
 import { Effects } from './view/effects.js';
 import { DebugPanel } from './debug.js';
 import { drawFrame } from './view/renderer.js';
+import { PICKUP_RING_COLOR } from './view/powerupVisuals.js';
 import { wireReactions } from './reactions.js';
 import { PowerUps } from './game/powerups.js';
 import { EventBus } from './engine/events.js';
@@ -178,7 +178,7 @@ export class Game {
     // it lives on Game, not the rebuilt mode). `powerupWeights` is the relative
     // mix of heart/⚡/❄️/🌈 (aligned to PICKUP order); `tipGap{Min,Max}` is the
     // seconds-between-tips range the tip roller reads. Power-ups arrive as
-    // customer tips + the combo breaker — there is no bubble lane.
+    // customer tips + the combo breaker.
     this.powerupWeights = PICKUP_WEIGHTS.slice();
     this.tipGapMin = PICKUP_SPAWN_MIN_S;
     this.tipGapMax = PICKUP_SPAWN_MAX_S;
@@ -592,7 +592,7 @@ export class Game {
         this.nightT = 1;
         this.inNightCycle = false;
         // The recap modal + night sweep are done — announce the wave we're now
-        // entering. (The banner used to fire on completion, ahead of the modal.)
+        // entering.
         this.banner = { text: `WAVE ${this.waves.wave}!`, t: 1.6 };
       }
     }
@@ -966,8 +966,8 @@ export class Game {
   /**
    * Wave-end cashout. Freezes gameplay (effects keep animating) and runs a
    * payout chain: bank the combo → pop the tray stack top-to-bottom (+scoop
-   * each) → pop the banked queue back-to-front (+3 scoops each) → pop the
-   * active bubble for show (no points) → open the wave-transition overlay.
+   * each) → pop the active bubble for show (no points) → open the
+   * wave-transition overlay.
    * @param {number} completedWave
    */
   _runWaveCashout(completedWave) {

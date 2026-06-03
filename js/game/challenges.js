@@ -53,9 +53,8 @@ export const SETS = [
       { type: 'unlock_section', value: 'DAILY_DOUBLE' }
     ]
   },
-  // Set 2 — introduces the "use a power-up" verb (works in every mode: a
-  // power-up fires on catch in Auto, on spend in Banked, on a tip/combo-break
-  // in Tipping).
+  // Set 2 — introduces the "use a power-up" verb (a power-up fires from a tip
+  // or the combo breaker).
   {
     name: 'Heart on the Line',
     challenges: [
@@ -320,9 +319,8 @@ export class Challenges {
   }
 
   /**
-   * A power-up was used (fired). Mode-agnostic: Auto fires on catch, Banked on
-   * spend, Tipping on a customer tip or combo-breaker — all route through
-   * Game._firePower, which is the single call site for this. Feeds the
+   * A power-up was used (fired) — from a customer tip or the combo breaker, both
+   * routed through Game._firePower (the single call site). Feeds the
    * use_powerup_type / _total / _wave challenges.
    * @param {PickupTypeName} type
    */
@@ -388,12 +386,11 @@ export class Challenges {
   }
 
   /**
-   * Notify the HUD whenever a challenge's requirement is *newly* met. This
-   * no longer advances the current set or sets `completed` — that only
-   * happens at commitEarned() time (wave-end or game-over). The two-phase
-   * model means the player sees a toast as soon as a requirement is hit,
-   * but the cross-off animation and set-advancement wait for the natural
-   * pause between waves.
+   * Notify the HUD whenever a challenge's requirement is *newly* met. This does
+   * NOT advance the current set or set `completed` — that only happens at
+   * commitEarned() time (wave-end or game-over). The two-phase model means the
+   * player sees a toast as soon as a requirement is hit, but the cross-off
+   * animation and set-advancement wait for the natural pause between waves.
    */
   _checkCompletions() {
     const set = SETS[this.state.currentSet];
