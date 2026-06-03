@@ -90,9 +90,6 @@ export class BankedMode extends GameMode {
     return true;
   }
 
-  /** Active-power-up slot sits higher to leave room for the queue row beneath it. */
-  activeSlotY(bounds) { return bounds.height - 118; }
-
   /** @param {number} dt */
   step(dt) {
     const k = Math.min(1, dt * 14);

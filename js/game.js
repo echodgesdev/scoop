@@ -64,7 +64,13 @@ const NIGHT_CYCLE_S = 2.0;
 // ends — or is replaced by a fresh catch — it slides off to the LEFT.
 // A departing bubble takes PU_LEAVE_S to clear.
 const PU_LEAVE_S = 0.3;
-const ACTIVE_SLIDE_S = 0.18;
+// Entrance for the active power-up bubble: it ARCS up from the catch point (a
+// lobbed quadratic), holds briefly + large at a mid waypoint, then settles down
+// to its resting slot while shrinking. Phase boundaries are fractions of anim.
+const ACTIVE_SLIDE_S = 0.7;
+const ACTIVE_ARC_FRAC = 0.45;    // 0..this: arc up-and-over to the mid waypoint
+const ACTIVE_PAUSE_FRAC = 0.6;   // arc-frac..this: slight hold at the waypoint
+// (this..1: settle down to the resting slot, shrinking)
 
 // Map a caught bubble type to the timed power-up it runs. Heart is absent — it
 // heals instantly and never occupies the active slot (see _onPickup).
@@ -221,7 +227,7 @@ export class Game {
     // (speed / freeze / rainbow) are mutually exclusive — catching one replaces
     // whatever is currently running. The single "active" bubble below mirrors
     // the running timed power-up (its countdown ring); null when none is up.
-    /** @type {{ type: PickupTypeName, fromX: number, anim: number } | null} */
+    /** @type {{ type: PickupTypeName, fromX: number, fromY: number, anim: number } | null} */
     this.activeBubble = null;
     // Bubbles mid-slide-off to the left (a finished or just-replaced power-up).
     /** @type {{ type: PickupTypeName, x: number, y: number, r0: number, t: number }[]} */
@@ -231,6 +237,9 @@ export class Game {
     this.showTutorial = this._loadShowTutorial();
     // Free-running clock (seconds) for HUD pulse/flash animations.
     this.clock = 0;
+    // Whether the tutorial "day meter" callout is currently shown (so we only
+    // toggle the DOM on transitions, not every frame).
+    this._dayHintShown = false;
 
     this.health = MAX_HEALTH;
     this.running = false;
@@ -577,6 +586,7 @@ export class Game {
     // is actually in play.
     this.player.frozen = false;
     if (playWave0) this.tutorial.start(this);
+    this._syncDayHint();
 
     requestAnimationFrame(t => this._loop(t));
   }
@@ -607,6 +617,17 @@ export class Game {
   setTouchGain(g) {
     this.touchGain = Math.max(0.5, Math.min(5, g));
     try { localStorage.setItem('scoop.touchGain', String(this.touchGain)); } catch {}
+  }
+
+  /**
+   * Show the "day meter" tutorial callout exactly while the tutorial is active.
+   * Guarded so the DOM only changes on transitions, not every frame.
+   */
+  _syncDayHint() {
+    const want = this.tutorial.active;
+    if (want === this._dayHintShown) return;
+    this._dayHintShown = want;
+    this.hud.setDayHint(want);
   }
 
   /** @param {DOMHighResTimeStamp} t */
@@ -704,6 +725,7 @@ export class Game {
     });
 
     if (this.tutorial.active) this.tutorial.update(dt, this);
+    this._syncDayHint();
 
     this._stepActive(dt);
     this.mode.step(dt);  // banked-queue animations (no-op in other modes)
@@ -781,7 +803,7 @@ export class Game {
       }
       this.sound.heart();
     } else {
-      this._activateBubble(type, x);
+      this._activateBubble(type, x, y);
       this.powerups.trigger(type, durationMult);
       this.sound.powerupTrigger();
     }
@@ -1046,7 +1068,10 @@ export class Game {
     // peak; if that pushed the chain to the threshold, break it now into a
     // supercharged power-up (resets the meter + re-syncs the readout). Enabled
     // per mode (default Tipping-only) — see _applyModeConfig + the mode files.
-    if (this.comboBreakerEnabled && this.shop.combo >= this.comboBreakerThreshold) {
+    // Skipped on the wave-completing serve: the wave cashes the combo out anyway,
+    // and firing here would freeze its pop-text behind the between-wave overlay.
+    if (this.comboBreakerEnabled && event !== WAVE_EVENT.WAVE_UP &&
+        this.shop.combo >= this.comboBreakerThreshold) {
       this._fireComboBreaker(cx, cy);
     }
 
@@ -1093,7 +1118,7 @@ export class Game {
     this.sound.perfect();
     this.effects.addShake(12);
     this.effects.burst(x, y, ['#ffec5c', '#ff6fa3', '#7fe3c4', '#6a8cff', '#fff'], 36);
-    this.effects.popText(x, y - 46, '⚡ COMBO BREAK!', { color: '#ffec5c', size: 30, life: 1.2 });
+    this.effects.popText(x, y - 46, '⚡ SUPERCHARGED!', { color: '#ffec5c', size: 30, life: 1.2 });
     this._syncComboHud();
   }
 
@@ -1229,6 +1254,10 @@ export class Game {
   _beginWaveTransition(completedWave) {
     if (!this.running) return;
     this.inWaveTransition = true;
+    // Effects are frozen during the transition (the loop doesn't update them),
+    // so flush any in-flight pop-text / bursts now — otherwise they'd hang
+    // motionless behind the overlay until the next wave resumes.
+    this.effects.reset();
     this.hud.showWaveTransition({
       completedWave,
       onResume: () => this._endWaveTransition()
@@ -1262,6 +1291,8 @@ export class Game {
     this.inWaveTransition = false;
     this.inCashout = false;
     this.inNightCycle = false;
+    this._dayHintShown = false;
+    this.hud.setDayHint(false);
     this.sound.gameOver();
     this.haptics.gameOver();
     this.bus.emit('gameOver', /** @type {any} */ ({}));
@@ -1314,7 +1345,9 @@ export class Game {
       canServe:       i => this.shop.canServe(i, this.player.colors(), rainbow, this.deliveryMode),
       hex:            c => this.shop.hex(c),
       pausePatience,
-      rainbow
+      rainbow,
+      time:           this.clock,
+      tipLabel:       this.tutorial.active
     });
     // Tutorial hint pills — over the scene but under the effect bursts.
     if (this.tutorial.active) this.tutorial.draw(ctx, this);
@@ -1381,13 +1414,14 @@ export class Game {
    * already running, bump it out to the left first (the replace-on-catch read).
    * @param {PickupTypeName} type
    * @param {number} fromX  the x the bubble launches from (the cone)
+   * @param {number} fromY  the y the bubble launches from (the stack top)
    */
-  _activateBubble(type, fromX) {
+  _activateBubble(type, fromX, fromY) {
     if (this.activeBubble) {
       const pos = this._activeSlotPos();
       this.puLeaving.push({ type: this.activeBubble.type, x: pos.x, y: pos.y, r0: pos.r, t: 0 });
     }
-    this.activeBubble = { type, fromX, anim: 0 };
+    this.activeBubble = { type, fromX, fromY, anim: 0 };
   }
 
   /**
@@ -1433,15 +1467,36 @@ export class Game {
     }
     ctx.globalAlpha = 1;
 
-    // The running power-up: floats up into the slot with its countdown ring + pulse.
+    // The running power-up's entrance: a lobbed ARC up from the catch point to a
+    // mid waypoint (large, with a slight hold), then a settle DOWN to the resting
+    // slot while shrinking. The waypoint is ~10% above the rest.
     if (this.activeBubble) {
       const a = this.activeBubble;
-      const e = 1 - (1 - a.anim) * (1 - a.anim);  // easeOut
-      const startY = aslot.y + 70;
-      const bx = a.fromX + (aslot.x - a.fromX) * e;
-      const by = startY + (aslot.y - startY) * e;
-      const pulse = 1 + 0.1 * a.anim * Math.sin(this.clock * 6);  // big pulse, ramps in
-      const radius = aslot.r * (0.4 + 0.6 * e) * pulse;
+      const cx = aslot.x;
+      const restY = aslot.y;                              // final rest
+      const midY = restY - this.bounds.height * 0.10;     // pause waypoint
+      let bx, by, grow;
+      if (a.anim < ACTIVE_ARC_FRAC) {
+        // Quadratic Bézier with a control point lifted above both ends → a toss.
+        const t = a.anim / ACTIVE_ARC_FRAC;
+        const e = 1 - (1 - t) * (1 - t);                  // easeOut along the arc
+        const u = 1 - e;
+        const ctrlX = (a.fromX + cx) / 2;
+        const ctrlY = Math.min(a.fromY, midY) - this.bounds.height * 0.15;
+        bx = u * u * a.fromX + 2 * u * e * ctrlX + e * e * cx;
+        by = u * u * a.fromY + 2 * u * e * ctrlY + e * e * midY;
+        grow = 0.5 + 0.9 * e;                             // → ~1.4× by the waypoint
+      } else if (a.anim < ACTIVE_PAUSE_FRAC) {
+        bx = cx; by = midY; grow = 1.4;                   // slight hold, large
+      } else {
+        const p = (a.anim - ACTIVE_PAUSE_FRAC) / (1 - ACTIVE_PAUSE_FRAC);
+        const e = p * p * (3 - 2 * p);                    // smoothstep settle
+        bx = cx;
+        by = midY + (restY - midY) * e;
+        grow = 1.4 - 0.4 * e;                             // shrink 1.4× → 1.0×
+      }
+      const pulse = 1 + 0.08 * Math.sin(this.clock * 6);
+      const radius = aslot.r * grow * pulse;
       const frac = this.powerups.fraction(PICKUP_TO_POWER[a.type]);
       this._drawPowerupBubble(ctx, bx, by, radius, a.type, true, frac);
     }
@@ -1449,11 +1504,13 @@ export class Game {
   }
 
   /**
-   * The active power-up slot, centered along the bottom of the stage. The mode
-   * decides the height (Banked sits higher to leave room for its queue row).
+   * The active power-up's resting slot: horizontally centered, at the mode's
+   * activeSlotY (~25% up from the bottom). The entrance rises to screen-center
+   * before settling here.
    * @returns {{ x: number, y: number, r: number }}
    */
   _activeSlotPos() {
+    // r is the RESTING radius; the entrance peaks larger (≈1.4×) at the waypoint.
     return { x: this.bounds.width / 2, y: this.mode.activeSlotY(this.bounds), r: 40 };
   }
 

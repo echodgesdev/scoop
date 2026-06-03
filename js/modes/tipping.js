@@ -57,7 +57,9 @@ export class TippingMode extends GameMode {
   rollTip() {
     const g = this.game;
     const avgGap = (g.pickups.spawnMin + g.pickups.spawnMax) / 2;
-    const chance = Math.max(0.1, Math.min(0.9, 4 / Math.max(0.5, avgGap)));
+    // Tips are the only power-up source in Tipping, so keep them common — a
+    // healthy share of customers carry one (clamped so it never feels constant).
+    const chance = Math.max(0.3, Math.min(0.9, 5 / Math.max(0.5, avgGap)));
     if (Math.random() > chance) return null;
     const w = g.pickups.weights;
     /** @type {(PickupTypeName | 'coin')[]} */

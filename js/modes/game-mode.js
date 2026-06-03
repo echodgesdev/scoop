@@ -80,8 +80,11 @@ export class GameMode {
    * @param {number} vx @param {number} vy
    */
   onTapSpend(vx, vy) { return false; }
-  /** Y of the on-canvas active-power-up slot (Banked sits higher for its queue). @param {Bounds} bounds */
-  activeSlotY(bounds) { return bounds.height - 80; }
+  /** Resting Y of the on-canvas active-power-up slot — ~15% up from the bottom.
+   *  The bubble's entrance arcs up and pauses ~10% higher (its old rest spot)
+   *  before settling here, clear of the very bottom edge.
+   *  @param {Bounds} bounds */
+  activeSlotY(bounds) { return bounds.height * 0.85; }
 
   // --- tutorial --------------------------------------------------------------
   /** The hint overlay that plays over Wave 0 for this mode. @returns {TutorialBase} */

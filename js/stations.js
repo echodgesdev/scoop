@@ -63,7 +63,7 @@ export class Stations {
     this.groundY = groundYFor(bounds.height);
   }
 
-  draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false }) {
+  draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false, time = 0, tipLabel = false }) {
     for (let i = 0; i < customers.length; i++) {
       const c = customers[i];
       const cx = c.x;
@@ -88,7 +88,7 @@ export class Stations {
 
       // Tipping mode: a token by the face showing the reward this customer will
       // tip on a completed order (until they leave).
-      if (c.tip && c.state !== STATE.LEAVING) this._drawTip(ctx, c.tip, cx, faceY);
+      if (c.tip && c.state !== STATE.LEAVING) this._drawTip(ctx, c.tip, cx, faceY, time, tipLabel);
 
       // Held mini-cone + flying-in / settled scoops. Drawn for every state
       // so it slides off with the customer on LEAVING. Pass faceY in so the
@@ -99,31 +99,83 @@ export class Stations {
   }
 
   /**
-   * Tipping mode: a small token by the customer's face showing the reward
-   * they'll hand over when their order is completed.
+   * Tipping mode: the reward this customer hands over on a completed order.
+   * This is the ONLY power-up source in Tipping, so it's a big, glowing,
+   * gently-bobbing badge that floats above the customer — impossible to miss.
    * @param {CanvasRenderingContext2D} ctx
    * @param {string} tip  pickup type or 'coin'
+   * @param {number} cx @param {number} faceY
+   * @param {number} time free-running clock (s) for the pulse / bob
+   * @param {boolean} showLabel draw the "TIP" tag (tutorial only)
    */
-  _drawTip(ctx, tip, cx, faceY) {
-    const r = 19;
-    const bx = cx - FACE_SIZE * 0.46;
-    const by = faceY - FACE_SIZE * 0.42;
+  _drawTip(ctx, tip, cx, faceY, time, showLabel) {
+    const ring = PICKUP_RING_COLOR[tip] || '#ffd700';
+    const bob = Math.sin(time * 3) * 5;            // gentle float
+    const pulse = 1 + 0.07 * Math.sin(time * 5.5); // breathing scale
+    const r = 30 * pulse;
+    // Floats up-left of the face, clear of the speech bubble's tail above it.
+    const bx = cx - FACE_SIZE * 0.62;
+    const by = faceY - FACE_SIZE * 0.18 + bob;
+
     ctx.save();
-    ctx.shadowColor = PICKUP_RING_COLOR[tip] || '#ffd700';
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(bx, by, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = PICKUP_RING_COLOR[tip] || '#ffd700';
-    ctx.stroke();
-    ctx.font = `${Math.floor(r * 1.1)}px 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
+    // Soft rotating sparkles around the badge to pull the eye.
+    ctx.fillStyle = ring;
+    for (let k = 0; k < 3; k++) {
+      const a = time * 1.6 + k * (Math.PI * 2 / 3);
+      const sx = bx + Math.cos(a) * (r + 9);
+      const sy = by + Math.sin(a) * (r + 9);
+      const ss = 2.4 + 1.6 * (0.5 + 0.5 * Math.sin(time * 6 + k));
+      ctx.globalAlpha = 0.85;
+      ctx.beginPath();
+      ctx.arc(sx, sy, ss, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Coin body with a soft DARK drop shadow so it lifts off the scene.
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 5;
+    ctx.beginPath();
+    ctx.arc(bx, by, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Thick colored ring with a matching glow (the eye-catcher), drawn on the
+    // same circle path; then a faint inner ring for a minted-coin read.
+    ctx.shadowColor = ring;
+    ctx.shadowBlur = 14;
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = ring;
+    ctx.stroke();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
+    ctx.beginPath();
+    ctx.arc(bx, by, r - 6, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Reward icon.
+    ctx.font = `${Math.floor(r * 1.05)}px 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif`;
     ctx.fillStyle = '#222';
-    ctx.fillText(PICKUP_ICONS[tip] || '$', bx, by + 1);
+    ctx.fillText(PICKUP_ICONS[tip] || '🪙', bx, by + 1);
+
+    // "TIP" tag beneath — onboarding affordance, shown only during the tutorial.
+    if (showLabel) {
+      ctx.font = "bold 13px 'Comic Sans MS', sans-serif";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillStyle = '#fff';
+      ctx.strokeText('TIP', bx, by + r + 9);
+      ctx.fillText('TIP', bx, by + r + 9);
+    }
     ctx.restore();
   }
 
@@ -193,21 +245,30 @@ export class Stations {
     ctx.scale(pop, pop);
     ctx.translate(-cx, -bubbleBottom);
 
-    // Bubble + tail
+    // Bubble + tail. The tail is a solid triangle in the OUTLINE color (its
+    // infill matches the border — same as the tutorial tooltip tail), pointing
+    // down at the customer; the body's bottom border is that color too, so the
+    // two blend into one continuous pointer.
+    const outline = active ? '#ffb703' : (servable ? '#06d6a0' : '#666');
     ctx.save();
     if (active) { ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 18; }
     else if (servable) { ctx.shadowColor = '#06d6a0'; ctx.shadowBlur = 14; }
+    // Tail first, so the body fill + border draw cleanly over its root.
+    ctx.beginPath();
+    ctx.moveTo(cx - 10, bubbleBottom - 1);
+    ctx.lineTo(cx, bubbleBottom + 13);
+    ctx.lineTo(cx + 10, bubbleBottom - 1);
+    ctx.closePath();
+    ctx.fillStyle = outline;
+    ctx.fill();
+    // Body.
     ctx.beginPath();
     ctx.roundRect(left, top, bubbleW, BUBBLE_H, 14);
-    ctx.moveTo(cx - 9, bubbleBottom - 1);
-    ctx.lineTo(cx, bubbleBottom + 11);
-    ctx.lineTo(cx + 9, bubbleBottom - 1);
-    ctx.closePath();
     ctx.fillStyle = servable ? '#eafff7' : 'rgba(255,255,255,0.96)';
     ctx.fill();
     ctx.shadowBlur = 0;
     ctx.lineWidth = active ? 5 : 3;
-    ctx.strokeStyle = active ? '#ffb703' : (servable ? '#06d6a0' : '#666');
+    ctx.strokeStyle = outline;
     ctx.stroke();
     ctx.restore();
 

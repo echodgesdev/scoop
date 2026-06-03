@@ -483,6 +483,17 @@ export class Hud {
   }
 
   /**
+   * Tutorial-only: show/hide the "fill the meter to finish the day" callout by
+   * the wave gauge, and pulse the gauge to draw the eye (body.day-hint).
+   * @param {boolean} show
+   */
+  setDayHint(show) {
+    const el = document.getElementById('dayHint');
+    if (el) el.classList.toggle('hidden', !show);
+    document.body.classList.toggle('day-hint', show);
+  }
+
+  /**
    * Toggles body.menu-visible. Used by CSS to fade the HUD out while the
    * start/game-over overlay is up and fade it back in when the player
    * resumes, and to hide the in-game ⏸ button on menu screens.
