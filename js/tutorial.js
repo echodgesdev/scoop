@@ -1,5 +1,5 @@
 // @ts-check
-import { CONE_HEIGHT, PICKUP_TYPE } from './config.js';
+import { CONE_HEIGHT } from './config.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
@@ -16,31 +16,18 @@ import { CONE_HEIGHT, PICKUP_TYPE } from './config.js';
 export class TutorialBase {
   constructor() {
     this.active = false;
-    this.powerLessonDone = false;
-    this._banked = false;     // banked-mode: has the player banked at least one?
-    this._demoArmed = false;  // has the demo bubble been released (post first serve)?
   }
 
   /** @param {Game} game */
   start(game) {
     this.active = true;
-    this.powerLessonDone = false;
-    this._banked = false;
-    this._demoArmed = false;
   }
 
   /** @param {number} dt @param {Game} game */
   update(dt, game) {
     if (!this.active) return;
     // Wave 0 cleared (the director advanced) → onboarding is done.
-    if (game.waves.wave !== 0) { this._finish(); return; }
-    // Hold demo bubbles until the first order is served (Game._bubbleTypes gates
-    // the spawn); the moment it's served, surface the demo bubble promptly.
-    if (!this._demoArmed && game.waves.servedColors.size >= 1) {
-      this._demoArmed = true;
-      game.pickups.spawnTimer = Math.min(game.pickups.spawnTimer, 1.2);
-    }
-    this._updatePowerLesson(game);
+    if (game.waves.wave !== 0) this._finish();
   }
 
   /**
@@ -51,16 +38,8 @@ export class TutorialBase {
     this.active = false;
   }
 
-  /** Mode-specific: advance the power-up lesson from real state. @param {Game} game */
-  _updatePowerLesson(game) {}
-
   /** Mode-specific: the power-up prompt string, or null. @param {Game} game */
   _powerHint(game) { return null; }
-
-  /** @param {Game} game */
-  _featherPresent(game) {
-    return game.pickups.items.some(p => p.type === PICKUP_TYPE.FEATHER);
-  }
 
   /** True when the player is currently driving with touch (vs keyboard). */
   _touch(game) { return game.input.lastWasTouch; }

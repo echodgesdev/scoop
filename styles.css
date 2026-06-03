@@ -1258,29 +1258,25 @@ button.flash {
   padding: 2px 4px;
 }
 
-.debug-bubbles {
-  margin-top: 10px;
-  font-size: 15px;
-}
-.debug-bubble-freq input {
+.debug-pow-freq input {
   font-family: inherit;
   font-size: 15px;
   width: 52px;
   padding: 2px 4px;
 }
-.debug-bubble-weights {
+.debug-pow-weights {
   margin-top: 6px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px 10px;
   align-items: center;
 }
-.debug-bubble-weights label {
+.debug-pow-weights label {
   display: inline-flex;
   align-items: center;
   gap: 3px;
 }
-.debug-bubble-weights input {
+.debug-pow-weights input {
   font-family: inherit;
   font-size: 15px;
   width: 48px;

@@ -61,6 +61,27 @@ export const POWERUP_TYPE = Object.freeze({
   RAINBOW: 'rainbow'
 });
 
+// Power-up visuals — icon + ring color per type. Power-ups arrive as customer
+// tips (and the combo breaker); these maps drive the on-cone active indicator
+// and the tip token. The type names stay "feather"/"pause" for code stability,
+// but the icons are chosen for legibility (⚡ reads "fast", ❄️ "frozen"). 'coin'
+// is the points tip — '$' renders everywhere where the coin emoji does not.
+export const PICKUP_ICONS = {
+  heart:   '❤️',
+  feather: '⚡',
+  pause:   '❄️',
+  rainbow: '🌈',
+  coin:    '$'
+};
+
+export const PICKUP_RING_COLOR = {
+  heart:   '#ff6fa3',
+  feather: '#bfdcff',
+  pause:   '#c9b6ff',
+  rainbow: '#ffd166',
+  coin:    '#ffd700'
+};
+
 // Stringly-typed config values, centralized as frozen enums so a typo is a
 // missing property (loud — undefined) instead of a silently-false comparison.
 // (Game MODES are no longer config flags — each mode is its own strategy file
@@ -114,15 +135,9 @@ export {
   PHASE_ACTIVE,
   PHASE_GOAL,
   WAVE_CELEBRATE_S,
-  PICKUP_RADIUS,
   PICKUP_SPAWN_MIN_S,
   PICKUP_SPAWN_MAX_S,
   PICKUP_WEIGHTS,
-  PICKUP_FLOAT_MIN_SPEED,
-  PICKUP_FLOAT_MAX_SPEED,
-  PICKUP_MIN_Y_RATIO,
-  PICKUP_MAX_Y_RATIO,
-  PICKUP_BUBBLE_RADIUS_MULT,
   HEART_HEAL_AMOUNT,
   SPEED_DURATION_S,
   SPEED_MULT_BOOST,
@@ -146,8 +161,6 @@ export {
   HEAL_PER_SERVE,
   COMBO_CASHOUT_PER,
   STACK_CASHOUT_PER_SCOOP,
-  BUBBLE_CASHOUT,
-  MAX_PU_INVENTORY,
   SPAWN_DEMAND_BIAS,
   WAVE0_DEMAND_BIAS,
   ORDER_SIZE_WEIGHTS,

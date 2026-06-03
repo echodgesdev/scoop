@@ -66,7 +66,7 @@ export class Sound {
 
   catch_()  { this._tone(660, 0, 0.09, 'triangle', 0.18); }
 
-  /** A shot connecting with a bubble — a snappy descending "pop". */
+  /** A snappy descending "pop" — used for tip coins + the wave-end cashout. */
   bubblePop() {
     this._tone(1400, 0,    0.035, 'triangle', 0.20);
     this._tone(900,  0.03, 0.06,  'triangle', 0.15);
@@ -97,7 +97,7 @@ export class Sound {
     this._tone(1568, 0.40, 0.45, 'sine', 0.18);
   }
 
-  // ----- Pickup sounds -----
+  // ----- Power-up sounds -----
   heart() {
     this._tone(880,  0,    0.14, 'sine', 0.22);
     this._tone(1175, 0.08, 0.20, 'sine', 0.20);

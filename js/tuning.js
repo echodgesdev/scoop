@@ -9,7 +9,7 @@ export const PERFECT_CATCH_BONUS = 40;
 // === Wave / phase campaign structure ==========================================
 export const PHASES_PER_WAVE = 4;
 // Customer parallelism caps at 3. Late-wave difficulty now comes from richer
-// recipes (R4*/R5same) rather than more simultaneous bubbles to track.
+// recipes (R4*/R5same) rather than more simultaneous orders to track.
 export const PHASE_ACTIVE = [1, 2, 3, 3];
 export const PHASE_GOAL = [3, 5, 8, 13];
 export const WAVE_CELEBRATE_S = 1.4;
@@ -17,28 +17,14 @@ export const WAVE_CELEBRATE_S = 1.4;
 // Per-recipe point values are now defined per-group in recipes.js — each
 // recipe inherits its value from the group it belongs to.
 
-// === Pickups & power-ups ======================================================
-// Pickups now drift HORIZONTALLY across the screen inside bubbles. Their
-// y-position is the strategic axis: lower-flying bubbles can be caught
-// by the cone alone, higher-flying ones require taller stacks to reach.
-export const PICKUP_RADIUS = 24;
+// === Power-ups ================================================================
+// Power-ups arrive as customer tips (and the combo breaker) — there's no bubble
+// lane. These defaults seed the Game's tip-economy config (debug-tunable):
+// the tip-gap range (seconds between tips; wider = rarer) and the per-type mix
+// aligned to heart / ⚡ speed / ❄️ freeze / 🌈 rainbow.
 export const PICKUP_SPAWN_MIN_S = 5.5;
 export const PICKUP_SPAWN_MAX_S = 10.0;
 export const PICKUP_WEIGHTS = [0.35, 0.3, 0.2, 0.15];
-// Drift speed range. Each bubble picks its own value — slower ones give
-// time to plan, faster ones force quick stack management.
-export const PICKUP_FLOAT_MIN_SPEED = 50;
-export const PICKUP_FLOAT_MAX_SPEED = 160;
-// Vertical band (as fraction of canvas height) where bubbles can spawn. This
-// is a deliberately NARROW lane that sits in the sky above the cone — one of
-// the three readable zones (fall / catch / serve). MAX stays above the cone
-// top (cone sits ~0.57H now that the ground is taller) so bubbles never drift
-// into the customer area; MIN is high enough that the topmost bubbles need a
-// tall stack to reach. Tuned together with FLOOR_Y_RATIO below.
-export const PICKUP_MIN_Y_RATIO = 0.26;
-export const PICKUP_MAX_Y_RATIO = 0.50;
-// Bubble visual is slightly larger than the icon for readability.
-export const PICKUP_BUBBLE_RADIUS_MULT = 1.35;
 
 export const HEART_HEAL_AMOUNT = 30;
 export const SPEED_DURATION_S = 6;
@@ -100,7 +86,6 @@ export const HEAL_PER_SERVE = DAMAGE_PER_EXPIRE / 3;
 // clears the tray for a fresh start (health is NOT touched — it persists).
 export const COMBO_CASHOUT_PER = 25;        // points per combo point banked
 export const STACK_CASHOUT_PER_SCOOP = 10;  // points per leftover tray scoop
-export const BUBBLE_CASHOUT = STACK_CASHOUT_PER_SCOOP * 3;  // a banked bubble (Banked mode) is worth 3 scoops
 
 // === Spawn demand coupling ====================================================
 // Probability that a freshly-spawned scoop is biased toward what waiting
@@ -152,12 +137,6 @@ export const DISCOVERY_BIAS_END = 0.6;     // wave WAVE_RAMP and beyond
 // needs that color) buys this much patience back. Encourages players to make
 // progress on hard orders even when they don't have the whole order yet.
 export const PARTIAL_SERVE_EXTEND_S = 1.2;
-
-// === Banked power-up inventory (Banked game mode) ============================
-// In Banked mode, catching a bubble adds it to a FIFO queue instead of firing
-// it; Shift spends the front. The cap prevents stockpiling — catching while
-// full evicts the oldest. (Auto mode ignores this — it fires on catch.)
-export const MAX_PU_INVENTORY = 3;
 
 // === Scene floor + actor embedding ===========================================
 // Sand floor lives at FLOOR_Y_RATIO of canvas height. Each actor positions

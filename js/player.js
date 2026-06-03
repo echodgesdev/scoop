@@ -197,26 +197,6 @@ export class Player {
     };
   }
 
-  /**
-   * Hitbox for *pickups*. Unlike scoops (which only stick to the top of the
-   * stack), pickups pop on contact with ANY part of the player — the cone
-   * body OR any scoop in the tray. Vertical range: top edge of the top
-   * scoop (or cone top edge if empty) down to the cone tip. Bigger stack =
-   * taller hitbox = more reach for higher-flying bubbles.
-   */
-  pickupHitbox() {
-    const top = this.stack.length > 0
-      ? this.scoopPosition(this.stack.length - 1).y - SCOOP_RADIUS
-      : this.coneTopY();
-    const bottom = this.y + CONE_HEIGHT / 2;
-    return {
-      x: this.x,
-      y: (top + bottom) / 2,
-      r: (bottom - top) / 2,
-      halfW: CONE_WIDTH / 2 + SCOOP_RADIUS * 0.4
-    };
-  }
-
   /** @param {ScoopColor} color */
   push(color) {
     this.stack.push({ color, land: LAND_TIME });

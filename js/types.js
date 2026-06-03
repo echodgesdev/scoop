@@ -8,7 +8,7 @@
  *   The five tray-scoop colors. 'rainbow' is a render hint, not a real color.
  *
  * @typedef {'heart'|'feather'|'pause'|'rainbow'} PickupTypeName
- *   String tag for a falling pickup item.
+ *   String tag for a power-up type (granted via customer tips / the combo breaker).
  *
  * @typedef {'speed'|'pause'|'rainbow'} PowerUpTypeName
  *   String tag for a timed power-up (note: 'heart' is instant, not a power-up).
@@ -29,8 +29,6 @@
  * @typedef {{ x: number, y: number, vy: number, color: ScoopColor, dissolve?: number }} Scoop
  *   `dissolve` (seconds, 0..SCOOP_DISSOLVE_S) is present only while a missed
  *   scoop is fading out in the ground; absent means live/catchable.
- *
- * @typedef {{ type: PickupTypeName, x: number, y: number, vx: number, vy: number, spin: number, bobPhase: number }} Pickup
  *
  * @typedef {object} ServedScoop
  * @property {ScoopColor} color   what the player actually handed over (may differ from a "wanted" slot under rainbow)
@@ -69,7 +67,6 @@
  * @typedef {object} GameEventMap
  * @property {{ scoop: Scoop, perfect: boolean }} catch
  * @property {{}} trayFull
- * @property {{ pickup: Pickup }} pickup
  * @property {{ count: number }} expire
  * @property {{ gained: number, colors: ScoopColor[], combo: number, x: number, y: number }} serve
  * @property {{}} serveFail

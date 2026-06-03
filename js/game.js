@@ -9,10 +9,13 @@ import {
   HEART_HEAL_AMOUNT,
   PICKUP_TYPE,
   POWERUP_TYPE,
+  PICKUP_ICONS,
+  PICKUP_RING_COLOR,
+  PICKUP_WEIGHTS,
+  PICKUP_SPAWN_MIN_S,
+  PICKUP_SPAWN_MAX_S,
   CUSTOMER_FACE_OFFSET_PX,
   SCOOP_RADIUS,
-  PICKUP_RADIUS,
-  PICKUP_BUBBLE_RADIUS_MULT,
   COMBO_CASHOUT_PER,
   STACK_CASHOUT_PER_SCOOP,
   COMBO_BREAKER_THRESHOLD,
@@ -36,7 +39,6 @@ import { DebugPanel } from './debug.js';
 import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
 import { dayCycleState, nightCycleState } from './dayCycle.js';
 import { PowerUps } from './powerups.js';
-import { PickupField, pickupCaught, PICKUP_ICONS, PICKUP_RING_COLOR } from './pickups.js';
 import { EventBus } from './events.js';
 import { Recipes } from './recipes.js';
 import { Challenges } from './challenges.js';
@@ -57,21 +59,20 @@ const MAX_FRAME = 0.25;
 // moon arcing across) that plays after the cashout and before the wave overlay.
 const NIGHT_CYCLE_S = 2.0;
 
-// Power-up indicator animation timings. Catching a timed bubble floats it UP
-// into the "active" slot at the bottom (where its countdown lives); when it
-// ends — or is replaced by a fresh catch — it slides off to the LEFT.
-// A departing bubble takes PU_LEAVE_S to clear.
+// Active power-up indicator timings. When a timed power-up fires its indicator
+// floats UP into the "active" slot (where its countdown lives); when it ends —
+// or is replaced by a fresh one — it slides off to the LEFT, taking PU_LEAVE_S.
 const PU_LEAVE_S = 0.3;
-// Entrance for the active power-up bubble: it ARCS up from the catch point (a
-// lobbed quadratic), holds briefly + large at a mid waypoint, then settles down
-// to its resting slot while shrinking. Phase boundaries are fractions of anim.
+// Entrance for the active power-up indicator: it ARCS up from the cone (a lobbed
+// quadratic), holds briefly + large at a mid waypoint, then settles down to its
+// resting slot while shrinking. Phase boundaries are fractions of anim.
 const ACTIVE_SLIDE_S = 0.7;
 const ACTIVE_ARC_FRAC = 0.45;    // 0..this: arc up-and-over to the mid waypoint
 const ACTIVE_PAUSE_FRAC = 0.6;   // arc-frac..this: slight hold at the waypoint
 // (this..1: settle down to the resting slot, shrinking)
 
-// Map a caught bubble type to the timed power-up it runs. Heart is absent — it
-// heals instantly and never occupies the active slot (see _onPickup).
+// Map a power-up type to the timed effect it runs. Heart is absent — it heals
+// instantly and never occupies the active slot.
 const PICKUP_TO_POWER = {
   [PICKUP_TYPE.FEATHER]: POWERUP_TYPE.SPEED,
   [PICKUP_TYPE.PAUSE]:   POWERUP_TYPE.PAUSE,
@@ -171,9 +172,18 @@ export class Game {
     this.powerups    = new PowerUps();
     this.player      = new Player(0, 0);
     this.field       = new ScoopField();
-    this.pickups     = new PickupField(() => this.mode.bubbleTypes());
     this.shop        = new Shop(this.waves);
     this.stations    = new Stations();
+
+    // Power-up economy config (debug-tunable, persists across game starts since
+    // it lives on Game, not the rebuilt mode). `powerupWeights` is the relative
+    // mix of heart/⚡/❄️/🌈 (aligned to PICKUP order); `tipGap{Min,Max}` is the
+    // seconds-between-tips range the tip roller reads. Power-ups arrive as
+    // customer tips + the combo breaker — there is no bubble lane.
+    this.powerupWeights = PICKUP_WEIGHTS.slice();
+    this.tipGapMin = PICKUP_SPAWN_MIN_S;
+    this.tipGapMax = PICKUP_SPAWN_MAX_S;
+
     // Resolve the mode now that the actors it reaches into exist, then its
     // tutorial. _applyModeConfig pushes its board size + breaker capability.
     this.mode        = makeMode(this);
@@ -182,8 +192,8 @@ export class Game {
     // Couple supply to demand: the scoop field biases its incoming queue
     // toward colors the shop still needs.
     this.field.setDemandSource(() => this.shop.demandColors(this.player.colors()));
-    // Tip-sourced modes: some customers arrive with a tip (power-up or coin);
-    // the mode's roller decides per spawn. Returns null in bubble modes.
+    // Some customers arrive with a tip (power-up or coin); the mode's roller
+    // decides per spawn, reading the tip-gap + mix config above.
     this.shop.setTipRoller(() => this.mode.rollTip());
     this._applyModeConfig();  // apply the active mode's board size + capabilities
 
@@ -216,14 +226,14 @@ export class Game {
       onSwipeDown: () => {}
     });
 
-    // Power-ups fire the instant a bubble is caught (no banking, no manual
-    // spend). Heart heals on the spot; the three timed power-ups
-    // (speed / freeze / rainbow) are mutually exclusive — catching one replaces
-    // whatever is currently running. The single "active" bubble below mirrors
+    // Power-ups fire the instant they're granted (a customer tip or the combo
+    // breaker). Heart heals on the spot; the three timed power-ups
+    // (speed / freeze / rainbow) are mutually exclusive — a new one replaces
+    // whatever is currently running. The single "active" indicator below mirrors
     // the running timed power-up (its countdown ring); null when none is up.
     /** @type {{ type: PickupTypeName, fromX: number, fromY: number, anim: number } | null} */
     this.activeBubble = null;
-    // Bubbles mid-slide-off to the left (a finished or just-replaced power-up).
+    // Indicators mid-slide-off to the left (a finished or just-replaced power-up).
     /** @type {{ type: PickupTypeName, x: number, y: number, r0: number, t: number }[]} */
     this.puLeaving = [];
     // First-time onboarding flag (persisted). When true, hint overlays play
@@ -260,10 +270,10 @@ export class Game {
       getPatience: () => this.patienceOverride != null
         ? this.patienceOverride
         : Math.round(this.waves.tuning().patience),
-      onBubbleRange: (min, max) => this.pickups.setSpawnRange(min, max),
-      getBubbleRange: () => ({ min: this.pickups.spawnMin, max: this.pickups.spawnMax }),
-      onBubbleWeights: weights => this.pickups.setWeights(weights),
-      getBubbleWeights: () => this.pickups.weights,
+      onTipGap: (min, max) => this.setTipGap(min, max),
+      getTipGap: () => ({ min: this.tipGapMin, max: this.tipGapMax }),
+      onPowerupWeights: weights => this.setPowerupWeights(weights),
+      getPowerupWeights: () => this.powerupWeights,
       onTutorialFlag: v => this.setShowTutorial(v),
       getTutorialFlag: () => this.showTutorial,
       onDeliveryMode: name => { this.deliveryMode = name; },
@@ -431,8 +441,6 @@ export class Game {
       this.hurt = 0.2;
     });
 
-    this.bus.on('pickup', ({ pickup }) => this._pickupCatchFx(pickup));
-
     this.bus.on('serve', ({ gained, colors, combo, x, y }) => {
       this.effects.burst(x, y, colors.map(c => this.shop.hex(c)));
       this.effects.popText(x, y, `+${gained}`, { color: '#ffec5c', size: 28 });
@@ -513,7 +521,6 @@ export class Game {
     this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
     this.player.clearStack();
     this.field.reset();
-    this.pickups.reset();
     this.powerups.reset();
     this.effects.reset();
     this.stations.layout(this.bounds);
@@ -590,6 +597,28 @@ export class Game {
   setTouchGain(g) {
     this.touchGain = Math.max(0.5, Math.min(5, g));
     try { localStorage.setItem('scoop.touchGain', String(this.touchGain)); } catch {}
+  }
+
+  /**
+   * Debug: seconds-between-tips range the tip roller reads (wider/larger = rarer
+   * power-ups). @param {number} min @param {number} max
+   */
+  setTipGap(min, max) {
+    const lo = Math.max(0.2, min);
+    this.tipGapMin = lo;
+    this.tipGapMax = Math.max(lo, max);
+  }
+
+  /**
+   * Debug: relative power-up mix, aligned to PICKUP order (heart, ⚡, ❄️, 🌈).
+   * Negatives clamp to 0; a type weighted 0 never appears as a tip / breaker pick.
+   * @param {number[]} weights
+   */
+  setPowerupWeights(weights) {
+    for (let i = 0; i < this.powerupWeights.length; i++) {
+      const v = weights[i];
+      if (Number.isFinite(v)) this.powerupWeights[i] = Math.max(0, v);
+    }
   }
 
   /**
@@ -672,15 +701,6 @@ export class Game {
       return true;
     });
 
-    // Pickup collision uses the *expanded* hitbox — cone + every scoop in the
-    // tray. (Tipping spawns no bubbles, so this only fires if a mode ever does.)
-    const pickupBox = this.player.pickupHitbox();
-    this.pickups.update(dt, this.bounds, pickup => {
-      if (!pickupCaught(pickup, pickupBox)) return false;
-      this._onPickup(pickup);
-      return true;
-    });
-
     if (this.tutorial.active) this.tutorial.update(dt, this);
     this._syncDayHint();
 
@@ -695,17 +715,6 @@ export class Game {
     this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
     // The running power-up's countdown lives in the on-canvas "active" slot at
     // the bottom (see _drawActivePowerup).
-  }
-
-  /**
-   * Catching a power-up bubble. Tipping spawns none (power-ups arrive as tips),
-   * so this is effectively inert today; kept as the catch seam the pickup field
-   * calls. Power-up "use" is tracked at the single fire seam (_firePower).
-   * @param {{ type: import('./types.js').PickupTypeName, x: number, y: number }} pickup
-   */
-  _onPickup(pickup) {
-    this.bus.emit('pickup', { pickup });  // white burst at the catch point
-    this.mode.onCatch(pickup.type, this.player.x, this.player.stackTopY());
   }
 
   /**
@@ -748,12 +757,6 @@ export class Game {
     this._powerupUseFx(type, x, y);
   }
 
-  /** Catch FX — just the bubble bursting at the catch point. */
-  _pickupCatchFx(pickup) {
-    const { x, y } = pickup;
-    this.effects.burst(x, y, ['#ffffff', '#cfe9ff', '#e8f4ff'], 14);
-  }
-
   /**
    * Use FX — type-specific burst + popText, fired at the cone when a power-up
    * triggers on catch.
@@ -792,7 +795,7 @@ export class Game {
   _usePower(type) {
     if (!this.running || this.paused) return;
     if (!this.flags.pickupKeys) return;
-    this._onPickup({ type, x: this.player.x, y: this.player.stackTopY(), vy: 0, spin: 0 });
+    this._firePower(type, this.player.x, this.player.stackTopY());
   }
 
   _onCatch(scoop, perfect) {
@@ -1016,7 +1019,7 @@ export class Game {
    * @returns {import('./types.js').PickupTypeName}
    */
   _pickSuperchargeType() {
-    const w = this.pickups.weights;
+    const w = this.powerupWeights;
     /** @type {import('./types.js').PickupTypeName[]} */
     const types = [PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW];
     const weights = [w[1] || 0, w[2] || 0, w[3] || 0];
@@ -1100,8 +1103,8 @@ export class Game {
   }
 
   /**
-   * Pop every falling scoop + drifting bubble for the wave-end board clear.
-   * Visual only (no points) — the cashout already paid out the tray/combo/queue.
+   * Pop every falling scoop for the wave-end board clear. Visual only (no
+   * points) — the cashout already paid out the tray + combo.
    */
   _clearFieldFx() {
     for (const s of this.field.scoops) {
@@ -1109,10 +1112,6 @@ export class Game {
       this.effects.burst(s.x, s.y, [this.shop.hex(s.color), '#fff'], 10);
     }
     this.field.scoops.length = 0;
-    for (const p of this.pickups.items) {
-      this.effects.burst(p.x, p.y, [PICKUP_RING_COLOR[p.type], '#fff'], 12);
-    }
-    this.pickups.items.length = 0;
     this.sound.bubblePop();
   }
 
@@ -1221,7 +1220,6 @@ export class Game {
     }
 
     this.field.draw(ctx, rainbow);
-    this.pickups.draw(ctx);
     this.player.draw(ctx, rainbow);
     const pausePatience = this.powerups.pauseActive || !this.flags.patternTimer;
     this.stations.draw(ctx, this.shop.list, {
@@ -1451,20 +1449,9 @@ export class Game {
       ctx.stroke();
     }
 
-    // Pickup bubbles — collision circle.
-    for (const p of this.pickups.items) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, PICKUP_RADIUS * PICKUP_BUBBLE_RADIUS_MULT, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // Cone: catch hitbox (solid AABB) + pickup hitbox (dashed, taller).
+    // Cone: catch hitbox (solid AABB).
     const cb = this.player.catchHitbox();
     ctx.strokeRect(cb.x - cb.halfW, cb.y - cb.r, cb.halfW * 2, cb.r * 2);
-    const pb = this.player.pickupHitbox();
-    ctx.setLineDash([6, 5]);
-    ctx.strokeRect(pb.x - pb.halfW, pb.y - pb.r, pb.halfW * 2, pb.r * 2);
-    ctx.setLineDash([]);
 
     // Miss / dissolve line.
     const missY = this.stations.groundY + SCOOP_RADIUS * 2;

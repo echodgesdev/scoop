@@ -17,10 +17,10 @@ export class DebugPanel {
    *   getDemandBias?: () => number,
    *   onPatience?: (sec: number | null) => void,
    *   getPatience?: () => number,
-   *   onBubbleRange?: (min: number, max: number) => void,
-   *   getBubbleRange?: () => { min: number, max: number },
-   *   onBubbleWeights?: (weights: number[]) => void,
-   *   getBubbleWeights?: () => number[],
+   *   onTipGap?: (min: number, max: number) => void,
+   *   getTipGap?: () => { min: number, max: number },
+   *   onPowerupWeights?: (weights: number[]) => void,
+   *   getPowerupWeights?: () => number[],
    *   onTutorialFlag?: (v: boolean) => void,
    *   getTutorialFlag?: () => boolean,
    *   onDeliveryMode?: (name: string) => void,
@@ -39,7 +39,7 @@ export class DebugPanel {
    *   getFallSpeed?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onBubbleRange, getBubbleRange, onBubbleWeights, getBubbleWeights, onTutorialFlag, getTutorialFlag, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onTipGap, getTipGap, onPowerupWeights, getPowerupWeights, onTutorialFlag, getTutorialFlag, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -49,10 +49,10 @@ export class DebugPanel {
     this.getDemandBias = getDemandBias || (() => 0.65);
     this.onPatience = onPatience || (() => {});
     this.getPatience = getPatience || (() => 0);
-    this.onBubbleRange = onBubbleRange || (() => {});
-    this.getBubbleRange = getBubbleRange || (() => ({ min: 5.5, max: 10 }));
-    this.onBubbleWeights = onBubbleWeights || (() => {});
-    this.getBubbleWeights = getBubbleWeights || (() => [0.35, 0.3, 0.2, 0.15]);
+    this.onTipGap = onTipGap || (() => {});
+    this.getTipGap = getTipGap || (() => ({ min: 5.5, max: 10 }));
+    this.onPowerupWeights = onPowerupWeights || (() => {});
+    this.getPowerupWeights = getPowerupWeights || (() => [0.35, 0.3, 0.2, 0.15]);
     this.onTutorialFlag = onTutorialFlag || (() => {});
     this.getTutorialFlag = getTutorialFlag || (() => false);
     this.onDeliveryMode = onDeliveryMode || (() => {});
@@ -79,7 +79,7 @@ export class DebugPanel {
     this._wireGameplay();
     this._wireDemandBias();
     this._wirePatience();
-    this._wireBubbles();
+    this._wirePowerups();
     this._wireTutorial();
     this._wireWaveJump();
     this._wireTimeSlider();
@@ -181,18 +181,18 @@ export class DebugPanel {
   }
 
   /**
-   * Bubble (pickup) spawn frequency + per-type proportion. Frequency is a
-   * min/max seconds range; weights are four relative numbers aligned to
-   * heart / ⚡ speed / ❄️ freeze / 🌈 rainbow (any positive scale; 0 = never).
+   * Power-up economy: tip frequency + the per-type mix. Frequency is a min/max
+   * seconds gap (wider = rarer tips); weights are four relative numbers aligned
+   * to heart / ⚡ speed / ❄️ freeze / 🌈 rainbow (any positive scale; 0 = never).
    */
-  _wireBubbles() {
-    const minEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugBubbleMin'));
-    const maxEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugBubbleMax'));
+  _wirePowerups() {
+    const minEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugTipMin'));
+    const maxEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugTipMax'));
     if (minEl && maxEl) {
       const apply = () => {
         const min = parseFloat(minEl.value);
         const max = parseFloat(maxEl.value);
-        if (Number.isFinite(min) && Number.isFinite(max)) this.onBubbleRange(min, max);
+        if (Number.isFinite(min) && Number.isFinite(max)) this.onTipGap(min, max);
       };
       minEl.addEventListener('input', apply);
       maxEl.addEventListener('input', apply);
@@ -206,7 +206,7 @@ export class DebugPanel {
       /** @type {HTMLInputElement | null} */ (document.getElementById('debugWeightRainbow'))
     ];
     this._weightEls = weightEls;
-    const applyWeights = () => this.onBubbleWeights(weightEls.map(el => (el ? parseFloat(el.value) : NaN)));
+    const applyWeights = () => this.onPowerupWeights(weightEls.map(el => (el ? parseFloat(el.value) : NaN)));
     for (const el of weightEls) {
       if (el) el.addEventListener('input', applyWeights);
     }
@@ -270,12 +270,12 @@ export class DebugPanel {
     if (patienceInput && patienceInput.value.trim() === '') {
       patienceInput.placeholder = `${this.getPatience()} (ramp)`;
     }
-    const minEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugBubbleMin'));
-    const maxEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugBubbleMax'));
-    const range = this.getBubbleRange();
+    const minEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugTipMin'));
+    const maxEl = /** @type {HTMLInputElement | null} */ (document.getElementById('debugTipMax'));
+    const range = this.getTipGap();
     if (minEl && minEl.value.trim() === '') minEl.value = String(range.min);
     if (maxEl && maxEl.value.trim() === '') maxEl.value = String(range.max);
-    const weights = this.getBubbleWeights();
+    const weights = this.getPowerupWeights();
     const els = this._weightEls || [];
     for (let i = 0; i < els.length; i++) {
       const el = els[i];

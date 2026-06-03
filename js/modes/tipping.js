@@ -11,7 +11,7 @@ import { TutorialBase } from '../tutorial.js';
 const TIPPING_MAX_STACK = 4;
 const TIPPING_MAX_LIVE = 7;
 // Relative weight of the "coin" (bonus points) tip vs. the four power-up tips
-// (whose weights come from the bubble-mix debug control), and the coin payout.
+// (whose weights come from the power-up mix config), and the coin payout.
 const TIP_COIN_WEIGHT = 0.4;
 const TIP_COIN_POINTS = 50;
 
@@ -52,30 +52,19 @@ export class TippingMode {
   /** The combo breaker is part of Tipping's identity. */
   get comboBreaker() { return true; }
 
-  /** No bubble lane — power-ups arrive as tips. @returns {PickupTypeName[]} */
-  bubbleTypes() { return []; }
-
   /**
-   * A caught bubble would fire instantly. Tipping spawns no bubbles, so this is
-   * inert in practice — power-ups run via grantTip / the combo breaker calling
-   * the shared Game._firePower. Kept for the catch contract game.js expects.
-   * @param {PickupTypeName} type @param {number} x @param {number} y
-   */
-  onCatch(type, x, y) { this.game._firePower(type, x, y); }
-
-  /**
-   * Roll a tip for a freshly-spawned customer. Frequency comes from the bubble
-   * spawn-gap debug control (shorter gap → more tips), the mix from the bubble
-   * weights (+ a fixed coin share). @returns {PickupTypeName | 'coin' | null}
+   * Roll a tip for a freshly-spawned customer. Frequency comes from the tip-gap
+   * config (shorter gap → more tips), the mix from the power-up weights (+ a
+   * fixed coin share). @returns {PickupTypeName | 'coin' | null}
    */
   rollTip() {
     const g = this.game;
-    const avgGap = (g.pickups.spawnMin + g.pickups.spawnMax) / 2;
+    const avgGap = (g.tipGapMin + g.tipGapMax) / 2;
     // Tips are the only power-up source, so keep them common — a healthy share
     // of customers carry one (clamped so it never feels constant).
     const chance = Math.max(0.3, Math.min(0.9, 5 / Math.max(0.5, avgGap)));
     if (Math.random() > chance) return null;
-    const w = g.pickups.weights;
+    const w = g.powerupWeights;
     /** @type {(PickupTypeName | 'coin')[]} */
     const types = [PICKUP_TYPE.HEART, PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW, 'coin'];
     const weights = [w[0] || 0, w[1] || 0, w[2] || 0, w[3] || 0, TIP_COIN_WEIGHT];
