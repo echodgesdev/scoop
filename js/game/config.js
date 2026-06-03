@@ -82,6 +82,15 @@ export const PICKUP_RING_COLOR = {
   coin:    '#ffd700'
 };
 
+// Which timed power-up a caught/granted type runs. Heart is absent — it heals
+// instantly and never occupies the active slot. Read by the active-slot sim
+// (which timer is running) and its renderer (the countdown ring).
+export const PICKUP_TO_POWER = {
+  [PICKUP_TYPE.FEATHER]: POWERUP_TYPE.SPEED,
+  [PICKUP_TYPE.PAUSE]:   POWERUP_TYPE.PAUSE,
+  [PICKUP_TYPE.RAINBOW]: POWERUP_TYPE.RAINBOW
+};
+
 // Stringly-typed config values, centralized as frozen enums so a typo is a
 // missing property (loud — undefined) instead of a silently-false comparison.
 // (Game MODES are no longer config flags — each mode is its own strategy file

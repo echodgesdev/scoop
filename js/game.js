@@ -1,12 +1,16 @@
 // @ts-check
 // Composition root. The codebase is split into layers by folder:
-//   engine/ — game-agnostic runtime (loop bits, input, touch, audio, haptics,
-//             viewport, event bus)
+//   engine/ — game-agnostic runtime: loop.js (fixed-timestep), input, touch,
+//             audio, haptics, viewport, event bus
 //   game/   — simulation + rules + data (player, scoops, shop, waves, powerups,
 //             recipes, challenges, day cycle, modes, config, tuning)
-//   view/   — rendering (scene, stations, effects, HUD)
-// This file wires them together: builds the actors, runs the loop, routes input,
-// orchestrates the draw, and maps domain events → sound/haptics/effects/HUD.
+//   view/   — rendering: renderer.js (the frame), playerView, scoopsView, scene,
+//             stations, effects, HUD
+//   reactions.js — domain events → sound/haptics/effects/HUD glue
+// This file owns the remaining glue: builds the actors, drives the Loop with
+// _stepping/_step/_frame, routes input, and runs the wave-flow state machine
+// (start → cashout → transition → night cycle). Drawing and reactions are
+// delegated; it no longer renders or wires juice directly.
 import {
   MAX_HEALTH,
   DAMAGE_PER_EXPIRE,
@@ -16,9 +20,8 @@ import {
   PERFECT_CATCH_BONUS,
   HEART_HEAL_AMOUNT,
   PICKUP_TYPE,
-  POWERUP_TYPE,
-  PICKUP_ICONS,
   PICKUP_RING_COLOR,
+  PICKUP_TO_POWER,
   PICKUP_WEIGHTS,
   PICKUP_SPAWN_MIN_S,
   PICKUP_SPAWN_MAX_S,
@@ -35,7 +38,7 @@ import {
 } from './game/config.js';
 import { Player } from './game/player.js';
 import { ScoopField, isCaught } from './game/scoops.js';
-import { Shop, REACH } from './game/shop.js';
+import { Shop } from './game/shop.js';
 import { Stations } from './view/stations.js';
 import { Waves, WAVE_EVENT } from './game/waves.js';
 import { Hud } from './view/hud.js';
@@ -44,15 +47,14 @@ import { Sound } from './engine/audio.js';
 import { Haptics } from './engine/haptics.js';
 import { Effects } from './view/effects.js';
 import { DebugPanel } from './debug.js';
-import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './view/scene.js';
-import { drawPlayer } from './view/playerView.js';
-import { drawField } from './view/scoopsView.js';
-import { dayCycleState, nightCycleState } from './game/dayCycle.js';
+import { drawFrame } from './view/renderer.js';
+import { wireReactions } from './reactions.js';
 import { PowerUps } from './game/powerups.js';
 import { EventBus } from './engine/events.js';
 import { Recipes } from './game/recipes.js';
 import { Challenges } from './game/challenges.js';
 import { responsiveDims, fitRect } from './engine/viewport.js';
+import { Loop } from './engine/loop.js';
 import { makeMode } from './game/modes/index.js';
 import { TouchControls } from './engine/touch.js';
 
@@ -69,25 +71,12 @@ const MAX_FRAME = 0.25;
 // moon arcing across) that plays after the cashout and before the wave overlay.
 const NIGHT_CYCLE_S = 2.0;
 
-// Active power-up indicator timings. When a timed power-up fires its indicator
-// floats UP into the "active" slot (where its countdown lives); when it ends —
-// or is replaced by a fresh one — it slides off to the LEFT, taking PU_LEAVE_S.
+// Active power-up indicator timings (sim side). When a timed power-up fires its
+// indicator floats UP into the "active" slot; when it ends — or is replaced — it
+// slides off LEFT, taking PU_LEAVE_S. ACTIVE_SLIDE_S is the total entrance time
+// (its draw-phase fractions live in the renderer). PICKUP_TO_POWER is in config.
 const PU_LEAVE_S = 0.3;
-// Entrance for the active power-up indicator: it ARCS up from the cone (a lobbed
-// quadratic), holds briefly + large at a mid waypoint, then settles down to its
-// resting slot while shrinking. Phase boundaries are fractions of anim.
 const ACTIVE_SLIDE_S = 0.7;
-const ACTIVE_ARC_FRAC = 0.45;    // 0..this: arc up-and-over to the mid waypoint
-const ACTIVE_PAUSE_FRAC = 0.6;   // arc-frac..this: slight hold at the waypoint
-// (this..1: settle down to the resting slot, shrinking)
-
-// Map a power-up type to the timed effect it runs. Heart is absent — it heals
-// instantly and never occupies the active slot.
-const PICKUP_TO_POWER = {
-  [PICKUP_TYPE.FEATHER]: POWERUP_TYPE.SPEED,
-  [PICKUP_TYPE.PAUSE]:   POWERUP_TYPE.PAUSE,
-  [PICKUP_TYPE.RAINBOW]: POWERUP_TYPE.RAINBOW
-};
 
 export class Game {
   constructor() {
@@ -258,8 +247,8 @@ export class Game {
     this.health = MAX_HEALTH;
     this.running = false;
     this.paused = false;
-    this.lastTime = 0;
-    this.accumulator = 0;
+    // Fixed-timestep loop (engine). Started in start(), stopped on game over.
+    this.loop = new Loop(FIXED_DT, MAX_FRAME);
     this.hurt = 0;
 
     this.flags = {
@@ -309,7 +298,7 @@ export class Game {
     /** @type {{ unlocked: string[], mastered: string[] }} */
     this.sessionRecipeEvents = { unlocked: [], mastered: [] };
 
-    this._wireEvents();
+    wireReactions(this);
 
     // Window resize only re-letterboxes the (unchanged) virtual canvas; the
     // backing store is fixed per aspect. Fullscreen is just a bigger viewport.
@@ -428,76 +417,6 @@ export class Game {
     }
   }
 
-  // All cross-subsystem reactions live here: sound + effects + HUD respond to
-  // high-level game events. Game logic just mutates state and emits.
-  _wireEvents() {
-    this.bus.on('catch', ({ scoop, perfect }) => {
-      if (perfect) {
-        const top = { x: scoop.x, y: this.player.stackTopY() };
-        this.sound.perfect();
-        this.haptics.catch_();
-        this.effects.burst(top.x, top.y, ['#fff', this.shop.hex(scoop.color)], 10);
-        this.effects.popText(top.x, top.y - 24, 'Perfect!', { color: '#ffec5c', size: 22, life: 0.7 });
-        this.player.triggerFlash(0.25);
-      } else {
-        this.sound.catch_();
-      }
-    });
-
-    this.bus.on('trayFull', () => {
-      this.sound.bad();
-      this.haptics.error();
-      this.effects.addShake(8);
-      this.hurt = 0.2;
-    });
-
-    this.bus.on('serve', ({ gained, colors, combo, x, y }) => {
-      this.effects.burst(x, y, colors.map(c => this.shop.hex(c)));
-      this.effects.popText(x, y, `+${gained}`, { color: '#ffec5c', size: 28 });
-      if (combo > 1) {
-        this.effects.popText(x, y - 30, `${combo}× combo!`, { color: '#ff6fa3', size: 20, life: 0.8 });
-      }
-      this.player.triggerFlash();
-      this.effects.addShake(6);
-      this.sound.match();
-      this.haptics.serve();
-    });
-
-    this.bus.on('serveFail', () => {
-      this.sound.bad();
-      this.haptics.error();
-      this.effects.addShake(4);
-    });
-
-    this.bus.on('expire', () => {
-      this.sound.expire();
-      this.haptics.expire();
-      this.effects.addShake(12);
-      this.hurt = 0.35;
-    });
-
-    this.bus.on('phaseUp', () => {
-      this.hud.flashPhaseUp();
-      this.sound.phaseUp();
-      this.haptics.phaseUp();
-      this.effects.addShake(4);
-      const c = this.hud.gaugeCenter();
-      if (c) this.effects.burst(c.x, c.y, ['#ffd166', '#fff'], 14);
-    });
-
-    this.bus.on('waveUp', () => {
-      // The "WAVE N!" banner moved to the next-wave START (see the night-cycle
-      // completion in _loop) so it lands after the recap modal, not before it.
-      this.hud.setGauge(this.waves.wave, 1);
-      this.hud.flashWaveUp();
-      this.sound.levelUp();
-      this.haptics.wave();
-      this.effects.addShake(14);
-      const c = this.hud.gaugeCenter();
-      if (c) this.effects.burst(c.x, c.y, ['#ffec5c', '#ffd166', '#ff6fa3', '#7fe3c4'], 60);
-    });
-  }
-
   /**
    * Re-derive the virtual canvas from the viewport aspect (so it fills the
    * screen edge-to-edge on mobile); when the dims change the backing store is
@@ -559,8 +478,6 @@ export class Game {
     this._applyModeConfig();  // apply the active mode's board size + capabilities
     // Wave 0 (the opening tutorial wave) leans harder toward demanded colors.
     this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
-    this.lastTime = 0;
-    this.accumulator = 0;
     this.banner = null;
     // Fresh recipe-event slate per session — drained on game over.
     /** @type {{ unlocked: string[], mastered: string[] }} */
@@ -578,7 +495,11 @@ export class Game {
     if (playWave0) this.tutorial.start(this);
     this._syncDayHint();
 
-    requestAnimationFrame(t => this._loop(t));
+    this.loop.start({
+      shouldStep: () => this._stepping(),
+      step: dt => this._step(dt),
+      render: dt => this._frame(dt)
+    });
   }
 
   // Debug "force Wave 0 tutorial" override (persisted). Default OFF — whether
@@ -642,25 +563,26 @@ export class Game {
     this.hud.setDayHint(want);
   }
 
-  /** @param {DOMHighResTimeStamp} t */
-  _loop(t) {
-    if (!this.lastTime) this.lastTime = t;
-    const frame = Math.min(MAX_FRAME, (t - this.lastTime) / 1000);
-    this.lastTime = t;
+  /**
+   * Gate for the fixed-step pump (the Loop's `shouldStep`). The sim advances only
+   * during live play — paused, the between-wave overlay, the pause menu, the
+   * cashout, and the night-cycle all freeze it.
+   */
+  _stepping() {
+    return this.running && !this.paused && !this.inWaveTransition &&
+      !this.inPauseMenu && !this.inCashout && !this.inNightCycle;
+  }
 
+  /**
+   * Per-frame variable-step work (the Loop's `render`): smoothed FPS, the free
+   * clock, the between-wave night-cycle sweep, visual effects, and the draw.
+   * @param {number} frame seconds since the last frame (clamped by the Loop)
+   */
+  _frame(frame) {
     // Smoothed FPS for the debug overlay (EMA). Guard against the first frame.
     if (frame > 0) this.fps = this.fps * 0.9 + (1 / frame) * 0.1;
     this.clock += frame;
 
-    const stepping = this.running && !this.paused && !this.inWaveTransition &&
-      !this.inPauseMenu && !this.inCashout && !this.inNightCycle;
-    if (stepping) {
-      this.accumulator += frame;
-      while (this.accumulator >= FIXED_DT) {
-        this._step(FIXED_DT);
-        this.accumulator -= FIXED_DT;
-      }
-    }
     // Between-wave night cycle: a fast sunset→midnight→dawn sweep (moon arcs
     // across) that plays after the overlay is dismissed; when it lands the
     // freeze lifts and the next wave resumes.
@@ -676,10 +598,8 @@ export class Game {
     }
     // Visual-only systems run variable-step — including during the cashout /
     // night-cycle freezes, so particle pops keep animating while play is paused.
-    if (stepping || this.inCashout || this.inNightCycle) this.effects.update(frame);
-    this._draw();
-
-    if (this.running) requestAnimationFrame(nt => this._loop(nt));
+    if (this._stepping() || this.inCashout || this.inNightCycle) this.effects.update(frame);
+    drawFrame(this.ctx, this);
   }
 
   /** @param {number} dt */
@@ -1181,6 +1101,7 @@ export class Game {
 
   _endGame(title = 'Game Over') {
     this.running = false;
+    this.loop.stop();
     // Reset transition state in case the player died mid-pause (shouldn't
     // happen, but defensive).
     this.inWaveTransition = false;
@@ -1204,99 +1125,6 @@ export class Game {
       () => this.start(),
       this.sessionRecipeEvents
     );
-  }
-
-  _draw() {
-    const ctx = this.ctx;
-    const { x, y } = this.effects.offset();
-    ctx.save();
-    ctx.translate(x, y);
-
-    const rainbow = this.powerups.rainbowActive;
-
-    // Background: sky + sun (or the between-wave night cycle: moon + fast sky),
-    // then sand on top. Everything after this draws over the floor — actors stay
-    // visible even when their positions overlap the sand region.
-    if (this.inNightCycle) {
-      const nightState = nightCycleState(this.nightT, this.bounds);
-      drawNightSky(ctx, this.bounds, nightState);
-      drawSand(ctx, this.bounds, nightState);
-      drawOcean(ctx, this.bounds, nightState, this.clock);
-    } else {
-      const dayState = dayCycleState(this.waves.waveFraction, this.bounds);
-      drawSkyAndSun(ctx, this.bounds, dayState);
-      drawSand(ctx, this.bounds, dayState);
-      drawOcean(ctx, this.bounds, dayState, this.clock);
-    }
-
-    drawField(ctx, this.field, rainbow);
-    drawPlayer(ctx, this.player, rainbow);
-    const pausePatience = this.powerups.pauseActive || !this.flags.patternTimer;
-    this.stations.draw(ctx, this.shop.list, {
-      activeIndex:    this.shop.customerAt(this.player.x),
-      canServe:       i => this.shop.canServe(i, this.player.colors(), rainbow, this.deliveryMode),
-      hex:            c => this.shop.hex(c),
-      pausePatience,
-      rainbow,
-      time:           this.clock,
-      tipLabel:       this.tutorial.active
-    });
-    // Tutorial hint pills — over the scene but under the effect bursts.
-    if (this.tutorial.active) this.tutorial.draw(ctx, this);
-    this.effects.draw(ctx);
-
-    if (this.flags.showHitboxes) this._drawHitboxes(ctx);
-
-    if (this.banner) {
-      const f = Math.min(1, this.banner.t / 0.4);
-      ctx.save();
-      ctx.globalAlpha = f;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.font = "bold 64px 'Comic Sans MS', sans-serif";
-      ctx.lineWidth = 8;
-      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-      ctx.fillStyle = '#fff3c0';
-      const bx = this.bounds.width / 2 - x;
-      const by = this.bounds.height * 0.32 - y;
-      ctx.strokeText(this.banner.text, bx, by);
-      ctx.fillText(this.banner.text, bx, by);
-      ctx.restore();
-    }
-
-    if (this.hurt > 0) {
-      ctx.fillStyle = `rgba(230, 57, 70, ${0.35 * (this.hurt / 0.3)})`;
-      ctx.fillRect(-x, -y, this.bounds.width, this.bounds.height);
-    }
-
-    if (this.paused && this.running) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-      ctx.fillRect(-x, -y, this.bounds.width, this.bounds.height);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 52px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('⏸ PAUSED', this.bounds.width / 2 - x, this.bounds.height / 2 - y);
-    }
-    ctx.restore();
-
-    // The active running-power-up indicator (screen-fixed).
-    this._drawActivePowerup(ctx);
-
-    // FPS overlay is screen-fixed (drawn after the shake transform is popped).
-    if (this.flags.showFps) {
-      ctx.save();
-      ctx.font = "bold 20px 'Consolas', monospace";
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      const label = `${Math.round(this.fps)} fps  scoops:${this.field.scoops.length}`;
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-      ctx.strokeText(label, 12, 12);
-      ctx.fillStyle = '#39ff14';
-      ctx.fillText(label, 12, 12);
-      ctx.restore();
-    }
   }
 
   /**
@@ -1336,64 +1164,6 @@ export class Game {
   }
 
   /**
-   * Active power-up indicator (screen-space, scales with the letterboxed stage):
-   * a single bubble at bottom-center showing the running timed power-up with its
-   * countdown ring. Nothing is drawn while idle — the indicator only appears
-   * when a timed power-up is up. A finished / replaced bubble slides off LEFT.
-   * @param {CanvasRenderingContext2D} ctx
-   */
-  _drawActivePowerup(ctx) {
-    if (!this.activeBubble && this.puLeaving.length === 0) return;
-    const aslot = this._activeSlotPos();
-
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Bubbles sliding off to the left (finished / replaced).
-    for (const lv of this.puLeaving) {
-      ctx.globalAlpha = 1 - lv.t;
-      this._drawPowerupBubble(ctx, lv.x - lv.t * 70, lv.y, lv.r0 * (1 - 0.5 * lv.t), lv.type, false, -1);
-    }
-    ctx.globalAlpha = 1;
-
-    // The running power-up's entrance: a lobbed ARC up from the catch point to a
-    // mid waypoint (large, with a slight hold), then a settle DOWN to the resting
-    // slot while shrinking. The waypoint is ~10% above the rest.
-    if (this.activeBubble) {
-      const a = this.activeBubble;
-      const cx = aslot.x;
-      const restY = aslot.y;                              // final rest
-      const midY = restY - this.bounds.height * 0.10;     // pause waypoint
-      let bx, by, grow;
-      if (a.anim < ACTIVE_ARC_FRAC) {
-        // Quadratic Bézier with a control point lifted above both ends → a toss.
-        const t = a.anim / ACTIVE_ARC_FRAC;
-        const e = 1 - (1 - t) * (1 - t);                  // easeOut along the arc
-        const u = 1 - e;
-        const ctrlX = (a.fromX + cx) / 2;
-        const ctrlY = Math.min(a.fromY, midY) - this.bounds.height * 0.15;
-        bx = u * u * a.fromX + 2 * u * e * ctrlX + e * e * cx;
-        by = u * u * a.fromY + 2 * u * e * ctrlY + e * e * midY;
-        grow = 0.5 + 0.9 * e;                             // → ~1.4× by the waypoint
-      } else if (a.anim < ACTIVE_PAUSE_FRAC) {
-        bx = cx; by = midY; grow = 1.4;                   // slight hold, large
-      } else {
-        const p = (a.anim - ACTIVE_PAUSE_FRAC) / (1 - ACTIVE_PAUSE_FRAC);
-        const e = p * p * (3 - 2 * p);                    // smoothstep settle
-        bx = cx;
-        by = midY + (restY - midY) * e;
-        grow = 1.4 - 0.4 * e;                             // shrink 1.4× → 1.0×
-      }
-      const pulse = 1 + 0.08 * Math.sin(this.clock * 6);
-      const radius = aslot.r * grow * pulse;
-      const frac = this.powerups.fraction(PICKUP_TO_POWER[a.type]);
-      this._drawPowerupBubble(ctx, bx, by, radius, a.type, true, frac);
-    }
-    ctx.restore();
-  }
-
-  /**
    * The active power-up's resting slot: horizontally centered, at the mode's
    * activeSlotY (~25% up from the bottom). The entrance rises to screen-center
    * before settling here.
@@ -1404,85 +1174,6 @@ export class Game {
     return { x: this.bounds.width / 2, y: this.mode.activeSlotY(this.bounds), r: 40 };
   }
 
-  /**
-   * One power-up bubble: dark well + colored ring + icon, optional glow and a
-   * run-timer arc (ringFrac >= 0 shows the power-up's remaining duration).
-   * Assumes textAlign/baseline already centered and globalAlpha set by caller.
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {number} x @param {number} y @param {number} radius
-   * @param {import('./types.js').PickupTypeName} type
-   * @param {boolean} glow
-   * @param {number} ringFrac  0..1 to draw the run-timer ring; < 0 to skip it
-   */
-  _drawPowerupBubble(ctx, x, y, radius, type, glow, ringFrac) {
-    const ring = PICKUP_RING_COLOR[type];
-    if (glow) { ctx.shadowColor = ring; ctx.shadowBlur = 16; }
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = ring;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-
-    if (ringFrac >= 0) {
-      ctx.beginPath();
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = ring;
-      ctx.arc(x, y, radius + 5, -Math.PI / 2, -Math.PI / 2 + ringFrac * Math.PI * 2);
-      ctx.stroke();
-    }
-
-    ctx.font = `${Math.floor(radius * 1.05)}px 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif`;
-    ctx.fillStyle = '#fff';
-    ctx.fillText(PICKUP_ICONS[type], x, y + 1);
-  }
-
-  /**
-   * Debug overlay: red collision shapes for falling scoops, the cone (catch +
-   * pickup hitboxes), pickups, the dissolve/miss line, and each customer's
-   * serve-reach band + face box. Drawn inside the shake transform so it tracks
-   * the actors. Toggled via the "Show hitboxes" debug flag.
-   * @param {CanvasRenderingContext2D} ctx
-   */
-  _drawHitboxes(ctx) {
-    ctx.save();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = '#ff2d2d';
-
-    // Falling scoops — collision circle (skip dissolving ones; uncatchable).
-    for (const s of this.field.scoops) {
-      if (s.dissolve !== undefined) continue;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, SCOOP_RADIUS, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
-    // Cone: catch hitbox (solid AABB).
-    const cb = this.player.catchHitbox();
-    ctx.strokeRect(cb.x - cb.halfW, cb.y - cb.r, cb.halfW * 2, cb.r * 2);
-
-    // Miss / dissolve line.
-    const missY = this.stations.groundY + SCOOP_RADIUS * 2;
-    ctx.strokeStyle = 'rgba(255,45,45,0.45)';
-    ctx.beginPath();
-    ctx.moveTo(0, missY);
-    ctx.lineTo(this.bounds.width, missY);
-    ctx.stroke();
-
-    // Customers: face box + serve-reach band (serve test is x-distance only).
-    const groundY = this.stations.groundY;
-    for (const c of this.shop.list) {
-      const faceY = groundY + CUSTOMER_FACE_OFFSET_PX + c.yOff;
-      ctx.strokeStyle = '#ff2d2d';
-      ctx.strokeRect(c.x - 46, faceY - 46, 92, 92);
-      ctx.strokeStyle = 'rgba(255,45,45,0.4)';
-      ctx.strokeRect(c.x - REACH, faceY - 70, REACH * 2, 150);
-    }
-
-    ctx.restore();
-  }
 }
 
 new Game();
