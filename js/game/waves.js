@@ -55,6 +55,13 @@ export class Waves {
   constructor(getUnlockedSections, isDiscovered) {
     this.getUnlockedSections = getUnlockedSections || (() => null);
     this.isDiscovered = isDiscovered || (() => false);
+    // Declared here (not just in reset) so checkJs infers plain `number` rather
+    // than `number | undefined` — reset() is called below but TS doesn't trace it.
+    this.wave = 0;            // 0 = the tutorial wave; campaign proper is 1+
+    this.phase = 1;           // 1-based, 1..PHASES_PER_WAVE
+    this.servedInPhase = 0;
+    this.completedPhases = 0; // 0..PHASES_PER_WAVE — phases cleared this wave
+    this.celebrating = 0;     // seconds left in the wave-up freeze
     /** @type {Set<ScoopColor>} Colors served in Wave 0 (completion + no-repeat). */
     this.servedColors = new Set();
     this.reset();
@@ -197,7 +204,7 @@ export class Waves {
    * @returns {{ recipe: string, colors: ScoopColor[], value: number, weight: number }}
    */
   pickOrder() {
-    const wave = /** @type {number} */ (this.wave);
+    const wave = this.wave;
     const unlocked = this.getUnlockedSections() || undefined;
     let pool = recipesForWave(wave, unlocked);
     // Wave 0: never hand out a color the player has already served, so each of

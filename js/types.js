@@ -68,7 +68,15 @@
  * @property {{}} trayFull
  * @property {{ count: number }} expire
  * @property {{ gained: number, colors: ScoopColor[], combo: number, x: number, y: number }} serve
+ * @property {{ x: number, y: number, color: ScoopColor }} handoff   a scoop physically left the tray toward a customer (source burst at the cone)
+ * @property {{ x: number, y: number }} partialServe                an accepted-but-incomplete serve (the "✓" tick)
  * @property {{}} serveFail
+ * @property {{}} comboLost      the combo chain decayed / broke (patience timeout)
+ * @property {{ type: PickupTypeName, x: number, y: number }} powerup   a power-up fired (heart heal or timed)
+ * @property {{ x: number, y: number }} comboBreak                       the combo-breaker crescendo (supercharged power-up)
+ * @property {{ x: number, y: number, color: ScoopColor }} discard       toss-top (the upward gesture)
+ * @property {{ x: number, y: number, points: number }} coin            a coin tip granted
+ * @property {{ title: string }} challengeEarned                        a challenge requirement was newly met (HUD toast)
  * @property {{}} phaseUp
  * @property {{ wave: number }} waveUp
  * @property {{}} gameOver

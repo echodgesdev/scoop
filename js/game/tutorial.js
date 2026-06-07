@@ -27,7 +27,7 @@ export class TutorialBase {
   update(dt, game) {
     if (!this.active) return;
     // Wave 0 cleared (the director advanced) → onboarding is done.
-    if (game.waves.wave !== 0) this._finish();
+    if (game.world.waves.wave !== 0) this._finish();
   }
 
   /**
@@ -50,22 +50,23 @@ export class TutorialBase {
    * @param {Game} game @returns {{ text: string, x: number, y: number } | null}
    */
   _coreHint(game) {
-    const px = game.player.x;
-    const stack = game.player.stack;
-    const coneTop = game.player.coneTopY();
-    const underCone = game.player.y + CONE_HEIGHT / 2 + 36;
+    const world = game.world;
+    const px = world.player.x;
+    const stack = world.player.stack;
+    const coneTop = world.player.coneTopY();
+    const underCone = world.player.y + CONE_HEIGHT / 2 + 36;
     const touch = this._touch(game);
 
     if (stack.length === 0) return { text: 'Catch a falling scoop!', x: px, y: coneTop - 28, point: 'down' };
 
-    const idx = game.shop.customerAt(px);
+    const idx = world.shop.customerAt(px);
     if (idx < 0) {
       return { text: touch ? 'Drag to a customer' : '◀  Move to a customer  ▶', x: px, y: underCone, point: 'up' };
     }
-    if (game.shop.canServe(idx, game.player.colors(), false, game.deliveryMode)) {
+    if (world.shop.canServe(idx, world.player.colors(), false, world.deliveryMode)) {
       return { text: touch ? 'Tap to serve' : '↑ / Enter — Serve', x: px, y: coneTop - 28, point: 'down' };
     }
-    const customer = game.shop.list[idx];
+    const customer = world.shop.list[idx];
     const wanted = (customer && customer.order.colors) || [];
     const buriedWanted = stack.slice(0, -1).some(s => wanted.includes(s.color));
     if (buriedWanted) {

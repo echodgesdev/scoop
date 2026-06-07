@@ -1,45 +1,27 @@
 // @ts-check
-// Composition root. The codebase is split into layers by folder:
+// Composition root + coordinator. The codebase is split into layers by folder:
 //   engine/ — game-agnostic runtime: loop.js (fixed-timestep), input, touch,
 //             audio, haptics, viewport, event bus
-//   game/   — simulation + rules + data (player, scoops, shop, waves, powerups,
-//             recipes, challenges, day cycle, modes, config, tuning)
+//   game/   — simulation + rules + data: world.js (the sim), player, scoops,
+//             shop, waves, powerups, recipes, challenges, day cycle, modes,
+//             config, tuning
 //   view/   — rendering: renderer.js (the frame), playerView, scoopsView, scene,
 //             stations, effects, HUD
 //   reactions.js — domain events → sound/haptics/effects/HUD glue
-// This file owns the glue: builds the actors, drives the Loop with
-// _stepping/_step/_frame, routes input, and runs the wave-flow state machine
-// (start → cashout → transition → night cycle). Drawing (view/renderer.js) and
-// reactions (reactions.js) are delegated.
+// Dataflow is one-way: input → World.step(dt) → events → presentation. This file
+// owns the glue only: it builds the actors, drives the Loop with
+// _stepping/_step/_frame, routes input, runs the wave-flow state machine
+// (start → cashout → transition → night cycle), and pulls World state to the HUD
+// each frame. The sim (game/world.js), drawing (view/renderer.js), and reactions
+// (reactions.js) are delegated.
 import {
   MAX_HEALTH,
-  DAMAGE_PER_EXPIRE,
-  HEAL_PER_SERVE,
-  MAX_STACK,
-  PERFECT_CATCH_BAND,
-  PERFECT_CATCH_BONUS,
-  HEART_HEAL_AMOUNT,
-  PICKUP_TYPE,
-  PICKUP_TO_POWER,
-  PICKUP_WEIGHTS,
-  PICKUP_SPAWN_MIN_S,
-  PICKUP_SPAWN_MAX_S,
-  CUSTOMER_FACE_OFFSET_PX,
-  SCOOP_RADIUS,
   COMBO_CASHOUT_PER,
   STACK_CASHOUT_PER_SCOOP,
-  COMBO_BREAKER_THRESHOLD,
-  COMBO_BREAKER_DURATION_MULT,
   SPAWN_DEMAND_BIAS,
-  WAVE0_DEMAND_BIAS,
-  coneYFor,
-  DELIVERY_MODE
+  coneYFor
 } from './game/config.js';
-import { Player } from './game/player.js';
-import { ScoopField, isCaught } from './game/scoops.js';
-import { Shop } from './game/shop.js';
 import { Stations } from './view/stations.js';
-import { Waves, WAVE_EVENT } from './game/waves.js';
 import { Hud } from './view/hud.js';
 import { Input } from './engine/input.js';
 import { Sound } from './engine/audio.js';
@@ -49,13 +31,10 @@ import { DebugPanel } from './debug.js';
 import { drawFrame } from './view/renderer.js';
 import { PICKUP_RING_COLOR } from './view/powerupVisuals.js';
 import { wireReactions } from './reactions.js';
-import { PowerUps } from './game/powerups.js';
 import { EventBus } from './engine/events.js';
-import { Recipes } from './game/recipes.js';
-import { Challenges } from './game/challenges.js';
 import { responsiveDims, fitRect } from './engine/viewport.js';
 import { Loop } from './engine/loop.js';
-import { makeMode } from './game/modes/index.js';
+import { World } from './game/world.js';
 import { TouchControls } from './engine/touch.js';
 
 /** @typedef {import('./types.js').GameEventMap} GameEventMap */
@@ -71,13 +50,6 @@ const MAX_FRAME = 0.25;
 // moon arcing across) that plays after the cashout and before the wave overlay.
 const NIGHT_CYCLE_S = 2.0;
 
-// Active power-up indicator timings (sim side). When a timed power-up fires its
-// indicator floats UP into the "active" slot; when it ends — or is replaced — it
-// slides off LEFT, taking PU_LEAVE_S. ACTIVE_SLIDE_S is the total entrance time
-// (its draw-phase fractions live in the renderer). PICKUP_TO_POWER is in config.
-const PU_LEAVE_S = 0.3;
-const ACTIVE_SLIDE_S = 0.7;
-
 export class Game {
   constructor() {
     this.canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
@@ -92,25 +64,40 @@ export class Game {
     this.bounds = { width: _d.width, height: _d.height };
     // Smoothed frames-per-second for the debug overlay.
     this.fps = 60;
+    // Free-running clock (seconds) for HUD pulse/flash animations.
+    this.clock = 0;
 
-    this.recipes = new Recipes();
-    this.challenges = new Challenges(this.recipes);
-    // Toast at bottom-centre whenever a challenge requirement is hit mid-
-    // play. Wired before HUD construction so HUD can be the receiver.
-    this.challenges.onEarned = ch => this.hud && this.hud.showChallengeToast(ch);
-    // Gameplay is paused while the between-wave overlay is animating
-    // cross-offs / showing the countdown. See _beginWaveTransition.
-    this.inWaveTransition = false;
-    // Wave-end cashout animation (combo bank + stack pops). Gameplay stepping
-    // is frozen while this runs, but effects keep updating so the particles
-    // animate. See _runWaveCashout.
-    this.inCashout = false;
-    // Between-wave night-cycle reset (runs after the wave overlay is dismissed,
-    // right before the next wave). nightT drives the fast sky sweep + moon arc.
-    this.inNightCycle = false;
-    this.nightT = 0;
-    // Dedicated "Esc" pause menu — separate from the debug-panel pause.
-    this.inPauseMenu = false;
+    /** @type {EventBus<GameEventMap>} */
+    this.bus = new EventBus();
+
+    // Debug cheat/display flags. Shared by reference into the World for the few
+    // it reads (invincible, patternTimer); the rest gate debug input here.
+    this.flags = {
+      patternTimer: true, invincible: false, pickupKeys: false,
+      showHitboxes: false, showFps: false
+    };
+
+    // Persisted onboarding + control prefs (presentation). Loaded before the HUD
+    // and touch layer that read them.
+    this.showTutorial = this._loadShowTutorial();
+    // Relative drag is the only touch-steering scheme: small thumb travel moves
+    // the cone far, scaled by touchGain (the "Movement sensitivity" Settings
+    // slider). The discrete verbs (tap to serve, swipe up to toss) are
+    // independent of it. Keyboard stays live.
+    this.touchGain = this._loadTouchGain();
+
+    // Engine input (keyboard) — the World reads its steering state during step,
+    // so it's built before the World.
+    this.input = new Input();
+
+    // The simulation: owns the models + progression + sim state, advances them
+    // with step(dt), and emits domain events on the shared bus. game.js never
+    // reaches into the sim's rules — it reads World state and routes verbs to it.
+    this.world = new World(this.bus, this.bounds, this.flags, this.input);
+
+    // HUD reads recipes/challenges (from the World) for its modals. Built before
+    // the audio singletons to match the original wiring (the HUD's optional
+    // cross-off sound stays off); its volume/haptics/sensitivity getters are lazy.
     this.hud = new Hud({
       scoreEl:    document.getElementById('score'),
       comboEl:    document.getElementById('combo'),
@@ -124,8 +111,8 @@ export class Game {
       waveTransitionOverlayEl: document.getElementById('waveTransitionOverlay'),
       pauseOverlayEl: document.getElementById('pauseOverlay'),
       challengeToastEl: document.getElementById('challengeToast'),
-      recipes:    this.recipes,
-      challenges: this.challenges,
+      recipes:    this.world.recipes,
+      challenges: this.world.challenges,
       sound:      this.sound,
       onStart:    () => this.start(),
       onHowToPlay: () => this.start(true),  // replays the tutorial on demand
@@ -138,78 +125,83 @@ export class Game {
       onResetProgress: () => this._resetProgress(),
       onPauseToggle: () => this._togglePause()
     });
-    this.input   = new Input();
+
     this.sound   = new Sound();
     this.haptics = new Haptics();
     this.effects = new Effects();
-    /** @type {EventBus<GameEventMap>} */
-    this.bus = new EventBus();
+    // Customer view (faces + speech bubbles). Pure presentation; the renderer
+    // draws through it and reads its groundY for the miss line.
+    this.stations = new Stations();
 
-    // The game mode (Tipping) lives in its own file (modes/tipping.js) and owns
-    // board size, the tip-sourced power-ups, the tray verbs, the active slot, and
-    // the tutorial. game.js DELEGATES to this.mode — it never branches on a mode
-    // id. Resolved below (via makeMode) once the actors it reaches into exist.
-    // Delivery method (debug-switchable): how a tray serves an order.
-    // 'any' = top scoop fills any remaining color (default); 'sequential' = top
-    // must be the next color in order; 'whole' = the whole tray must equal the
-    // order, delivered in one action.
-    this.deliveryMode = DELIVERY_MODE.ANY;
-    /** @type {number | null} */
-    this.spawnIntervalOverride = null;
-    // Combo breaker: the score combo doubles as a charge meter — at this many
-    // chained serves it "breaks" into a supercharged power-up. A per-mode
-    // capability (comboBreakerEnabled, set by _applyModeConfig from the mode's
-    // `comboBreaker`) defaulted on for Tipping; toggle + threshold are debug-tunable.
-    this.comboBreakerThreshold = COMBO_BREAKER_THRESHOLD;
-    this.comboBreakerEnabled = false;
-    this.maxStack = MAX_STACK;  // re-set per mode by _applyModeConfig below
+    // Presentation tutorial, built from the active mode. Rebuilt each start().
+    this.tutorial = this.world.mode.makeTutorial();
 
-    this.waves       = new Waves(
-      () => this.challenges.unlockedSectionIds(),
-      id => this.recipes.isDiscovered(id)
-    );
-    this.powerups    = new PowerUps();
-    this.player      = new Player(0, 0);
-    this.field       = new ScoopField();
-    this.shop        = new Shop(this.waves);
-    this.stations    = new Stations();
-
-    // Power-up economy config (debug-tunable, persists across game starts since
-    // it lives on Game, not the rebuilt mode). `powerupWeights` is the relative
-    // mix of heart/⚡/❄️/🌈 (aligned to PICKUP order); `tipGap{Min,Max}` is the
-    // seconds-between-tips range the tip roller reads. Power-ups arrive as
-    // customer tips + the combo breaker.
-    this.powerupWeights = PICKUP_WEIGHTS.slice();
-    this.tipGapMin = PICKUP_SPAWN_MIN_S;
-    this.tipGapMax = PICKUP_SPAWN_MAX_S;
-
-    // Resolve the mode now that the actors it reaches into exist, then its
-    // tutorial. _applyModeConfig pushes its board size + breaker capability.
-    this.mode        = makeMode(this);
-    this.tutorial    = this.mode.makeTutorial();
-
-    // Couple supply to demand: the scoop field biases its incoming queue
-    // toward colors the shop still needs.
-    this.field.setDemandSource(() => this.shop.demandColors(this.player.colors()));
-    // Some customers arrive with a tip (power-up or coin); the mode's roller
-    // decides per spawn, reading the tip-gap + mix config above.
-    this.shop.setTipRoller(() => this.mode.rollTip());
-    this._applyModeConfig();  // apply the active mode's board size + capabilities
-
+    // === Game-flow state machine + frame state (coordinator-owned) ============
+    // Gameplay is paused while the between-wave overlay is animating cross-offs /
+    // showing the countdown. See _beginWaveTransition.
+    this.inWaveTransition = false;
+    // Wave-end cashout animation (combo bank + stack pops). Stepping is frozen
+    // while this runs, but effects keep updating so the particles animate.
+    this.inCashout = false;
+    // Between-wave night-cycle reset (runs after the wave overlay is dismissed,
+    // right before the next wave). nightT drives the fast sky sweep + moon arc.
+    this.inNightCycle = false;
+    this.nightT = 0;
+    // Dedicated "Esc" pause menu — separate from the debug-panel pause.
+    this.inPauseMenu = false;
     /** @type {{ text: string, t: number } | null} */
     this.banner = null;
+    this.hurt = 0;
+    this.running = false;
+    this.paused = false;
+    // Whether the tutorial "day meter" callout is currently shown (so we only
+    // toggle the DOM on transitions, not every frame).
+    this._dayHintShown = false;
+    // Fixed-timestep loop (engine). Started in start(), stopped on game over.
+    this.loop = new Loop(FIXED_DT, MAX_FRAME);
 
+    // Debug panel — its tuning controls forward straight to the World.
+    this.debug = new DebugPanel(this.flags, {
+      onPauseChange: open => { this.paused = open; },
+      onWaveJump: n => this._jumpToWave(n),
+      onTimeJump: f => this._jumpToTime(f),
+      getWaveFraction: () => this.world.waves.waveFraction,
+      onDemandBias: v => this.world.field.setDemandBias(v),
+      getDemandBias: () => this.world.field.demandBias,
+      onPatience: sec => { this.world.patienceOverride = sec; },
+      getPatience: () => this.world.patienceOverride != null
+        ? this.world.patienceOverride
+        : Math.round(this.world.waves.tuning().patience),
+      onTipGap: (min, max) => this.world.setTipGap(min, max),
+      getTipGap: () => ({ min: this.world.tipGapMin, max: this.world.tipGapMax }),
+      onPowerupWeights: weights => this.world.setPowerupWeights(weights),
+      getPowerupWeights: () => this.world.powerupWeights,
+      onTutorialFlag: v => this.setShowTutorial(v),
+      getTutorialFlag: () => this.showTutorial,
+      onDeliveryMode: name => { this.world.deliveryMode = name; },
+      getDeliveryMode: () => this.world.deliveryMode,
+      onMaxStack: n => { this.world.maxStack = Math.max(1, Math.round(n)); },
+      getMaxStack: () => this.world.maxStack,
+      onMaxLive: n => this.world.field.setMaxLive(n),
+      getMaxLive: () => this.world.field.maxLive,
+      onSpawnInterval: sec => { this.world.spawnIntervalOverride = sec; },
+      getSpawnInterval: () => this.world.spawnIntervalOverride != null
+        ? this.world.spawnIntervalOverride
+        : this.world.waves.tuning().spawnInterval,
+      onFallSpeed: m => this.world.field.setFallScale(m),
+      getFallSpeed: () => this.world.field.fallScale,
+      onComboBreaker: n => { this.world.comboBreakerThreshold = Math.max(2, Math.round(n)); },
+      getComboBreaker: () => this.world.comboBreakerThreshold,
+      onComboBreakerToggle: on => { this.world.comboBreakerEnabled = on; this._syncComboHud(); },
+      getComboBreakerEnabled: () => this.world.comboBreakerEnabled
+    });
+
+    // Input routing: discrete verbs are guarded here, then handed to the World.
     this.input.onPop = () => this._pop();
     this.input.onDeliver = () => this._deliver();
     this.input.onUsePower = type => this._usePower(type);
     this.input.onDebugDamage = () => this._debugDamage();
     this.input.onPause = () => this._togglePause();
-
-    // Relative drag is the only touch-steering scheme: small thumb travel moves
-    // the cone far, scaled by touchGain (the "Movement sensitivity" Settings
-    // slider). It's the least-fatiguing one-handed control; the discrete verbs
-    // (tap to serve, swipe up to toss) are independent of it. Keyboard stays live.
-    this.touchGain = this._loadTouchGain();
 
     // Native touch layer (also handles mouse/pen). Reports raw gestures; the
     // handlers below apply relative steering + map the verbs. The down-swipe is
@@ -225,80 +217,20 @@ export class Game {
       onSwipeDown: () => {}
     });
 
-    // Power-ups fire the instant they're granted (a customer tip or the combo
-    // breaker). Heart heals on the spot; the three timed power-ups
-    // (speed / freeze / rainbow) are mutually exclusive — a new one replaces
-    // whatever is currently running. The single "active" indicator below mirrors
-    // the running timed power-up (its countdown ring); null when none is up.
-    /** @type {{ type: PickupTypeName, fromX: number, fromY: number, anim: number } | null} */
-    this.activeBubble = null;
-    // Indicators mid-slide-off to the left (a finished or just-replaced power-up).
-    /** @type {{ type: PickupTypeName, x: number, y: number, r0: number, t: number }[]} */
-    this.puLeaving = [];
-    // First-time onboarding flag (persisted). When true, hint overlays play
-    // over Wave 0; the "How to Play" button forces them anytime.
-    this.showTutorial = this._loadShowTutorial();
-    // Free-running clock (seconds) for HUD pulse/flash animations.
-    this.clock = 0;
-    // Whether the tutorial "day meter" callout is currently shown (so we only
-    // toggle the DOM on transitions, not every frame).
-    this._dayHintShown = false;
-
-    this.health = MAX_HEALTH;
-    this.running = false;
-    this.paused = false;
-    // Fixed-timestep loop (engine). Started in start(), stopped on game over.
-    this.loop = new Loop(FIXED_DT, MAX_FRAME);
-    this.hurt = 0;
-
-    this.flags = {
-      patternTimer: true, invincible: false, pickupKeys: false,
-      showHitboxes: false, showFps: false
-    };
-    // Debug patience override (seconds). null = follow the wave ramp.
-    /** @type {number | null} */
-    this.patienceOverride = null;
-    this.debug = new DebugPanel(this.flags, {
-      onPauseChange: open => { this.paused = open; },
-      onWaveJump: n => this._jumpToWave(n),
-      onTimeJump: f => this._jumpToTime(f),
-      getWaveFraction: () => this.waves.waveFraction,
-      onDemandBias: v => this.field.setDemandBias(v),
-      getDemandBias: () => this.field.demandBias,
-      onPatience: sec => { this.patienceOverride = sec; },
-      getPatience: () => this.patienceOverride != null
-        ? this.patienceOverride
-        : Math.round(this.waves.tuning().patience),
-      onTipGap: (min, max) => this.setTipGap(min, max),
-      getTipGap: () => ({ min: this.tipGapMin, max: this.tipGapMax }),
-      onPowerupWeights: weights => this.setPowerupWeights(weights),
-      getPowerupWeights: () => this.powerupWeights,
-      onTutorialFlag: v => this.setShowTutorial(v),
-      getTutorialFlag: () => this.showTutorial,
-      onDeliveryMode: name => { this.deliveryMode = name; },
-      getDeliveryMode: () => this.deliveryMode,
-      onMaxStack: n => { this.maxStack = Math.max(1, Math.round(n)); },
-      getMaxStack: () => this.maxStack,
-      onMaxLive: n => this.field.setMaxLive(n),
-      getMaxLive: () => this.field.maxLive,
-      onSpawnInterval: sec => { this.spawnIntervalOverride = sec; },
-      getSpawnInterval: () => this.spawnIntervalOverride != null
-        ? this.spawnIntervalOverride
-        : this.waves.tuning().spawnInterval,
-      onFallSpeed: m => this.field.setFallScale(m),
-      getFallSpeed: () => this.field.fallScale,
-      onComboBreaker: n => { this.comboBreakerThreshold = Math.max(2, Math.round(n)); },
-      getComboBreaker: () => this.comboBreakerThreshold,
-      onComboBreakerToggle: on => { this.comboBreakerEnabled = on; this._syncComboHud(); },
-      getComboBreakerEnabled: () => this.comboBreakerEnabled
-    });
-
-    // Recipes unlocked / mastered during this play session — drained on
-    // game over to drive the celebration overlay.
-    /** @type {{ unlocked: string[], mastered: string[] }} */
-    this.sessionRecipeEvents = { unlocked: [], mastered: [] };
-
+    // Presentation reactions: sound/haptics/effects/HUD subscribe to World events.
     wireReactions(this);
+
+    // Flow timing (game-owned, NOT presentation): the wave-end cashout schedule
+    // and the game-over teardown react to the sim's events. The sim only DECIDES
+    // (emits waveUp / gameOver); the coordinator runs the timed flow.
+    this.bus.on('waveUp', ({ wave }) => {
+      // The wave just completed is (wave - 1) since waves.onServed already
+      // incremented. Let the wave-up banner read, then run the cashout, which
+      // opens the transition overlay when it ends.
+      const completedWave = Math.max(1, (wave || 1) - 1);
+      setTimeout(() => this._runWaveCashout(completedWave), 700);
+    });
+    this.bus.on('gameOver', () => this._endGame('Out of health! 😱'));
 
     // Window resize only re-letterboxes the (unchanged) virtual canvas; the
     // backing store is fixed per aspect. Fullscreen is just a bigger viewport.
@@ -318,9 +250,9 @@ export class Game {
   _applyAspect() {
     this.canvas.width = this.bounds.width;
     this.canvas.height = this.bounds.height;
-    this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+    this.world.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
     this.stations.layout(this.bounds);
-    this.shop.layout(this.bounds.width);
+    this.world.shop.layout(this.bounds.width);
     this._resize();
   }
 
@@ -351,53 +283,46 @@ export class Game {
   }
 
   /**
-   * Debug: fast-forward to wave N. Resets phase progress but leaves the
-   * shop's existing customers — they'll reconcile against the new wave's
-   * active count on the next update tick.
+   * Debug: fast-forward to wave N. Resets phase progress but leaves the shop's
+   * existing customers — they'll reconcile against the new wave's active count
+   * on the next update tick. The HUD catches up on the next frame's _syncHud.
    * @param {number} n
    */
   _jumpToWave(n) {
     if (!this.running) return;
-    this.waves.jumpToWave(n);
-    this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
-    this.shop.setOrderTime(this.waves.tuning().patience);
+    this.world.waves.jumpToWave(n);
+    this.world.shop.setOrderTime(this.world.waves.tuning().patience);
     // jumpToWave floors to wave ≥ 1, so leave the Wave 0 bias behind.
-    this.field.setDemandBias(SPAWN_DEMAND_BIAS);
+    this.world.field.setDemandBias(SPAWN_DEMAND_BIAS);
   }
 
   /**
-   * Debug: scrub to a wave-fraction (0..1). Updates the gauge so the HUD
-   * reflects the jump. The canvas redraws every frame even while paused,
-   * so the sun and sky also update live as the slider is dragged.
+   * Debug: scrub to a wave-fraction (0..1). The canvas redraws every frame even
+   * while paused, so the sun, sky, and gauge update live as the slider is dragged.
    * @param {number} fraction
    */
   _jumpToTime(fraction) {
     if (!this.running) return;
-    this.waves.jumpToFraction(fraction);
-    this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
+    this.world.waves.jumpToFraction(fraction);
   }
 
   /**
-   * Debug (T key): inflict one expire's worth of damage on the player.
-   * Gated by the same cheat flag as Q/W/E/R so it doesn't trigger by
-   * accident — open the Debug panel and tick "Cheat keys: Q/W/E/R" first.
+   * Debug (T key): inflict one expire's worth of damage on the player. Gated by
+   * the same cheat flag as Q/W/E/R so it doesn't trigger by accident. Routes
+   * through the real expire path so damage, the expire reaction, and the
+   * game-over decision all live in one place.
    */
   _debugDamage() {
     if (!this.running || this.paused) return;
     if (!this.flags.pickupKeys) return;
     if (this.flags.invincible) return;
-    this.health = Math.max(0, this.health - DAMAGE_PER_EXPIRE);
-    this.hud.setHealth(this.health / MAX_HEALTH);
-    this.effects.addShake(10);
-    this.hurt = 0.35;
-    this.sound.expire();
-    if (this.health <= 0) this._endGame('Out of health! 😱');
+    this.world.onExpire(1);
   }
 
   /** Settings: wipe challenges + recipes back to a fresh save. */
   _resetProgress() {
-    this.challenges.reset();
-    this.recipes.reset();
+    this.world.challenges.reset();
+    this.world.recipes.reset();
   }
 
   /**
@@ -422,7 +347,8 @@ export class Game {
    * screen edge-to-edge on mobile); when the dims change the backing store is
    * resized and actors are repositioned. Then fit #stage over the viewport —
    * fitRect with a matching aspect yields a full-bleed rect; with the portrait
-   * cap on a wide desktop it centers the column.
+   * cap on a wide desktop it centers the column. `bounds` is shared with the
+   * World, so resizing it here updates the sim's view of the play area too.
    */
   _resize() {
     if (!this.stage) return;
@@ -432,9 +358,9 @@ export class Game {
       this.bounds.height = d.height;
       this.canvas.width = d.width;
       this.canvas.height = d.height;
-      this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+      this.world.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
       this.stations.layout(this.bounds);
-      this.shop.layout(this.bounds.width);
+      this.world.shop.layout(this.bounds.width);
     }
     const r = fitRect(window.innerWidth, window.innerHeight, this.bounds.width, this.bounds.height);
     this.stage.style.left = `${r.left}px`;
@@ -447,51 +373,29 @@ export class Game {
   start(forceTutorial = false) {
     this.sound.resume();
     this.hud.hideOverlay();
-    this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
-    this.player.clearStack();
-    this.field.reset();
-    this.powerups.reset();
     this.effects.reset();
     this.stations.layout(this.bounds);
-    this.shop.layout(this.bounds.width);
     // Wave 0 (the tutorial wave) only plays until the first challenge set is
     // cleared — after that we jump straight to Wave 1. "How to Play" and the
     // debug "force tutorial" flag override and replay it.
-    const playWave0 = forceTutorial || this.showTutorial || !this.challenges.firstSetCleared();
-    this.waves.reset(playWave0 ? 0 : 1);
-    this.shop.setOrderTime(this.waves.tuning().patience);
-    this.shop.reset();
-    this.health = MAX_HEALTH;
+    const playWave0 = forceTutorial || this.showTutorial || !this.world.challenges.firstSetCleared();
+    // Reset the simulation (models + progression-session counters). The mode is
+    // rebuilt inside, so re-derive the presentation tutorial from it afterward.
+    this.world.reset(playWave0);
+    this.tutorial = this.world.mode.makeTutorial();
+
+    this.banner = null;
     this.hurt = 0;
     this.running = true;
     this.inWaveTransition = false;
     this.inCashout = false;
     this.inNightCycle = false;
     this.nightT = 0;
-    this.activeBubble = null;
-    this.puLeaving.length = 0;
-    this.input.moveDelta = 0;  // drop any stale touch-steer state
-    // Rebuild the mode + its tutorial for a fresh run.
-    this.mode = makeMode(this);
-    this.mode.reset();
-    this.tutorial = this.mode.makeTutorial();
-    this._applyModeConfig();  // apply the active mode's board size + capabilities
-    // Wave 0 (the opening tutorial wave) leans harder toward demanded colors.
-    this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
-    this.banner = null;
-    // Fresh recipe-event slate per session — drained on game over.
-    /** @type {{ unlocked: string[], mastered: string[] }} */
-    this.sessionRecipeEvents = { unlocked: [], mastered: [] };
-    this.challenges.resetSession();
 
-    this.hud.setScore(this.shop.score);
-    this._syncComboHud();
-    this.hud.setHealth(this.health / MAX_HEALTH);
-    this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
+    this._syncHud();
 
     // Onboarding hints overlay the real Wave 0 (no freeze) — only when Wave 0
     // is actually in play.
-    this.player.frozen = false;
     if (playWave0) this.tutorial.start(this);
     this._syncDayHint();
 
@@ -531,25 +435,25 @@ export class Game {
   }
 
   /**
-   * Debug: seconds-between-tips range the tip roller reads (wider/larger = rarer
-   * power-ups). @param {number} min @param {number} max
+   * Per-frame HUD pull: push live sim numbers (score, health, gauge, combo) to
+   * the HUD. Numeric HUD is a PULL from World state rather than event-driven, so
+   * the readouts stay correct through cashout / debug jumps without event churn.
    */
-  setTipGap(min, max) {
-    const lo = Math.max(0.2, min);
-    this.tipGapMin = lo;
-    this.tipGapMax = Math.max(lo, max);
+  _syncHud() {
+    this.hud.setScore(this.world.shop.score);
+    this.hud.setHealth(this.world.health / MAX_HEALTH);
+    this.hud.setGauge(this.world.waves.wave, this.world.waves.waveFraction);
+    this._syncComboHud();
   }
 
   /**
-   * Debug: relative power-up mix, aligned to PICKUP order (heart, ⚡, ❄️, 🌈).
-   * Negatives clamp to 0; a type weighted 0 never appears as a tip / breaker pick.
-   * @param {number[]} weights
+   * Push the combo readout to the HUD. In Tipping mode the readout reframes as
+   * the combo-breaker charge meter ("N / threshold"). Single seam so every combo
+   * change updates consistently.
    */
-  setPowerupWeights(weights) {
-    for (let i = 0; i < this.powerupWeights.length; i++) {
-      const v = weights[i];
-      if (Number.isFinite(v)) this.powerupWeights[i] = Math.max(0, v);
-    }
+  _syncComboHud() {
+    const target = this.world.comboBreakerEnabled ? this.world.comboBreakerThreshold : 0;
+    this.hud.setCombo(this.world.shop.combo, this.world.shop.comboFraction, target);
   }
 
   /**
@@ -575,13 +479,19 @@ export class Game {
 
   /**
    * Per-frame variable-step work (the Loop's `render`): smoothed FPS, the free
-   * clock, the between-wave night-cycle sweep, visual effects, and the draw.
+   * clock, presentation-timer decay, the between-wave night-cycle sweep, visual
+   * effects, the HUD pull, the tutorial overlay, and the draw.
    * @param {number} frame seconds since the last frame (clamped by the Loop)
    */
   _frame(frame) {
     // Smoothed FPS for the debug overlay (EMA). Guard against the first frame.
     if (frame > 0) this.fps = this.fps * 0.9 + (1 / frame) * 0.1;
     this.clock += frame;
+
+    // Presentation timers decay on the variable step (they're game-owned, not
+    // part of the deterministic sim): the "WAVE N!" banner and the hurt flash.
+    if (this.banner && (this.banner.t -= frame) <= 0) this.banner = null;
+    if (this.hurt > 0) this.hurt = Math.max(0, this.hurt - frame);
 
     // Between-wave night cycle: a fast sunset→midnight→dawn sweep (moon arcs
     // across) that plays after the overlay is dismissed; when it lands the
@@ -593,403 +503,85 @@ export class Game {
         this.inNightCycle = false;
         // The recap modal + night sweep are done — announce the wave we're now
         // entering.
-        this.banner = { text: `WAVE ${this.waves.wave}!`, t: 1.6 };
+        this.banner = { text: `WAVE ${this.world.waves.wave}!`, t: 1.6 };
       }
     }
     // Visual-only systems run variable-step — including during the cashout /
     // night-cycle freezes, so particle pops keep animating while play is paused.
     if (this._stepping() || this.inCashout || this.inNightCycle) this.effects.update(frame);
+
+    // Numeric HUD is a per-frame PULL from sim state. Then advance the
+    // presentation-only tutorial overlay + its DOM callout.
+    this._syncHud();
+    if (this.tutorial.active) this.tutorial.update(frame, this);
+    this._syncDayHint();
+
     drawFrame(this.ctx, this);
   }
 
   /** @param {number} dt */
   _step(dt) {
-    this.waves.update(dt);
-    this.powerups.update(dt);
-    if (this.banner && (this.banner.t -= dt) <= 0) this.banner = null;
-
-    const tuning = this.waves.tuning();
-    // Debug overrides win over the wave ramp; only affect spawns from here on
-    // (in-flight customers/scoops keep their values).
-    this.shop.setOrderTime(this.patienceOverride != null ? this.patienceOverride : tuning.patience);
-    if (this.spawnIntervalOverride != null) tuning.spawnInterval = this.spawnIntervalOverride;
-    this.player.update(dt, this.input, this.bounds, this.powerups.speedMultiplier);
-    if (this.hurt > 0) this.hurt = Math.max(0, this.hurt - dt);
-
-    const hitbox = this.player.catchHitbox();
-    // Missed scoops fall past the cone and dissolve down in the sand (below the
-    // ground line), so the fizzle reads as the scoop landing/melting into the
-    // floor rather than vanishing at the cone tip.
-    const missY = this.stations.groundY + SCOOP_RADIUS * 2;
-
-    // The falling field + bubbles run during the tutorial now — Wave 0 is a
-    // real, playable wave; the tutorial only overlays hints on top of it.
-    this.field.update(dt, this.bounds, tuning, missY, scoop => {
-      if (!isCaught(scoop, hitbox)) return false;
-      const perfect = Math.abs(scoop.x - hitbox.x) <= PERFECT_CATCH_BAND;
-      this._onCatch(scoop, perfect);
-      return true;
-    });
-
-    if (this.tutorial.active) this.tutorial.update(dt, this);
-    this._syncDayHint();
-
-    this._stepActive(dt);
-
-    // Patience is frozen during the tutorial so the staged customer never bails.
-    const patienceOn = this.flags.patternTimer && !this.powerups.pauseActive && !this.tutorial.active;
-    const { expired, comboLost } = this.shop.update(dt, { patienceOn });
-    if (expired > 0) this._onExpire(expired);
-    if (comboLost) this.sound.bad();
-    this._syncComboHud();
-    this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
-    // The running power-up's countdown lives in the on-canvas "active" slot at
-    // the bottom (see _drawActivePowerup).
-  }
-
-  /**
-   * Apply the mode's load-time settings (board size + combo-breaker capability).
-   * The single place mode defaults land; debug sliders can still override
-   * afterward. Called on construction and each game start.
-   */
-  _applyModeConfig() {
-    this.maxStack = this.mode.maxStack;
-    this.field.setMaxLive(this.mode.maxLive);
-    this.comboBreakerEnabled = this.mode.comboBreaker;
-  }
-
-  /**
-   * Apply a power-up's effect at (x, y): heart heals instantly and is
-   * orthogonal (never disturbs a running timed power-up); the three timed types
-   * replace whatever is running (mutual exclusion via PowerUps.trigger) and
-   * float into the active slot. Driven by tip grants + the combo breaker.
-   * @param {import('./types.js').PickupTypeName} type
-   * @param {number} x @param {number} y
-   * @param {number} [durationMult] scale the timed power-up's duration (combo
-   *   breaker passes > 1 to supercharge it). Ignored by the instant heart heal.
-   */
-  _firePower(type, x, y, durationMult = 1) {
-    // Single seam for "a power-up was used" — every source (tip, combo-breaker)
-    // flows through here, so this is the one place challenge tracking counts it.
-    this.challenges.recordPowerupUsed(type);
-    if (type === PICKUP_TYPE.HEART) {
-      if (!this.flags.invincible) {
-        this.health = Math.min(MAX_HEALTH, this.health + HEART_HEAL_AMOUNT);
-        this.hud.setHealth(this.health / MAX_HEALTH);
-      }
-      this.sound.heart();
-    } else {
-      this._activateBubble(type, x, y);
-      this.powerups.trigger(type, durationMult);
-      this.sound.powerupTrigger();
-    }
-    this.haptics.powerup();
-    this._powerupUseFx(type, x, y);
-  }
-
-  /**
-   * Use FX — type-specific burst + popText, fired at the cone when a power-up
-   * triggers on catch.
-   * @param {PickupTypeName} type
-   * @param {number} x @param {number} y
-   */
-  _powerupUseFx(type, x, y) {
-    switch (type) {
-      case PICKUP_TYPE.HEART:
-        this.effects.burst(x, y, ['#ff6fa3', '#fff', '#ffd166'], 20);
-        this.effects.popText(x, y - 10, `+${HEART_HEAL_AMOUNT} ❤`, { color: '#ff6fa3', size: 24 });
-        break;
-      case PICKUP_TYPE.FEATHER:
-        this.effects.burst(x, y, ['#bfdcff', '#fff'], 16);
-        this.effects.popText(x, y - 10, 'Speed!', { color: '#5cb8ff', size: 24 });
-        break;
-      case PICKUP_TYPE.PAUSE:
-        this.effects.burst(x, y, ['#c9b6ff', '#fff'], 16);
-        this.effects.popText(x, y - 10, 'Frozen!', { color: '#b69aff', size: 24 });
-        break;
-      case PICKUP_TYPE.RAINBOW:
-        this.effects.burst(x, y, ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'], 30);
-        this.effects.popText(x, y - 10, 'Rainbow!', { color: '#ffb703', size: 26 });
-        break;
-    }
-    this.player.triggerFlash(0.2);
-  }
-
-  /**
-   * Q/W/E/R is a debug-only cheat: synthesizes a pickup catch at the cone so
-   * testers can trigger any effect on demand. Gated on the pickupKeys flag —
-   * when it's off these keys do nothing (silently, so a player who hits them
-   * isn't punished with a "nope" beep for a binding that isn't theirs to use).
-   * @param {import('./types.js').PickupTypeName} type
-   */
-  _usePower(type) {
-    if (!this.running || this.paused) return;
-    if (!this.flags.pickupKeys) return;
-    this._firePower(type, this.player.x, this.player.stackTopY());
-  }
-
-  _onCatch(scoop, perfect) {
-    if (this.player.stack.length >= this.maxStack) {
-      this.bus.emit('trayFull', /** @type {any} */ ({}));
-      return;
-    }
-    this.player.push(scoop.color);
-
-    if (perfect) {
-      this.shop.addScore(PERFECT_CATCH_BONUS);
-      this.shop.refreshCombo();
-      this.hud.setScore(this.shop.score);
-      this._syncComboHud();
-    }
-    this.bus.emit('catch', { scoop, perfect });
-  }
-
-  /** Spit out the top scoop (discard) — the Tipping upward gesture. */
-  _discardTop() {
-    const stack = this.player.stack;
-    if (stack.length === 0) { this.sound.bad(); return; }
-    const pos = this.player.scoopPosition(stack.length - 1);
-    const color = stack[stack.length - 1].color;
-    this.player.popTop();
-    this.effects.burst(pos.x, pos.y, [this.shop.hex(color), '#fff'], 10);
-    this.sound.catch_();
+    // The tutorial freezes patience; it's presentation, so hand the sim that one
+    // boolean each step rather than letting the sim reach the tutorial.
+    this.world.tutorialActive = this.tutorial.active;
+    this.world.step(dt);
   }
 
   /** The upward gesture (swipe up / Space): the mode tosses the top scoop. */
   _pop() {
-    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
-    this.mode.onSwipeUp(this);
+    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.world.player.frozen) return;
+    this.world.pop();
   }
 
   _deliver() {
-    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.player.frozen) return;
-    const index = this.shop.customerAt(this.player.x);
+    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.world.player.frozen) return;
+    const index = this.world.shop.customerAt(this.world.player.x);
     if (index < 0) {
       this.sound.bad();
       return;
     }
-    this._serve(index);
+    this.world.serve(index);
   }
 
   /**
-   * Top-down per-scoop delivery: hand the top of the tray to the customer.
-   * If they take it, pop the top off the tray and play partial-serve FX
-   * (or full completion FX if this finished their order). If they refuse,
-   * the scoop stays put — no combo penalty, just a "nope" beep.
+   * Q/W/E/R is a debug-only cheat: fires any power-up at the cone so testers can
+   * trigger an effect on demand. Gated on the pickupKeys flag — when it's off
+   * these keys do nothing (silently, so a player who hits them isn't punished).
+   * @param {PickupTypeName} type
    */
-  _serve(index) {
-    const stack = this.player.stack;
-    if (stack.length === 0) {
-      this.bus.emit('serveFail', /** @type {any} */ ({}));
-      return;
-    }
-    const rainbow = this.powerups.rainbowActive;
-    const customer = this.shop.list[index];
-
-    // 'whole' delivery: the entire tray must equal the order; serve it in one
-    // action (every scoop flies over, the tray clears).
-    if (this.deliveryMode === DELIVERY_MODE.WHOLE) {
-      const result = this.shop.serveWhole(index, this.player.colors(), rainbow);
-      if (!result.accepted) { this.bus.emit('serveFail', /** @type {any} */ ({})); return; }
-      for (let i = 0; i < stack.length; i++) {
-        const p = this.player.scoopPosition(i);
-        customer.order.served.push({ color: stack[i].color, t: 0, srcX: p.x, srcY: p.y });
-        this.effects.burst(p.x, p.y, [this.shop.hex(stack[i].color), '#fff'], 8);
-      }
-      this.player.clearStack();
-      this._onOrderComplete(result, customer);
-      return;
-    }
-
-    // 1-at-a-time delivery ('any' or 'sequential'): hand over the top scoop.
-    const topColor = stack[stack.length - 1].color;
-    const srcPos = this.player.scoopPosition(stack.length - 1);
-
-    const result = this.shop.serveOne(index, topColor, rainbow, this.deliveryMode);
-    if (!result.accepted) {
-      this.bus.emit('serveFail', /** @type {any} */ ({}));
-      return;
-    }
-
-    // Customer took the top scoop — physically remove it from the tray and
-    // queue the flying-scoop animation on the customer's mini-cone.
-    this.player.popTop();
-    customer.order.served.push({ color: topColor, t: 0, srcX: srcPos.x, srcY: srcPos.y });
-
-    // Cone leans toward the customer's face for a brief moment — the
-    // "handing" gesture. Face center is groundY + CUSTOMER_FACE_OFFSET_PX,
-    // modulated by their slide-in offset.
-    const targetY = this.stations.groundY + CUSTOMER_FACE_OFFSET_PX + customer.yOff;
-    this.player.triggerHandoff(customer.x, targetY);
-
-    // Source burst at the cone — same family as the pop burst, so "giving"
-    // and "letting go" feel like the same kind of action.
-    this.effects.burst(srcPos.x, srcPos.y, [this.shop.hex(topColor), '#fff'], 10);
-
-    if (!result.complete) {
-      this.sound.catch_();
-      const cy = this.stations.groundY - 60;
-      this.effects.popText(customer.x, cy, '✓', { color: '#43aa8b', size: 22, life: 0.5 });
-      return;
-    }
-    this._onOrderComplete(result, customer);
-  }
-
-  /**
-   * Shared order-completion handling: heal, recipe/challenge tracking, serve
-   * FX, tip grant, and the wave-progress event. Called by every delivery mode.
-   * @param {{ gained?: number, colors?: import('./types.js').ScoopColor[], event?: string|null, tip?: (import('./types.js').PickupTypeName|'coin'|null) }} result
-   * @param {import('./types.js').Customer} customer
-   */
-  _onOrderComplete(result, customer) {
-    const { gained, colors, event } = result;
-    const cx = customer.x;
-    const cy = this.stations.groundY - 60;
-
-    const targetY = this.stations.groundY + CUSTOMER_FACE_OFFSET_PX + customer.yOff;
-    this.player.triggerHandoff(customer.x, targetY);
-
-    this.health = Math.min(MAX_HEALTH, this.health + HEAL_PER_SERVE);
-
-    // Recipe book: record the completion. Stash any first-time-unlocked
-    // or just-mastered ids for the game-over celebration overlay. Then
-    // forward to challenges so progress trackers update in real time.
-    if (colors && colors.length > 0) {
-      const ev = this.recipes.recordComplete(colors);
-      if (ev.wasNew) {
-        this.sessionRecipeEvents.unlocked.push(ev.id);
-        this.challenges.recordDiscover(ev.id);
-      }
-      if (ev.justMastered) {
-        this.sessionRecipeEvents.mastered.push(ev.id);
-        this.challenges.recordMaster(ev.id);
-      }
-    }
-    this.challenges.recordCustomerServed();
-    this.challenges.recordCombo(this.shop.combo);
-
-    // Tip-sourced modes: grant the customer's tip (coin = points, else fire it).
-    if (result.tip) this.mode.grantTip(result.tip, cx, cy);
-
-    this.bus.emit('serve', {
-      gained: gained ?? 0,
-      colors: colors ?? [],
-      combo: this.shop.combo,
-      x: cx,
-      y: cy
-    });
-
-    this.hud.setScore(this.shop.score);
-    this._syncComboHud();
-    this.hud.setHealth(this.health / MAX_HEALTH);
-    this.hud.setGauge(this.waves.wave, this.waves.waveFraction);
-
-    // Combo breaker: the serve event above already showed the combo at its
-    // peak; if that pushed the chain to the threshold, break it now into a
-    // supercharged power-up (resets the meter + re-syncs the readout). Enabled
-    // per mode (default Tipping-only) — see _applyModeConfig + the mode files.
-    // Skipped on the wave-completing serve: the wave cashes the combo out anyway,
-    // and firing here would freeze its pop-text behind the between-wave overlay.
-    if (this.comboBreakerEnabled && event !== WAVE_EVENT.WAVE_UP &&
-        this.shop.combo >= this.comboBreakerThreshold) {
-      this._fireComboBreaker(cx, cy);
-    }
-
-    if (event === WAVE_EVENT.PHASE_UP) {
-      this.bus.emit('phaseUp', /** @type {any} */ ({}));
-    } else if (event === WAVE_EVENT.WAVE_UP) {
-      this.bus.emit('waveUp', { wave: this.waves.wave });
-      // Challenge tracking: new wave reached, and per-wave counters reset
-      // (e.g. "pop X bubbles in one wave" starts over).
-      this.challenges.recordWaveReached(this.waves.wave);
-      this.challenges.recordWaveEnded();
-      // Leaving Wave 0 → restore the normal demand bias for the campaign proper.
-      if (this.waves.wave === 1) this.field.setDemandBias(SPAWN_DEMAND_BIAS);
-      // The wave just completed is (waves.wave - 1) since waves.onServed
-      // already incremented. Let the wave-up banner read, then run the
-      // cashout animation, which opens the transition overlay when it ends.
-      const completedWave = Math.max(1, (this.waves.wave || 1) - 1);
-      setTimeout(() => this._runWaveCashout(completedWave), 700);
-    }
-  }
-
-  /**
-   * Push the combo readout to the HUD. In Tipping mode the readout reframes as
-   * the combo-breaker charge meter ("N / threshold"); other modes show plain
-   * "N× combo". Single seam so every combo change updates consistently.
-   */
-  _syncComboHud() {
-    const target = this.comboBreakerEnabled ? this.comboBreakerThreshold : 0;
-    this.hud.setCombo(this.shop.combo, this.shop.comboFraction, target);
-  }
-
-  /**
-   * Combo breaker: the serve chain hit the threshold. Empty the meter and fire
-   * a SUPERCHARGED timed power-up (extended duration) as the earned payoff — a
-   * crescendo on a hot streak, not a random pop. No new verb: it discharges
-   * automatically. Gated by comboBreakerEnabled (default Tipping-only).
-   * @param {number} x @param {number} y burst origin
-   */
-  _fireComboBreaker(x, y) {
-    this.shop.breakCombo();
-    const type = this._pickSuperchargeType();
-    this._firePower(type, this.player.x, this.player.stackTopY(), COMBO_BREAKER_DURATION_MULT);
-    // Crescendo over the normal power-up FX: extra ding, shake, confetti burst.
-    this.sound.perfect();
-    this.effects.addShake(12);
-    this.effects.burst(x, y, ['#ffec5c', '#ff6fa3', '#7fe3c4', '#6a8cff', '#fff'], 36);
-    this.effects.popText(x, y - 46, '⚡ SUPERCHARGED!', { color: '#ffec5c', size: 30, life: 1.2 });
-    this._syncComboHud();
-  }
-
-  /**
-   * Pick which timed power-up the breaker supercharges — weighted by the bubble
-   * mix (debug weights for ⚡ speed / ❄️ freeze / 🌈 rainbow), uniform if unset.
-   * Heart is excluded: it heals instantly, so a duration multiplier is moot.
-   * @returns {import('./types.js').PickupTypeName}
-   */
-  _pickSuperchargeType() {
-    const w = this.powerupWeights;
-    /** @type {import('./types.js').PickupTypeName[]} */
-    const types = [PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW];
-    const weights = [w[1] || 0, w[2] || 0, w[3] || 0];
-    const total = weights.reduce((a, b) => a + b, 0);
-    if (total <= 0) return types[Math.floor(Math.random() * types.length)];
-    let r = Math.random() * total;
-    for (let i = 0; i < types.length; i++) {
-      r -= weights[i];
-      if (r <= 0) return types[i];
-    }
-    return types[types.length - 1];
+  _usePower(type) {
+    if (!this.running || this.paused) return;
+    if (!this.flags.pickupKeys) return;
+    this.world.usePower(type);
   }
 
   /**
    * Wave-end cashout. Freezes gameplay (effects keep animating) and runs a
    * payout chain: bank the combo → pop the tray stack top-to-bottom (+scoop
    * each) → pop the active bubble for show (no points) → open the
-   * wave-transition overlay.
+   * wave-transition overlay. Reaches into World models — it's a scripted
+   * presentation sequence, not part of the deterministic sim step.
    * @param {number} completedWave
    */
   _runWaveCashout(completedWave) {
     if (!this.running) return;
     this.inCashout = true;
 
-    // Clear the board: pop every scoop still falling and every bubble drifting,
-    // so the wave ends on an empty field before the night-cycle reset.
+    // Clear the board: pop every scoop still falling, so the wave ends on an
+    // empty field before the night-cycle reset.
     this._clearFieldFx();
 
     // Combo bank.
-    const combo = this.shop.bankCombo();
+    const combo = this.world.shop.bankCombo();
     if (combo > 0) {
       const gain = combo * COMBO_CASHOUT_PER;
-      this.shop.addScore(gain);
+      this.world.shop.addScore(gain);
       const c = this.hud.gaugeCenter() || { x: this.bounds.width / 2, y: this.bounds.height * 0.3 };
       this.effects.popText(c.x, c.y, `Combo ×${combo} → +${gain}`, { color: '#ff6fa3', size: 30, life: 1.3 });
       this.effects.burst(c.x, c.y, ['#ff6fa3', '#ffd166', '#fff'], 24);
       this.sound.perfect();
     }
     this._syncComboHud();
-    this.hud.setScore(this.shop.score);
 
     setTimeout(() => this._cashoutStack(completedWave), combo > 0 ? 500 : 150);
   }
@@ -997,15 +589,14 @@ export class Game {
   /** Cashout step 1: pop the tray stack top-to-bottom, then the active power-up. */
   _cashoutStack(completedWave) {
     if (!this.running) { this.inCashout = false; return; }
-    if (this.player.stack.length === 0) { this._cashoutActive(completedWave); return; }
-    const idx = this.player.stack.length - 1;
-    const pos = this.player.scoopPosition(idx);
-    const color = this.player.stack[idx].color;
-    this.player.popTop();
-    this.shop.addScore(STACK_CASHOUT_PER_SCOOP);
-    this.effects.burst(pos.x, pos.y, [this.shop.hex(color), '#fff'], 14);
+    if (this.world.player.stack.length === 0) { this._cashoutActive(completedWave); return; }
+    const idx = this.world.player.stack.length - 1;
+    const pos = this.world.player.scoopPosition(idx);
+    const color = this.world.player.stack[idx].color;
+    this.world.player.popTop();
+    this.world.shop.addScore(STACK_CASHOUT_PER_SCOOP);
+    this.effects.burst(pos.x, pos.y, [this.world.shop.hex(color), '#fff'], 14);
     this.effects.popText(pos.x, pos.y - 10, `+${STACK_CASHOUT_PER_SCOOP}`, { color: '#ffec5c', size: 20, life: 0.6 });
-    this.hud.setScore(this.shop.score);
     this.sound.catch_();
     setTimeout(() => this._cashoutStack(completedWave), 120);
   }
@@ -1020,12 +611,12 @@ export class Game {
       this.inCashout = false;
       this._beginWaveTransition(completedWave);
     };
-    if (this.activeBubble) {
-      const pos = this._activeSlotPos();
-      this.effects.burst(pos.x, pos.y, [PICKUP_RING_COLOR[this.activeBubble.type], '#fff'], 22);
+    if (this.world.activeBubble) {
+      const pos = this.world.activeSlotPos();
+      this.effects.burst(pos.x, pos.y, [PICKUP_RING_COLOR[this.world.activeBubble.type], '#fff'], 22);
       this.sound.bubblePop();
-      this.activeBubble = null;
-      this.powerups.reset();
+      this.world.activeBubble = null;
+      this.world.powerups.reset();
       setTimeout(finish, 220);
       return;
     }
@@ -1037,24 +628,24 @@ export class Game {
    * points) — the cashout already paid out the tray + combo.
    */
   _clearFieldFx() {
-    for (const s of this.field.scoops) {
+    for (const s of this.world.field.scoops) {
       if (s.dissolve !== undefined) continue;  // already fizzling out
-      this.effects.burst(s.x, s.y, [this.shop.hex(s.color), '#fff'], 10);
+      this.effects.burst(s.x, s.y, [this.world.shop.hex(s.color), '#fff'], 10);
     }
-    this.field.scoops.length = 0;
+    this.world.field.scoops.length = 0;
     this.sound.bubblePop();
   }
 
   /**
    * Between-wave reset: the night-cycle sweep that plays AFTER the wave overlay
    * is dismissed (countdown done / Play pressed), right before the next wave
-   * resumes. The _loop advances nightT and lifts the freeze when it lands;
+   * resumes. _frame advances nightT and lifts the freeze when it lands;
    * endCelebration() makes the next wave open at dawn rather than the previous
    * sunset.
    */
   _runNightCycle() {
     if (!this.running) return;
-    this.waves.endCelebration();
+    this.world.waves.endCelebration();
     this.nightT = 0;
     this.inNightCycle = true;
   }
@@ -1083,20 +674,10 @@ export class Game {
     // The countdown expired or the player hit Play — commit any earned
     // challenges, close the overlay, then run the night-cycle reset, which
     // hands off to the next wave when it finishes.
-    this.challenges.commitEarned();
+    this.world.challenges.commitEarned();
     this.inWaveTransition = false;
     this.hud.hideWaveTransition();
     this._runNightCycle();
-  }
-
-  _onExpire(count) {
-    if (!this.flags.invincible) {
-      this.health = Math.max(0, this.health - DAMAGE_PER_EXPIRE * count);
-      this.hud.setHealth(this.health / MAX_HEALTH);
-    }
-    this.bus.emit('expire', { count });
-    this._syncComboHud();
-    if (this.health <= 0) this._endGame('Out of health! 😱');
   }
 
   _endGame(title = 'Game Over') {
@@ -1111,69 +692,18 @@ export class Game {
     this.hud.setDayHint(false);
     this.sound.gameOver();
     this.haptics.gameOver();
-    this.bus.emit('gameOver', /** @type {any} */ ({}));
     // Commit any earned-but-uncommitted challenges so the game-over screen
-    // shows the player's final state. Cross-off animation on the game-over
-    // card is a future polish — for now the inline challenges just render
-    // their completed state.
-    this.challenges.commitEarned();
+    // shows the player's final state.
+    this.world.challenges.commitEarned();
     this.hud.showGameOver(
       title,
-      this.shop.score,
-      this.shop.bestCombo,
-      this.waves.wave,
+      this.world.shop.score,
+      this.world.shop.bestCombo,
+      this.world.waves.wave,
       () => this.start(),
-      this.sessionRecipeEvents
+      this.world.sessionRecipeEvents
     );
   }
-
-  /**
-   * Float a freshly-caught timed power-up UP into the active slot. If one is
-   * already running, bump it out to the left first (the replace-on-catch read).
-   * @param {PickupTypeName} type
-   * @param {number} fromX  the x the bubble launches from (the cone)
-   * @param {number} fromY  the y the bubble launches from (the stack top)
-   */
-  _activateBubble(type, fromX, fromY) {
-    if (this.activeBubble) {
-      const pos = this._activeSlotPos();
-      this.puLeaving.push({ type: this.activeBubble.type, x: pos.x, y: pos.y, r0: pos.r, t: 0 });
-    }
-    this.activeBubble = { type, fromX, fromY, anim: 0 };
-  }
-
-  /**
-   * Per-frame active-slot update: float the running power-up's bubble up and
-   * advance the slide-off-left animations. The bubble retires (slides left)
-   * once its timed power-up ends.
-   * @param {number} dt
-   */
-  _stepActive(dt) {
-    for (let i = this.puLeaving.length - 1; i >= 0; i--) {
-      this.puLeaving[i].t += dt / PU_LEAVE_S;
-      if (this.puLeaving[i].t >= 1) this.puLeaving.splice(i, 1);
-    }
-    const a = this.activeBubble;
-    if (!a) return;
-    a.anim = Math.min(1, a.anim + dt / ACTIVE_SLIDE_S);
-    if (a.anim >= 1 && !this.powerups.active(PICKUP_TO_POWER[a.type])) {
-      const pos = this._activeSlotPos();
-      this.puLeaving.push({ type: a.type, x: pos.x, y: pos.y, r0: pos.r, t: 0 });
-      this.activeBubble = null;
-    }
-  }
-
-  /**
-   * The active power-up's resting slot: horizontally centered, at the mode's
-   * activeSlotY (~25% up from the bottom). The entrance rises to screen-center
-   * before settling here.
-   * @returns {{ x: number, y: number, r: number }}
-   */
-  _activeSlotPos() {
-    // r is the RESTING radius; the entrance peaks larger (≈1.4×) at the waypoint.
-    return { x: this.bounds.width / 2, y: this.mode.activeSlotY(this.bounds), r: 40 };
-  }
-
 }
 
 new Game();

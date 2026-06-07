@@ -4,6 +4,7 @@ import { STATE } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
 
 /** @typedef {import('../../game.js').Game} Game */
+/** @typedef {import('../world.js').World} World */
 /** @typedef {import('../../types.js').PickupTypeName} PickupTypeName */
 /** @typedef {import('../../types.js').Bounds} Bounds */
 
@@ -27,7 +28,7 @@ class TippingTutorial extends TutorialBase {
 
   /** Surface the tip concept whenever a waiting customer is carrying one. @param {Game} game */
   _powerHint(game) {
-    const tipped = game.shop.list.some(c => c.state === STATE.WAITING && c.tip);
+    const tipped = game.world.shop.list.some(c => c.state === STATE.WAITING && c.tip);
     return tipped ? 'Finish a customer with a token — they tip you a reward!' : null;
   }
 }
@@ -35,14 +36,14 @@ class TippingTutorial extends TutorialBase {
 /**
  * Tipping — the game's one and only mode. Power-ups come from customer TIPS (and
  * the combo breaker): a tighter board, the combo breaker on, the upward gesture
- * tosses the top scoop, no rotate. game.js owns the shared machinery (catching,
- * serving, the active-slot visual, _firePower, the combo breaker, day/night, …)
- * and DELEGATES to this object via modes/index.js.
+ * tosses the top scoop, no rotate. World owns the shared machinery (catching,
+ * serving, the active-slot sim, firePower, the combo breaker, …) and DELEGATES to
+ * this object via modes/index.js.
  */
 export class TippingMode {
-  /** @param {Game} game */
-  constructor(game) {
-    this.game = game;
+  /** @param {World} world */
+  constructor(world) {
+    this.world = world;
   }
 
   get id() { return 'tipping'; }
@@ -58,7 +59,7 @@ export class TippingMode {
    * fixed coin share). @returns {PickupTypeName | 'coin' | null}
    */
   rollTip() {
-    const g = this.game;
+    const g = this.world;
     const avgGap = (g.tipGapMin + g.tipGapMax) / 2;
     // Tips are the only power-up source, so keep them common — a healthy share
     // of customers carry one (clamped so it never feels constant).
@@ -83,20 +84,17 @@ export class TippingMode {
    * @param {PickupTypeName | 'coin'} tip @param {number} x @param {number} y
    */
   grantTip(tip, x, y) {
-    const g = this.game;
+    const g = this.world;
     if (tip === 'coin') {
       g.shop.addScore(TIP_COIN_POINTS);
-      g.hud.setScore(g.shop.score);
-      g.effects.burst(x, y, ['#ffd700', '#fff7c0', '#fff'], 18);
-      g.effects.popText(x, y - 28, `+${TIP_COIN_POINTS}`, { color: '#ffd700', size: 24 });
-      g.sound.bubblePop();
+      g.bus.emit('coin', { x, y, points: TIP_COIN_POINTS });
     } else {
-      g._firePower(tip, g.player.x, g.player.stackTopY());
+      g.firePower(tip, g.player.x, g.player.stackTopY());
     }
   }
 
   /** Up gesture / Space: toss the top scoop (Tipping has no rotate verb). */
-  onSwipeUp() { this.game._discardTop(); }
+  onSwipeUp() { this.world.discardTop(); }
 
   /**
    * Resting Y of the on-canvas active-power-up slot — ~15% up from the bottom.

@@ -30,7 +30,8 @@ export function drawFrame(ctx, game) {
   ctx.save();
   ctx.translate(x, y);
 
-  const rainbow = game.powerups.rainbowActive;
+  const world = game.world;
+  const rainbow = world.powerups.rainbowActive;
 
   // Background: sky + sun (or the between-wave night cycle: moon + fast sky),
   // then sand on top. Everything after this draws over the floor — actors stay
@@ -41,19 +42,19 @@ export function drawFrame(ctx, game) {
     drawSand(ctx, game.bounds, nightState);
     drawOcean(ctx, game.bounds, nightState, game.clock);
   } else {
-    const dayState = dayCycleState(game.waves.waveFraction, game.bounds);
+    const dayState = dayCycleState(world.waves.waveFraction, game.bounds);
     drawSkyAndSun(ctx, game.bounds, dayState);
     drawSand(ctx, game.bounds, dayState);
     drawOcean(ctx, game.bounds, dayState, game.clock);
   }
 
-  drawField(ctx, game.field, rainbow);
-  drawPlayer(ctx, game.player, rainbow);
-  const pausePatience = game.powerups.pauseActive || !game.flags.patternTimer;
-  game.stations.draw(ctx, game.shop.list, {
-    activeIndex:    game.shop.customerAt(game.player.x),
-    canServe:       i => game.shop.canServe(i, game.player.colors(), rainbow, game.deliveryMode),
-    hex:            c => game.shop.hex(c),
+  drawField(ctx, world.field, rainbow);
+  drawPlayer(ctx, world.player, rainbow);
+  const pausePatience = world.powerups.pauseActive || !game.flags.patternTimer;
+  game.stations.draw(ctx, world.shop.list, {
+    activeIndex:    world.shop.customerAt(world.player.x),
+    canServe:       i => world.shop.canServe(i, world.player.colors(), rainbow, world.deliveryMode),
+    hex:            c => world.shop.hex(c),
     pausePatience,
     rainbow,
     time:           game.clock,
@@ -107,7 +108,7 @@ export function drawFrame(ctx, game) {
     ctx.font = "bold 20px 'Consolas', monospace";
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    const label = `${Math.round(game.fps)} fps  scoops:${game.field.scoops.length}`;
+    const label = `${Math.round(game.fps)} fps  scoops:${game.world.field.scoops.length}`;
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0,0,0,0.6)';
     ctx.strokeText(label, 12, 12);
@@ -121,26 +122,27 @@ export function drawFrame(ctx, game) {
  * Active power-up indicator (screen-space): a single bubble showing the running
  * timed power-up with its countdown ring. Idle → nothing. A finished / replaced
  * bubble slides off LEFT. The entrance lobs up to a waypoint then settles into
- * the resting slot (game._activeSlotPos) while shrinking.
+ * the resting slot (game.world.activeSlotPos) while shrinking.
  * @param {CanvasRenderingContext2D} ctx @param {Game} game
  */
 function drawActivePowerup(ctx, game) {
-  if (!game.activeBubble && game.puLeaving.length === 0) return;
-  const aslot = game._activeSlotPos();
+  const world = game.world;
+  if (!world.activeBubble && world.puLeaving.length === 0) return;
+  const aslot = world.activeSlotPos();
 
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   // Bubbles sliding off to the left (finished / replaced).
-  for (const lv of game.puLeaving) {
+  for (const lv of world.puLeaving) {
     ctx.globalAlpha = 1 - lv.t;
     drawPowerupBubble(ctx, lv.x - lv.t * 70, lv.y, lv.r0 * (1 - 0.5 * lv.t), lv.type, false, -1);
   }
   ctx.globalAlpha = 1;
 
-  if (game.activeBubble) {
-    const a = game.activeBubble;
+  if (world.activeBubble) {
+    const a = world.activeBubble;
     const cx = aslot.x;
     const restY = aslot.y;                              // final rest
     const midY = restY - game.bounds.height * 0.10;     // pause waypoint
@@ -166,7 +168,7 @@ function drawActivePowerup(ctx, game) {
     }
     const pulse = 1 + 0.08 * Math.sin(game.clock * 6);
     const radius = aslot.r * grow * pulse;
-    const frac = game.powerups.fraction(PICKUP_TO_POWER[a.type]);
+    const frac = world.powerups.fraction(PICKUP_TO_POWER[a.type]);
     drawPowerupBubble(ctx, bx, by, radius, a.type, true, frac);
   }
   ctx.restore();
@@ -214,12 +216,13 @@ function drawPowerupBubble(ctx, x, y, radius, type, glow, ringFrac) {
  * @param {CanvasRenderingContext2D} ctx @param {Game} game
  */
 function drawHitboxes(ctx, game) {
+  const world = game.world;
   ctx.save();
   ctx.lineWidth = 2;
   ctx.strokeStyle = '#ff2d2d';
 
   // Falling scoops — collision circle (skip dissolving ones; uncatchable).
-  for (const s of game.field.scoops) {
+  for (const s of world.field.scoops) {
     if (s.dissolve !== undefined) continue;
     ctx.beginPath();
     ctx.arc(s.x, s.y, SCOOP_RADIUS, 0, Math.PI * 2);
@@ -227,7 +230,7 @@ function drawHitboxes(ctx, game) {
   }
 
   // Cone: catch hitbox (solid AABB).
-  const cb = game.player.catchHitbox();
+  const cb = world.player.catchHitbox();
   ctx.strokeRect(cb.x - cb.halfW, cb.y - cb.r, cb.halfW * 2, cb.r * 2);
 
   // Miss / dissolve line.
@@ -240,7 +243,7 @@ function drawHitboxes(ctx, game) {
 
   // Customers: face box + serve-reach band (serve test is x-distance only).
   const groundY = game.stations.groundY;
-  for (const c of game.shop.list) {
+  for (const c of world.shop.list) {
     const faceY = groundY + CUSTOMER_FACE_OFFSET_PX + c.yOff;
     ctx.strokeStyle = '#ff2d2d';
     ctx.strokeRect(c.x - 46, faceY - 46, 92, 92);
