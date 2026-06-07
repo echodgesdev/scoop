@@ -7,6 +7,7 @@ import {
   HANDOFF_DURATION_S
 } from '../game/config.js';
 import { LAND_TIME, SLOSH_HIST } from '../game/player.js';
+import { scoopSheet, SCOOP_STATE, drawScoopSprite } from './sprites.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../game/player.js').Player} Player */
@@ -58,12 +59,14 @@ export function drawPlayer(ctx, player, rainbow = false) {
     const laggedLean = player._sloshHist[(player._sloshHead - lag + SLOSH_HIST) % SLOSH_HIST];
     drawX += laggedLean * arc;
 
-    drawScoop(ctx, drawX, drawY, rainbow ? 'rainbow' : s.color, drawScale);
+    const isTop = i === stack.length - 1;
+    const state = isTop ? SCOOP_STATE.CONE_TOP : SCOOP_STATE.CONE;
+    drawScoop(ctx, drawX, drawY, rainbow ? 'rainbow' : s.color, drawScale, state);
 
-    // Highlight the top scoop — the one a tap hands to the customer — with the
-    // same amber outline + glow as the "selected" customer speech bubble, so the
-    // "I'm giving you this" read is unmistakable.
-    if (i === stack.length - 1) {
+    // The Cone-Top sprite frame is the "deliver me next" highlight. Keep the
+    // amber ring only as a fallback — when the sheet hasn't loaded, or under the
+    // rainbow power-up (which uses the procedural circle, with no per-state art).
+    if (isTop && (!scoopSheet.ready || rainbow)) {
       drawTopRing(ctx, drawX, drawY, SCOOP_RADIUS * drawScale);
     }
   }
@@ -111,15 +114,20 @@ function drawCone(ctx, player) {
 }
 
 /**
- * One scoop: filled circle (or rainbow gradient) + dark stroke + sparkle. Shared
- * by the tray, the customer mini-cones (stations), and anywhere a scoop renders.
+ * One scoop: the sheet sprite for its flavor + state, or a procedural circle
+ * fallback (also used for the rainbow power-up). Shared by the tray, the customer
+ * mini-cones (stations), the falling field, and anywhere a scoop renders.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x @param {number} y
  * @param {ScoopColor | 'rainbow'} colorKey
  * @param {number} [scale]
+ * @param {number | string} [state] one of SCOOP_STATE (sprite row); ignored by the circle
  */
-export function drawScoop(ctx, x, y, colorKey, scale = 1) {
+export function drawScoop(ctx, x, y, colorKey, scale = 1, state = SCOOP_STATE.CONE) {
   const r = SCOOP_RADIUS * scale;
+  // Sheet sprite for this flavor + state when it's loaded; the procedural circle
+  // below is the fallback (and handles the rainbow power-up, which has no art).
+  if (colorKey !== 'rainbow' && drawScoopSprite(ctx, x, y, r, colorKey, state)) return;
   ctx.save();
   if (colorKey === 'rainbow') {
     const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);

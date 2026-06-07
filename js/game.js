@@ -149,6 +149,10 @@ export class Game {
     this.nightT = 0;
     // Dedicated "Esc" pause menu — separate from the debug-panel pause.
     this.inPauseMenu = false;
+    // Set once the game-over panel is up. Stepping is dead, but effects keep
+    // updating so the death shake tapers off instead of jittering forever (the
+    // loop keeps rendering the ambient scene behind the panel).
+    this.inGameOver = false;
     /** @type {{ text: string, t: number } | null} */
     this.banner = null;
     this.hurt = 0;
@@ -390,6 +394,7 @@ export class Game {
     this.inWaveTransition = false;
     this.inCashout = false;
     this.inNightCycle = false;
+    this.inGameOver = false;
     this.nightT = 0;
 
     this._syncHud();
@@ -507,8 +512,9 @@ export class Game {
       }
     }
     // Visual-only systems run variable-step — including during the cashout /
-    // night-cycle freezes, so particle pops keep animating while play is paused.
-    if (this._stepping() || this.inCashout || this.inNightCycle) this.effects.update(frame);
+    // night-cycle freezes, so particle pops keep animating while play is paused,
+    // and during game over so the death shake gently tapers out under the panel.
+    if (this._stepping() || this.inCashout || this.inNightCycle || this.inGameOver) this.effects.update(frame);
 
     // Numeric HUD is a per-frame PULL from sim state. Then advance the
     // presentation-only tutorial overlay + its DOM callout.
@@ -688,6 +694,7 @@ export class Game {
     this.inWaveTransition = false;
     this.inCashout = false;
     this.inNightCycle = false;
+    this.inGameOver = true;
     this._dayHintShown = false;
     this.hud.setDayHint(false);
     this.sound.gameOver();

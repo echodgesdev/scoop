@@ -25,7 +25,7 @@ export const COLOR_KEYS = /** @type {ScoopColor[]} */ (Object.keys(COLORS));
 
 // === Geometry / layout ========================================================
 export const SCOOP_RADIUS = 28;
-export const SCOOP_SPACING = SCOOP_RADIUS * 1.6;
+export const SCOOP_SPACING = SCOOP_RADIUS * .95;
 
 export const CONE_WIDTH = 90;
 export const CONE_HEIGHT = 110;

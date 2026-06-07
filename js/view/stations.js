@@ -1,6 +1,7 @@
 // @ts-check
 import { STATE } from '../game/shop.js';
 import { drawScoop } from './playerView.js';
+import { SCOOP_STATE } from './sprites.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
   SCOOP_RADIUS,
@@ -229,7 +230,7 @@ export class Stations {
       // tray's land animation.
       const squash = t > 0.85 ? 1 + 0.35 * (1 - (t - 0.85) / 0.15) : 1;
 
-      drawScoop(ctx, x, y, s.color, scale * squash);
+      drawScoop(ctx, x, y, s.color, scale * squash, SCOOP_STATE.CONE);
     }
   }
 

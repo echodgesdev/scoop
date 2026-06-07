@@ -1,6 +1,7 @@
 // @ts-check
 import { SCOOP_RADIUS, SCOOP_DISSOLVE_S } from '../game/config.js';
 import { drawScoop } from './playerView.js';
+import { SCOOP_STATE } from './sprites.js';
 
 /** @typedef {import('../game/scoops.js').ScoopField} ScoopField */
 
@@ -15,13 +16,13 @@ import { drawScoop } from './playerView.js';
 export function drawField(ctx, field, rainbow = false) {
   for (const s of field.scoops) {
     if (s.dissolve === undefined) {
-      drawScoop(ctx, s.x, s.y, rainbow ? 'rainbow' : s.color);
+      drawScoop(ctx, s.x, s.y, rainbow ? 'rainbow' : s.color, 1, SCOOP_STATE.DEFAULT);
       continue;
     }
     const p = Math.min(1, s.dissolve / SCOOP_DISSOLVE_S);
     ctx.save();
     ctx.globalAlpha = 1 - p;
-    drawScoop(ctx, s.x, s.y, rainbow ? 'rainbow' : s.color, 1 - 0.4 * p);
+    drawScoop(ctx, s.x, s.y, rainbow ? 'rainbow' : s.color, 1 - 0.4 * p, SCOOP_STATE.DEFAULT);
     ctx.globalAlpha = (1 - p) * 0.6;
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.lineWidth = 2;
