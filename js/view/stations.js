@@ -2,6 +2,8 @@
 import { STATE } from '../game/shop.js';
 import { drawScoop } from './playerView.js';
 import { SCOOP_STATE } from './sprites.js';
+import { SpriteSheet } from './spriteSheet.js';
+import FACE_SPRITE from './sprites/faceSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
   SCOOP_RADIUS,
@@ -18,7 +20,9 @@ import {
 // Customers are now scaled to read at parity with the cone (face ≈ cone width,
 // bigger than a falling scoop) so the serve half holds visual weight equal to
 // the fall half. Bubble + mini-cone assets scale with the face.
-const FACE_SIZE = 92;
+// Faces render at the sprite's native frame size (not a hand-set knob); this is
+// also the reference the tip badge + speech bubble sit relative to.
+const FACE_SIZE = FACE_SPRITE.frame.height;
 const BUBBLE_H = 96;
 const GAP = 18;          // between face and bubble
 const POP_TIME = 0.16;   // bubble scale-in duration
@@ -35,15 +39,29 @@ function bubbleWidthFor(orderLen) {
 
 const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'];
 
+// Customer face sprite sheet (replaces the emoji faces). Frame indices:
+const FACE = Object.freeze({ DEFAULT: 0, HUNGRY: 1, UPSET: 2, ANGRY: 3, DROOL: 4, FROZEN: 5 });
+// Emoji fallback by frame index, used until the sheet image loads.
+const FACE_EMOJI = ['🙂', '😋', '😟', '😠', '🤤', '🥶'];
+const faceSheet = new SpriteSheet({
+  ...FACE_SPRITE,
+  image: 'assets/' + String(FACE_SPRITE.image || '').split(/[\\/]/).pop()
+});
+
+/**
+ * The customer's face frame index for its state + patience. As patience drains
+ * the sequence is 0,1,0,2,3 (Default → Hungry → Default → Upset → Angry), with
+ * Drool (4) while servable and Frozen (5) while the pause power-up holds it.
+ */
 function faceFor(customer, patience, servable, pausePatience) {
-  if (customer.state === STATE.LEAVING) return customer.mood === 'happy' ? '😄' : '😠';
-  if (customer.state !== STATE.WAITING) return '🙂'; // arriving / delay
-  if (pausePatience) return '🥶';  // patience frozen by power-up or debug flag
-  if (servable) return '🤤';
-  if (patience > 0.6) return '😋';
-  if (patience > 0.35) return '🙂';
-  if (patience > 0.15) return '😟';
-  return '😠';
+  if (customer.state === STATE.LEAVING) return customer.mood === 'happy' ? FACE.HUNGRY : FACE.ANGRY;
+  if (customer.state !== STATE.WAITING) return FACE.DEFAULT;  // arriving / delay
+  if (pausePatience) return FACE.FROZEN;                       // frozen power-up / debug
+  if (servable) return FACE.DROOL;
+  if (patience > 0.6) return FACE.HUNGRY;
+  if (patience > 0.35) return FACE.DEFAULT;
+  if (patience > 0.15) return FACE.UPSET;
+  return FACE.ANGRY;
 }
 
 function easeOut(t) {
@@ -82,10 +100,15 @@ export class Stations {
         this._drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, hex, rainbow });
       }
 
-      ctx.font = `${FACE_SIZE}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(faceFor(c, patience, servable, pausePatience), cx, faceY);
+      // Face sprite at its native size (scale 1); falls back to the emoji until
+      // the sheet image loads.
+      const faceIdx = faceFor(c, patience, servable, pausePatience);
+      if (!faceSheet.draw(ctx, 0, faceIdx, cx, faceY, 1)) {
+        ctx.font = `${FACE_SIZE}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(FACE_EMOJI[faceIdx] || '🙂', cx, faceY);
+      }
 
       // Tipping mode: a token by the face showing the reward this customer will
       // tip on a completed order (until they leave).
