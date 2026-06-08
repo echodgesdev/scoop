@@ -1,7 +1,7 @@
 // @ts-check
 import { SCOOP_RADIUS, SCOOP_DISSOLVE_S } from '../game/config.js';
 import { drawScoop } from './playerView.js';
-import { SCOOP_STATE } from './sprites.js';
+import { SCOOP_STATE, drawFallingScoop } from './sprites.js';
 
 /** @typedef {import('../game/scoops.js').ScoopField} ScoopField */
 
@@ -16,7 +16,8 @@ import { SCOOP_STATE } from './sprites.js';
 export function drawField(ctx, field, rainbow = false) {
   for (const s of field.scoops) {
     if (s.dissolve === undefined) {
-      drawScoop(ctx, s.x, s.y, rainbow ? 'rainbow' : s.color, 1, SCOOP_STATE.DEFAULT);
+      // Live scoop: the look (and any speed-flair) follows its fall speed.
+      drawFallingScoop(ctx, s.x, s.y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color, s.speedMult);
       continue;
     }
     const p = Math.min(1, s.dissolve / SCOOP_DISSOLVE_S);

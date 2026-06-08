@@ -75,12 +75,12 @@
 <header>
   <h1>🍦 Sprite ⇄ Body Editor</h1>
   <div>
-    <label>Image (in this folder)</label>
-    <select id="imgSelect"></select>
+    <label>Load image</label>
+    <input type="file" id="fileInput" accept="image/*" />
   </div>
   <div>
-    <label>…or load from disk</label>
-    <input type="file" id="fileInput" accept="image/*" />
+    <label>Load JSON (resume a session)</label>
+    <input type="file" id="jsonInput" accept="application/json,.json" />
   </div>
   <span id="imgInfo" class="mini"></span>
   <div class="spacer"></div>
@@ -212,13 +212,6 @@
 </main>
 
 <script>
-// ===========================================================================
-// Images that live in this folder. A static page can't list a directory, so
-// add new filenames here — OR use the "load from disk" picker (works with
-// anything; loaded files get added to the dropdown for the session).
-// ===========================================================================
-const FOLDER_IMAGES = ['scoop_sample.png'];
-
 const $ = id => document.getElementById(id);
 const preview = $('preview');
 const pctx = preview.getContext('2d');
@@ -252,15 +245,9 @@ const ca = () => state.animations[state.anim];               // current animatio
 const cf = () => { const a = ca(); return a ? a.frames[state.frame] : undefined; }; // current frame
 
 // --- image loading ---------------------------------------------------------
-function populateDropdown() {
-  const sel = $('imgSelect');
-  sel.innerHTML = '';
-  for (const name of FOLDER_IMAGES) {
-    const o = document.createElement('option');
-    o.value = name; o.textContent = name; sel.appendChild(o);
-  }
-}
-
+// Attaches an image to the current session. If frames already exist (e.g. just
+// restored from a JSON session), the data is KEPT and the image is dropped in
+// underneath; otherwise a fresh single-frame default is created.
 function loadImage(src, name) {
   const img = new Image();
   img.onload = () => {
@@ -268,11 +255,13 @@ function loadImage(src, name) {
     state.imageName = name;
     state.imgW = img.naturalWidth;
     state.imgH = img.naturalHeight;
-    // Default: whole image as the viewport, one animation with one frame.
-    state.viewport = { w: img.naturalWidth, h: img.naturalHeight };
-    state.animations = [newAnim('anim 0', [newFrame(0, 0, defaultBody(img.naturalWidth, img.naturalHeight), { x: 0, y: 0 })])];
-    state.anim = 0; state.frame = 0;
-    state.zoom = Math.max(0.5, Math.min(16, Math.round(440 / Math.max(img.naturalWidth, img.naturalHeight))));
+    if (state.animations.length === 0) {
+      // Fresh project: whole image as the viewport, one animation with one frame.
+      state.viewport = { w: img.naturalWidth, h: img.naturalHeight };
+      state.animations = [newAnim('anim 0', [newFrame(0, 0, defaultBody(img.naturalWidth, img.naturalHeight), { x: 0, y: 0 })])];
+      state.anim = 0; state.frame = 0;
+    }
+    fitZoom();
     $('imgInfo').textContent = `${name} — ${img.naturalWidth}×${img.naturalHeight}px`;
     renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
   };
@@ -280,21 +269,68 @@ function loadImage(src, name) {
   img.src = src;
 }
 
-$('imgSelect').addEventListener('change', e => loadImage(e.target.value, e.target.value));
+// Zoom so the current cell (viewport) fills the preview comfortably.
+function fitZoom() {
+  const m = Math.max(1, state.viewport.w, state.viewport.h);
+  state.zoom = Math.max(0.5, Math.min(16, Math.round(440 / m)));
+}
+
 $('fileInput').addEventListener('change', e => {
   const f = e.target.files[0];
-  if (!f) return;
-  if (!FOLDER_IMAGES.includes(f.name)) { FOLDER_IMAGES.push(f.name); populateDropdown(); }
-  loadImage(URL.createObjectURL(f), f.name);
+  if (f) loadImage(URL.createObjectURL(f), f.name);
 });
 preview.addEventListener('dragover', e => e.preventDefault());
 preview.addEventListener('drop', e => {
   e.preventDefault();
   const f = e.dataTransfer.files[0];
-  if (f && f.type.startsWith('image/')) {
-    if (!FOLDER_IMAGES.includes(f.name)) { FOLDER_IMAGES.push(f.name); populateDropdown(); }
-    loadImage(URL.createObjectURL(f), f.name);
+  if (f && f.type.startsWith('image/')) loadImage(URL.createObjectURL(f), f.name);
+});
+
+// --- JSON session loading ---------------------------------------------------
+// Restore a previous session from an exported JSON. The data (viewport, frames,
+// bodies, offsets) comes back immediately; the image itself can't be auto-loaded
+// from a path, so load the matching image after (it attaches without wiping this).
+function bodyIn(b) {
+  // Exported body (circle / rect / null) → internal shape that carries every
+  // field, so the inputs can always read them.
+  if (!b) return { shape: 'none', x: 0, y: 0, radius: 0, width: 0, height: 0 };
+  return {
+    shape: b.shape || 'circle',
+    x: b.x || 0, y: b.y || 0,
+    radius: b.radius != null ? b.radius : 0,
+    width: b.width != null ? b.width : 0,
+    height: b.height != null ? b.height : 0
+  };
+}
+function loadJSON(def) {
+  if (!def || !def.frame || !Array.isArray(def.animations)) {
+    $('imgInfo').textContent = '⚠ not a sprite-sheet JSON';
+    return;
   }
+  state.imageName = def.image || state.imageName;
+  if (def.imageSize) { state.imgW = def.imageSize.width; state.imgH = def.imageSize.height; }
+  state.viewport = { w: def.frame.width, h: def.frame.height };
+  state.animations = def.animations.map(a => newAnim(
+    a.name,
+    (a.frames || []).map(f => newFrame(f.x || 0, f.y || 0, bodyIn(f.body), f.offset || { x: 0, y: 0 }))
+  ));
+  if (state.animations.length === 0) state.animations = [newAnim('anim 0', [])];
+  state.anim = 0; state.frame = 0;
+  fitZoom();
+  $('imgInfo').textContent = state.img
+    ? `${state.imageName || 'session'} — restored (${state.animations.length} anim)`
+    : `session restored — now load ${state.imageName || 'the image'} to preview`;
+  renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
+}
+$('jsonInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { loadJSON(JSON.parse(String(reader.result))); }
+    catch (err) { $('imgInfo').textContent = '⚠ JSON parse error'; }
+  };
+  reader.readAsText(f);
 });
 
 // --- inputs ↔ state --------------------------------------------------------
@@ -556,11 +592,10 @@ document.querySelectorAll('main section').forEach(sec => {
 });
 
 // --- boot ------------------------------------------------------------------
-populateDropdown();
 renderAnims();
 renderFrames();
 syncInputs();
-if (FOLDER_IMAGES.length) loadImage(FOLDER_IMAGES[0], FOLDER_IMAGES[0]);
+render();
 </script>
 </body>
 </html>

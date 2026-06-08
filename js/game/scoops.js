@@ -152,10 +152,14 @@ export class ScoopField {
     const color = this.upcoming.shift();
     if (!color) return;
     this._refill();
+    // Effective fall multiplier over the default (1.0): the wave ramp × the debug
+    // fall-speed knob. Stamped on the scoop so the view can pick its sprite tier.
+    const speedMult = fallMult * this.fallScale;
     this.scoops.push({
       x: Math.random() * (bounds.width - 80) + 40,
       y: -SCOOP_RADIUS,
-      vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * fallMult * this.fallScale,
+      vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * speedMult,
+      speedMult,
       color
     });
   }

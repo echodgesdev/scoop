@@ -63,10 +63,9 @@ export function drawPlayer(ctx, player, rainbow = false) {
     const state = isTop ? SCOOP_STATE.CONE_TOP : SCOOP_STATE.CONE;
     drawScoop(ctx, drawX, drawY, rainbow ? 'rainbow' : s.color, drawScale, state);
 
-    // The Cone-Top sprite frame is the "deliver me next" highlight. Keep the
-    // amber ring only as a fallback — when the sheet hasn't loaded, or under the
-    // rainbow power-up (which uses the procedural circle, with no per-state art).
-    if (isTop && (!scoopSheet.ready || rainbow)) {
+    // The Scoop-Top sprite frame is the "deliver me next" highlight. Keep the
+    // amber ring only as a fallback for when the sheet hasn't loaded.
+    if (isTop && !scoopSheet.ready) {
       drawTopRing(ctx, drawX, drawY, SCOOP_RADIUS * drawScale);
     }
   }
@@ -125,9 +124,9 @@ function drawCone(ctx, player) {
  */
 export function drawScoop(ctx, x, y, colorKey, scale = 1, state = SCOOP_STATE.CONE) {
   const r = SCOOP_RADIUS * scale;
-  // Sheet sprite for this flavor + state when it's loaded; the procedural circle
-  // below is the fallback (and handles the rainbow power-up, which has no art).
-  if (colorKey !== 'rainbow' && drawScoopSprite(ctx, x, y, r, colorKey, state)) return;
+  // Sheet sprite for this flavor + state (rainbow is now its own column) when the
+  // sheet's loaded; the procedural circle below is the fallback.
+  if (drawScoopSprite(ctx, x, y, r, colorKey, state)) return;
   ctx.save();
   if (colorKey === 'rainbow') {
     const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);

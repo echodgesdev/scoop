@@ -24,7 +24,10 @@ export const COLORS = Object.freeze({
 export const COLOR_KEYS = /** @type {ScoopColor[]} */ (Object.keys(COLORS));
 
 // === Geometry / layout ========================================================
-export const SCOOP_RADIUS = 28;
+// Matched to the scoop sheet's body radius (view/sprites.js → BODY_R = 35) so the
+// sprite renders 1:1 — the draw scale is SCOOP_RADIUS / body.radius, which is 1
+// when they're equal. If the sheet's body radius changes, keep this in step.
+export const SCOOP_RADIUS = 35;
 export const SCOOP_SPACING = SCOOP_RADIUS * .95;
 
 export const CONE_WIDTH = 90;
