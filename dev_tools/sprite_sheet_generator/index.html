@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sprite ⇄ Body Editor — Scoop</title>
+<style>
+  :root {
+    --bg: #14141c; --panel: #1e1e2a; --panel2: #262633; --line: #34344a;
+    --ink: #e8e8f0; --muted: #9a9ab0; --accent: #ffb703; --accent2: #5cd8ff;
+    --good: #43d6a0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font: 14px/1.45 system-ui, sans-serif; background: var(--bg); color: var(--ink);
+    display: grid; grid-template-rows: auto 1fr; height: 100vh;
+  }
+  header {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; letter-spacing: .3px; }
+  header .spacer { flex: 1; }
+  main { display: grid; grid-template-columns: 330px 1fr 340px; min-height: 0; }
+  .col { overflow: auto; padding: 14px; }
+  .col.mid { display: grid; grid-template-rows: auto 1fr auto; background: #0e0e16; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 0 0 10px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .row > div { flex: 1; }
+  input, select, button { font: inherit; color: var(--ink); }
+  input[type=number], input[type=text], select {
+    width: 100%; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+  }
+  input[type=range] { width: 100%; }
+  button {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 7px 11px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent2); }
+  button.primary { background: var(--accent); color: #1a1208; border: none; font-weight: 700; }
+  button.primary:hover { filter: brightness(1.08); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; background: var(--panel2); }
+  .seg button.on { background: var(--accent2); color: #06222c; font-weight: 700; }
+  canvas { background:
+      repeating-conic-gradient(#1a1a26 0% 25%, #20202e 0% 50%) 50% / 24px 24px;
+    border-radius: 8px; display: block; width: 100%; touch-action: none; cursor: crosshair; }
+  .preview-wrap { display: grid; place-items: center; padding: 16px; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+  .list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow: auto; }
+  .lrow { display: flex; gap: 6px; align-items: center; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
+  .lrow.sel { border-color: var(--accent); }
+  .lrow input[type=number] { width: 60px; padding: 3px 5px; }
+  .lrow input[type=text] { flex: 1; min-width: 60px; padding: 3px 6px; }
+  .lrow .ix { width: 20px; color: var(--muted); text-align: right; flex: 0 0 auto; }
+  .lrow button { padding: 3px 7px; flex: 0 0 auto; }
+  .mini { font-size: 11px; color: var(--muted); }
+  textarea {
+    width: 100%; height: 100%; min-height: 200px; resize: none; background: #0c0c14; color: #cfe9ff;
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px; font: 12px/1.4 ui-monospace, monospace;
+  }
+  .legend { font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .legend b { color: var(--ink); }
+  .swatch-circle { color: var(--accent); } .swatch-anchor { color: var(--accent2); }
+  /* collapsible accordion sections (toggle wired up in JS) */
+  main section > h2 { cursor: pointer; user-select: none; }
+  main section > h2::before { content: '▾'; display: inline-block; width: 14px; font-size: 10px; color: var(--muted); }
+  main section.collapsed > h2::before { content: '▸'; }
+  main section.collapsed > h2 { margin-bottom: 0; }
+  main section.collapsed > .acc-body { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🍦 Sprite ⇄ Body Editor</h1>
+  <div>
+    <label>Image (in this folder)</label>
+    <select id="imgSelect"></select>
+  </div>
+  <div>
+    <label>…or load from disk</label>
+    <input type="file" id="fileInput" accept="image/*" />
+  </div>
+  <span id="imgInfo" class="mini"></span>
+  <div class="spacer"></div>
+  <button class="primary" id="exportBtn">Export JSON ▾</button>
+</header>
+
+<main>
+  <!-- LEFT: sheet / animations / frames -->
+  <div class="col">
+    <section>
+      <h2>Viewport (frame size)</h2>
+      <div class="row">
+        <div><label>Width</label><input type="number" id="vpW" min="1" /></div>
+        <div><label>Height</label><input type="number" id="vpH" min="1" /></div>
+      </div>
+      <button id="vpReset">Reset to image size</button>
+      <p class="hint">The slice of the image rendered per frame. Defaults to the full image.</p>
+    </section>
+
+    <section>
+      <h2>Sprite sheet → animations</h2>
+      <div class="row">
+        <div><label>Columns (frames/row)</label><input type="number" id="gCols" min="1" value="1" /></div>
+        <div><label>Rows (animations)</label><input type="number" id="gRows" min="1" value="1" /></div>
+      </div>
+      <div class="row">
+        <div><label>Margin X / Y</label>
+          <div class="row" style="margin:0"><input type="number" id="gMx" value="0" /><input type="number" id="gMy" value="0" /></div>
+        </div>
+        <div><label>Spacing X / Y</label>
+          <div class="row" style="margin:0"><input type="number" id="gSx" value="0" /><input type="number" id="gSy" value="0" /></div>
+        </div>
+      </div>
+      <button id="gGen">Generate — each row → an animation</button>
+      <p class="hint">Splits the sheet into one animation per row, each holding “columns” frames.</p>
+    </section>
+
+    <section>
+      <h2>Animations</h2>
+      <div class="list" id="animList"></div>
+      <button id="addAnim" style="margin-top:6px">+ Add animation</button>
+      <p class="hint">Each animation is <b>{ name, frames[] }</b> — reference by name or index.</p>
+    </section>
+
+    <section>
+      <h2>Frames · <span id="frameAnimTag" class="swatch-circle">—</span></h2>
+      <div class="row" style="align-items:flex-end;">
+        <div style="flex:0 0 auto">
+          <label>Preview frame</label>
+          <div class="seg"><button id="framePrev">◀</button><button id="frameNext">▶</button></div>
+        </div>
+        <div class="mini" id="frameLabel" style="text-align:right"></div>
+      </div>
+      <label style="margin-top:10px">Frames (top-left in sheet)</label>
+      <div class="list" id="framesList"></div>
+      <button id="addFrame" style="margin-top:6px">+ Add frame</button>
+    </section>
+  </div>
+
+  <!-- MIDDLE: preview -->
+  <div class="col mid">
+    <div class="row" style="padding:10px 12px 0; margin:0;">
+      <div style="flex:0 0 auto" class="mini">Drag in canvas to move:</div>
+      <div class="seg" id="dragSeg">
+        <button data-t="body" class="on">Body</button>
+        <button data-t="offset">Sprite</button>
+      </div>
+      <div class="spacer"></div>
+      <div style="flex:0 0 160px">
+        <label>Zoom <span id="zoomLabel" class="mini"></span></label>
+        <input type="range" id="zoom" min="0.5" max="20" step="0.5" />
+      </div>
+    </div>
+    <div class="preview-wrap"><canvas id="preview" width="560" height="560"></canvas></div>
+    <div style="padding:0 14px 14px">
+      <p class="legend">
+        <span class="swatch-anchor">✛ anchor</span> = the world origin the engine positions. &nbsp;
+        <span class="swatch-circle">▢ body</span> = rigid body (per frame; <b>None</b> = no collision). &nbsp;
+        <b>offset</b> = sprite center vs. anchor; <b>body x/y</b> = body center vs. anchor.
+      </p>
+    </div>
+  </div>
+
+  <!-- RIGHT: body / offset / export -->
+  <div class="col">
+    <section>
+      <h2>Rigid body · <span id="bodyFrameTag" class="swatch-circle">—</span></h2>
+      <label>Shape</label>
+      <select id="bodyShape">
+        <option value="circle">Circle</option>
+        <option value="rect">Rectangle</option>
+        <option value="none">None (no body)</option>
+      </select>
+      <div class="row" style="margin-top:8px" id="bodyPos">
+        <div><label>Center X</label><input type="number" id="bodyX" step="0.5" /></div>
+        <div><label>Center Y</label><input type="number" id="bodyY" step="0.5" /></div>
+      </div>
+      <div id="sizeCircle">
+        <label>Radius</label><input type="number" id="bodyR" min="0" step="0.5" />
+      </div>
+      <div id="sizeRect" style="display:none">
+        <div class="row">
+          <div><label>Width</label><input type="number" id="bodyW" min="0" step="0.5" /></div>
+          <div><label>Height</label><input type="number" id="bodyH" min="0" step="0.5" /></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Sprite offset · <span id="offFrameTag" class="swatch-circle">—</span></h2>
+      <div class="row">
+        <div><label>Offset X</label><input type="number" id="offX" step="0.5" /></div>
+        <div><label>Offset Y</label><input type="number" id="offY" step="0.5" /></div>
+      </div>
+      <p class="hint">Sprite center relative to the anchor. (0,0) = centered on the anchor.</p>
+      <button id="applyAll">Apply body + offset to every frame</button>
+      <p class="hint">Body &amp; offset are <b>per&nbsp;frame</b>. New / grid frames inherit the current frame's.</p>
+    </section>
+
+    <section>
+      <h2>Export</h2>
+      <div class="row">
+        <button id="copyBtn">Copy</button>
+        <button id="downloadBtn">Download .json</button>
+      </div>
+      <textarea id="jsonOut" spellcheck="false" readonly></textarea>
+    </section>
+  </div>
+</main>
+
+<script>
+// ===========================================================================
+// Images that live in this folder. A static page can't list a directory, so
+// add new filenames here — OR use the "load from disk" picker (works with
+// anything; loaded files get added to the dropdown for the session).
+// ===========================================================================
+const FOLDER_IMAGES = ['scoop_sample.png'];
+
+const $ = id => document.getElementById(id);
+const preview = $('preview');
+const pctx = preview.getContext('2d');
+
+// --- model -----------------------------------------------------------------
+// animations: [ { name, frames: [ { x, y, body, offset } ] } ]
+//   body  = { shape:'circle', x,y, radius } | { shape:'rect', x,y, width,height } | { shape:'none' }
+//   offset= { x, y }   (sprite center relative to the anchor)
+// Body + offset are PER FRAME (a sheet's poses differ). New/grid frames inherit
+// the current frame's; "Apply to every frame" copies it across all animations.
+function defaultBody(w, h) {
+  return { shape: 'circle', x: 0, y: 0, radius: Math.round(Math.min(w, h) * 0.45), width: w, height: h };
+}
+function newFrame(x, y, body, offset) {
+  return { x, y, body: { ...body }, offset: { ...offset } };
+}
+function newAnim(name, frames) {
+  return { name, frames: frames || [] };
+}
+
+const state = {
+  imageName: '', img: null, imgW: 0, imgH: 0,
+  viewport: { w: 0, h: 0 },
+  animations: [],   // see shape above
+  anim: 0,          // current animation index
+  frame: 0,         // current frame within the current animation
+  zoom: 4,
+  dragTarget: 'body'
+};
+const ca = () => state.animations[state.anim];               // current animation
+const cf = () => { const a = ca(); return a ? a.frames[state.frame] : undefined; }; // current frame
+
+// --- image loading ---------------------------------------------------------
+function populateDropdown() {
+  const sel = $('imgSelect');
+  sel.innerHTML = '';
+  for (const name of FOLDER_IMAGES) {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name; sel.appendChild(o);
+  }
+}
+
+function loadImage(src, name) {
+  const img = new Image();
+  img.onload = () => {
+    state.img = img;
+    state.imageName = name;
+    state.imgW = img.naturalWidth;
+    state.imgH = img.naturalHeight;
+    // Default: whole image as the viewport, one animation with one frame.
+    state.viewport = { w: img.naturalWidth, h: img.naturalHeight };
+    state.animations = [newAnim('anim 0', [newFrame(0, 0, defaultBody(img.naturalWidth, img.naturalHeight), { x: 0, y: 0 })])];
+    state.anim = 0; state.frame = 0;
+    state.zoom = Math.max(0.5, Math.min(16, Math.round(440 / Math.max(img.naturalWidth, img.naturalHeight))));
+    $('imgInfo').textContent = `${name} — ${img.naturalWidth}×${img.naturalHeight}px`;
+    renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
+  };
+  img.onerror = () => { $('imgInfo').textContent = `⚠ couldn't load ${name}`; };
+  img.src = src;
+}
+
+$('imgSelect').addEventListener('change', e => loadImage(e.target.value, e.target.value));
+$('fileInput').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  if (!FOLDER_IMAGES.includes(f.name)) { FOLDER_IMAGES.push(f.name); populateDropdown(); }
+  loadImage(URL.createObjectURL(f), f.name);
+});
+preview.addEventListener('dragover', e => e.preventDefault());
+preview.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) {
+    if (!FOLDER_IMAGES.includes(f.name)) { FOLDER_IMAGES.push(f.name); populateDropdown(); }
+    loadImage(URL.createObjectURL(f), f.name);
+  }
+});
+
+// --- inputs ↔ state --------------------------------------------------------
+function syncInputs() {
+  const b = cf() ? cf().body : defaultBody(state.imgW || 64, state.imgH || 64);
+  const o = cf() ? cf().offset : { x: 0, y: 0 };
+  $('vpW').value = state.viewport.w;
+  $('vpH').value = state.viewport.h;
+  $('bodyShape').value = b.shape;
+  $('bodyX').value = b.x;
+  $('bodyY').value = b.y;
+  $('bodyR').value = b.radius;
+  $('bodyW').value = b.width;
+  $('bodyH').value = b.height;
+  $('offX').value = o.x;
+  $('offY').value = o.y;
+  $('zoom').value = state.zoom;
+  $('zoomLabel').textContent = state.zoom + '×';
+  $('bodyPos').style.display = b.shape === 'none' ? 'none' : '';
+  $('sizeCircle').style.display = b.shape === 'circle' ? '' : 'none';
+  $('sizeRect').style.display = b.shape === 'rect' ? '' : 'none';
+  const tag = ca() ? `${ca().name} · f${state.frame + 1}` : '—';
+  $('bodyFrameTag').textContent = tag;
+  $('offFrameTag').textContent = tag;
+  updateFrameLabel();
+}
+
+const num = (el, fn) => $(el).addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (Number.isFinite(v)) { fn(v); render(); exportJSON(); }
+});
+num('vpW', v => state.viewport.w = v);
+num('vpH', v => state.viewport.h = v);
+num('bodyX', v => { if (cf()) cf().body.x = v; });
+num('bodyY', v => { if (cf()) cf().body.y = v; });
+num('bodyR', v => { if (cf()) cf().body.radius = v; });
+num('bodyW', v => { if (cf()) cf().body.width = v; });
+num('bodyH', v => { if (cf()) cf().body.height = v; });
+num('offX', v => { if (cf()) cf().offset.x = v; });
+num('offY', v => { if (cf()) cf().offset.y = v; });
+$('zoom').addEventListener('input', e => { state.zoom = parseFloat(e.target.value); $('zoomLabel').textContent = state.zoom + '×'; render(); });
+$('bodyShape').addEventListener('change', e => { if (cf()) cf().body.shape = e.target.value; syncInputs(); render(); exportJSON(); });
+$('vpReset').addEventListener('click', () => { state.viewport = { w: state.imgW, h: state.imgH }; syncInputs(); render(); exportJSON(); });
+$('applyAll').addEventListener('click', () => {
+  if (!cf()) return;
+  const b = cf().body, o = cf().offset;
+  state.animations.forEach(a => a.frames.forEach(f => { f.body = { ...b }; f.offset = { ...o }; }));
+  exportJSON();
+});
+
+$('dragSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  state.dragTarget = b.dataset.t;
+  [...$('dragSeg').children].forEach(c => c.classList.toggle('on', c === b));
+});
+
+// --- animations ------------------------------------------------------------
+function selectAnim(i) {
+  state.anim = i; state.frame = 0;
+  renderAnims(); renderFrames(); syncInputs(); render();
+}
+$('addAnim').addEventListener('click', () => {
+  const tBody = cf() ? cf().body : defaultBody(state.imgW, state.imgH);
+  const tOff = cf() ? cf().offset : { x: 0, y: 0 };
+  state.animations.push(newAnim(`anim ${state.animations.length}`, [newFrame(0, 0, tBody, tOff)]));
+  selectAnim(state.animations.length - 1);
+  exportJSON();
+});
+function renderAnims() {
+  const wrap = $('animList'); wrap.innerHTML = '';
+  state.animations.forEach((a, i) => {
+    const row = document.createElement('div');
+    row.className = 'lrow' + (i === state.anim ? ' sel' : '');
+    row.innerHTML = `<span class="ix">${i}</span>
+      <input type="text" value="${a.name}" data-i="${i}">
+      <span class="mini">${a.frames.length}f</span>
+      <button data-view="${i}">view</button>
+      <button data-del="${i}">✕</button>`;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('input').forEach(inp => inp.addEventListener('input', e => {
+    state.animations[+e.target.dataset.i].name = e.target.value;
+    if (+e.target.dataset.i === state.anim) syncInputs();
+    exportJSON();
+  }));
+  wrap.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', e => selectAnim(+e.target.dataset.view)));
+  wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', e => {
+    state.animations.splice(+e.target.dataset.del, 1);
+    if (state.animations.length === 0) state.animations.push(newAnim('anim 0', [newFrame(0, 0, defaultBody(state.imgW, state.imgH), { x: 0, y: 0 })]));
+    state.anim = Math.min(state.anim, state.animations.length - 1); state.frame = 0;
+    renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
+  }));
+}
+
+// --- frames (within the current animation) ---------------------------------
+$('gGen').addEventListener('click', () => {
+  const cols = Math.max(1, parseInt($('gCols').value) || 1);
+  const rows = Math.max(1, parseInt($('gRows').value) || 1);
+  const mx = parseFloat($('gMx').value) || 0, my = parseFloat($('gMy').value) || 0;
+  const sx = parseFloat($('gSx').value) || 0, sy = parseFloat($('gSy').value) || 0;
+  const vw = state.viewport.w, vh = state.viewport.h;
+  // Each cell inherits the current frame's body + offset as a template.
+  const tBody = cf() ? cf().body : defaultBody(state.imgW, state.imgH);
+  const tOff = cf() ? cf().offset : { x: 0, y: 0 };
+  const anims = [];
+  for (let r = 0; r < rows; r++) {
+    const frames = [];
+    for (let c = 0; c < cols; c++)
+      frames.push(newFrame(mx + c * (vw + sx), my + r * (vh + sy), tBody, tOff));
+    anims.push(newAnim(`row ${r}`, frames));
+  }
+  state.animations = anims; state.anim = 0; state.frame = 0;
+  renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
+});
+$('addFrame').addEventListener('click', () => {
+  const a = ca(); if (!a) return;
+  const tBody = cf() ? cf().body : defaultBody(state.imgW, state.imgH);
+  const tOff = cf() ? cf().offset : { x: 0, y: 0 };
+  a.frames.push(newFrame(0, 0, tBody, tOff)); state.frame = a.frames.length - 1;
+  renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
+});
+$('framePrev').addEventListener('click', () => { const a = ca(); if (!a || !a.frames.length) return; state.frame = (state.frame - 1 + a.frames.length) % a.frames.length; renderFrames(); syncInputs(); render(); });
+$('frameNext').addEventListener('click', () => { const a = ca(); if (!a || !a.frames.length) return; state.frame = (state.frame + 1) % a.frames.length; renderFrames(); syncInputs(); render(); });
+
+function updateFrameLabel() {
+  const a = ca();
+  $('frameLabel').textContent = a && a.frames.length ? `frame ${state.frame + 1} / ${a.frames.length}` : 'no frames';
+  $('frameAnimTag').textContent = a ? a.name : '—';
+}
+function renderFrames() {
+  const wrap = $('framesList'); wrap.innerHTML = '';
+  const a = ca();
+  if (a) a.frames.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'lrow' + (i === state.frame ? ' sel' : '');
+    row.innerHTML = `<span class="ix">${i}</span>
+      x<input type="number" value="${f.x}" data-i="${i}" data-k="x">
+      y<input type="number" value="${f.y}" data-i="${i}" data-k="y">
+      <button data-view="${i}">view</button>
+      <button data-del="${i}">✕</button>`;
+    wrap.appendChild(row);
+  });
+  wrap.querySelectorAll('input').forEach(inp => inp.addEventListener('input', e => {
+    const i = +e.target.dataset.i, k = e.target.dataset.k, v = parseFloat(e.target.value);
+    if (Number.isFinite(v) && ca()) { ca().frames[i][k] = v; render(); exportJSON(); }
+  }));
+  wrap.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', e => { state.frame = +e.target.dataset.view; renderFrames(); syncInputs(); render(); }));
+  wrap.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', e => {
+    const a2 = ca(); if (!a2) return;
+    a2.frames.splice(+e.target.dataset.del, 1);
+    if (a2.frames.length === 0) a2.frames.push(newFrame(0, 0, defaultBody(state.imgW, state.imgH), { x: 0, y: 0 }));
+    state.frame = Math.min(state.frame, a2.frames.length - 1);
+    renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
+  }));
+  updateFrameLabel();
+}
+
+// --- preview render --------------------------------------------------------
+function render() {
+  const w = preview.width, h = preview.height, z = state.zoom;
+  const ax = w / 2, ay = h / 2;   // anchor (world origin) at canvas center
+  pctx.clearRect(0, 0, w, h);
+
+  const fr = cf();
+  if (state.img && fr) {
+    const vw = state.viewport.w, vh = state.viewport.h;
+    const cx = ax + fr.offset.x * z, cy = ay + fr.offset.y * z;   // sprite center
+    const dx = cx - (vw * z) / 2, dy = cy - (vh * z) / 2;
+    pctx.imageSmoothingEnabled = z < 3;
+    try { pctx.drawImage(state.img, fr.x, fr.y, vw, vh, dx, dy, vw * z, vh * z); } catch (e) {}
+    pctx.strokeStyle = 'rgba(255,255,255,0.25)'; pctx.lineWidth = 1;
+    pctx.strokeRect(dx + .5, dy + .5, vw * z, vh * z);
+  }
+
+  // rigid body (this frame; 'none' draws nothing)
+  if (fr && fr.body.shape !== 'none') {
+    const b = fr.body;
+    const bx = ax + b.x * z, by = ay + b.y * z;
+    pctx.lineWidth = 2; pctx.strokeStyle = '#ffb703';
+    pctx.fillStyle = 'rgba(255,183,3,0.14)';
+    if (b.shape === 'circle') {
+      pctx.beginPath(); pctx.arc(bx, by, b.radius * z, 0, Math.PI * 2); pctx.fill(); pctx.stroke();
+    } else {
+      const ww = b.width * z, hh = b.height * z;
+      pctx.fillRect(bx - ww / 2, by - hh / 2, ww, hh); pctx.strokeRect(bx - ww / 2, by - hh / 2, ww, hh);
+    }
+  }
+
+  // anchor crosshair
+  pctx.strokeStyle = '#5cd8ff'; pctx.lineWidth = 1.5;
+  pctx.beginPath();
+  pctx.moveTo(ax - 9, ay); pctx.lineTo(ax + 9, ay);
+  pctx.moveTo(ax, ay - 9); pctx.lineTo(ax, ay + 9);
+  pctx.stroke();
+}
+
+// --- canvas drag -----------------------------------------------------------
+let dragging = false, last = null;
+preview.addEventListener('pointerdown', e => { dragging = true; last = e; preview.setPointerCapture(e.pointerId); });
+preview.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  const dx = (e.clientX - last.clientX) / state.zoom;
+  const dy = (e.clientY - last.clientY) / state.zoom;
+  last = e;
+  const fr = cf(); if (!fr) return;
+  if (state.dragTarget === 'body' && fr.body.shape === 'none') return;
+  const t = state.dragTarget === 'body' ? fr.body : fr.offset;
+  t.x = Math.round((t.x + dx) * 2) / 2;
+  t.y = Math.round((t.y + dy) * 2) / 2;
+  syncInputs(); render(); exportJSON();
+});
+preview.addEventListener('pointerup', () => { dragging = false; });
+
+// --- export ----------------------------------------------------------------
+function bodyOut(b) {
+  if (b.shape === 'none') return null;   // purely visual frame — no collision body
+  return b.shape === 'circle'
+    ? { shape: 'circle', x: b.x, y: b.y, radius: b.radius }
+    : { shape: 'rect', x: b.x, y: b.y, width: b.width, height: b.height };
+}
+function buildJSON() {
+  return {
+    image: state.imageName,
+    imageSize: { width: state.imgW, height: state.imgH },
+    frame: { width: state.viewport.w, height: state.viewport.h },
+    animations: state.animations.map(a => ({
+      name: a.name,
+      frames: a.frames.map(f => ({
+        x: f.x, y: f.y,
+        body: bodyOut(f.body),
+        offset: { x: f.offset.x, y: f.offset.y }
+      }))
+    }))
+  };
+}
+function exportJSON() { $('jsonOut').value = JSON.stringify(buildJSON(), null, 2); }
+$('exportBtn').addEventListener('click', exportJSON);
+$('copyBtn').addEventListener('click', () => { exportJSON(); navigator.clipboard?.writeText($('jsonOut').value); });
+$('downloadBtn').addEventListener('click', () => {
+  exportJSON();
+  const blob = new Blob([$('jsonOut').value], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (state.imageName.replace(/\.[^.]+$/, '') || 'sprite') + '.json';
+  a.click();
+});
+
+// --- collapsible accordions ------------------------------------------------
+// Wrap each section's body so clicking its <h2> collapses/expands it. Element
+// ids stay reachable (just nested), so all the wiring above keeps working.
+document.querySelectorAll('main section').forEach(sec => {
+  const h2 = sec.querySelector('h2');
+  if (!h2) return;
+  const body = document.createElement('div');
+  body.className = 'acc-body';
+  while (h2.nextSibling) body.appendChild(h2.nextSibling);
+  sec.appendChild(body);
+  h2.addEventListener('click', () => sec.classList.toggle('collapsed'));
+});
+
+// --- boot ------------------------------------------------------------------
+populateDropdown();
+renderAnims();
+renderFrames();
+syncInputs();
+if (FOLDER_IMAGES.length) loadImage(FOLDER_IMAGES[0], FOLDER_IMAGES[0]);
+</script>
+</body>
+</html>
