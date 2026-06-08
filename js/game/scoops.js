@@ -2,6 +2,7 @@
 import {
   COLOR_KEYS,
   SCOOP_RADIUS,
+  SCOOP_HALF_H,
   SCOOP_FALL_MIN,
   SCOOP_FALL_RANGE,
   UPCOMING_COUNT,
@@ -170,9 +171,12 @@ export class ScoopField {
  * @param {Hitbox} hitbox
  */
 export function isCaught(scoop, hitbox) {
+  // Vertical extent comes from the scoop body's half-height (circle radius or
+  // rect height/2); horizontal is the cone's reach band (hitbox.halfW already
+  // folds in the body's half-width). For a circle body these are equal.
   const verticalOverlap =
-    scoop.y + SCOOP_RADIUS >= hitbox.y - hitbox.r &&
-    scoop.y - SCOOP_RADIUS <= hitbox.y + hitbox.r;
+    scoop.y + SCOOP_HALF_H >= hitbox.y - hitbox.r &&
+    scoop.y - SCOOP_HALF_H <= hitbox.y + hitbox.r;
   const horizontalOverlap = Math.abs(scoop.x - hitbox.x) < hitbox.halfW;
   return verticalOverlap && horizontalOverlap;
 }

@@ -6,6 +6,9 @@ import {
   FLOOR_Y_RATIO as _FLOOR_Y_RATIO,
   CONE_EMBED_PX as _CONE_EMBED_PX
 } from './tuning.js';
+// The scoop sprite def is data (no rendering), so config reads it to derive the
+// scoop's collision size — single source of truth, set in the sprite editor.
+import SCOOP_SPRITE from '../view/sprites/scoopSprite.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
@@ -24,10 +27,23 @@ export const COLORS = Object.freeze({
 export const COLOR_KEYS = /** @type {ScoopColor[]} */ (Object.keys(COLORS));
 
 // === Geometry / layout ========================================================
-// Matched to the scoop sheet's body radius (view/sprites.js → BODY_R = 35) so the
-// sprite renders 1:1 — the draw scale is SCOOP_RADIUS / body.radius, which is 1
-// when they're equal. If the sheet's body radius changes, keep this in step.
-export const SCOOP_RADIUS = 35;
+// The scoop's collision body comes from its sprite definition
+// (view/sprites/scoopSprite.js, set in the sprite editor) — no magic radius here.
+// SCOOP_HALF_W/H are the body's
+// half-extents (circle → radius; rect → width/2, height/2) used by the catch
+// hitbox, so the hitbox shape follows the sprite instead of being locked to a
+// circle. SCOOP_RADIUS is the representative scalar (half-height) the rest of the
+// layout/tuning + the 1:1 draw scale use.
+const _scoopBody = SCOOP_SPRITE.animations[0].frames[0].body;
+/** @type {import('../types.js').SpriteBody | null} */
+export const SCOOP_BODY = _scoopBody;
+export const SCOOP_HALF_W = _scoopBody
+  ? (_scoopBody.shape === 'rect' ? (_scoopBody.width || 0) / 2 : (_scoopBody.radius || 0))
+  : 0;
+export const SCOOP_HALF_H = _scoopBody
+  ? (_scoopBody.shape === 'rect' ? (_scoopBody.height || 0) / 2 : (_scoopBody.radius || 0))
+  : 0;
+export const SCOOP_RADIUS = SCOOP_HALF_H;
 export const SCOOP_SPACING = SCOOP_RADIUS * .95;
 
 export const CONE_WIDTH = 90;

@@ -6,6 +6,8 @@ import {
   CONE_ACCEL,
   CONE_FRICTION,
   SCOOP_RADIUS,
+  SCOOP_HALF_W,
+  SCOOP_HALF_H,
   SCOOP_SPACING,
   HANDOFF_REACH,
   HANDOFF_DURATION_S
@@ -189,11 +191,14 @@ export class Player {
   }
 
   catchHitbox() {
+    // Catch band follows the scoop body's half-extents (so a rect body isn't
+    // forced into a circle). For a circle body SCOOP_HALF_W/H both equal the
+    // radius, so this matches the previous behavior exactly.
     return {
       x: this.x,
       y: this.stackTopY(),
-      r: SCOOP_RADIUS,
-      halfW: CONE_WIDTH / 2 + SCOOP_RADIUS * 0.4
+      r: SCOOP_HALF_H,
+      halfW: CONE_WIDTH / 2 + SCOOP_HALF_W * 0.4
     };
   }
 
