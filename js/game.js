@@ -45,6 +45,10 @@ import { TouchControls } from './engine/touch.js';
 // stay variable-step.
 const FIXED_DT = 1 / 60;
 const MAX_FRAME = 0.25;
+// Cap the RENDER rate. The sim is fixed-step at FIXED_DT (60Hz); on a 90/120Hz
+// phone, painting at the display rate just burns GPU/battery for no gameplay gain,
+// so the loop throttles rendering to this.
+const RENDER_FPS = 60;
 
 // Between-wave reset beat: a sped-up night cycle (sunset→midnight→dawn, crescent
 // moon arcing across) that plays after the cashout and before the wave overlay.
@@ -162,7 +166,8 @@ export class Game {
     // toggle the DOM on transitions, not every frame).
     this._dayHintShown = false;
     // Fixed-timestep loop (engine). Started in start(), stopped on game over.
-    this.loop = new Loop(FIXED_DT, MAX_FRAME);
+    // Render throttled to RENDER_FPS so high-refresh phones don't over-paint.
+    this.loop = new Loop(FIXED_DT, MAX_FRAME, RENDER_FPS);
 
     // Debug panel — its tuning controls forward straight to the World.
     this.debug = new DebugPanel(this.flags, {
@@ -238,7 +243,14 @@ export class Game {
 
     // Window resize only re-letterboxes the (unchanged) virtual canvas; the
     // backing store is fixed per aspect. Fullscreen is just a bigger viewport.
-    window.addEventListener('resize', () => this._resize());
+    // Debounce resize: a mobile URL-bar show/hide fires a burst of resize events,
+    // and each dim change reallocates the canvas backing store (a black flash) +
+    // repositions actors. Coalesce the burst into a single resize once it settles.
+    let _resizeTimer = 0;
+    window.addEventListener('resize', () => {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = /** @type {any} */ (setTimeout(() => this._resize(), 150));
+    });
     document.addEventListener('fullscreenchange', () => this._resize());
     const fsBtn = document.getElementById('fullscreenBtn');
     if (fsBtn) fsBtn.addEventListener('click', () => this._toggleFullscreen());
