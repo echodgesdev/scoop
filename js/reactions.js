@@ -102,8 +102,10 @@ export function wireReactions(game) {
     game.effects.popText(x, y - 46, '⚡ SUPERCHARGED!', { color: '#ffec5c', size: 30, life: 1.2 });
   });
 
-  // Toss-top (upward gesture): burst at the popped scoop + the "let go" beep.
+  // Toss-top (upward gesture): launch a stretch-and-fade ghost of the popped
+  // scoop, a small puff, and the "let go" beep.
   game.bus.on('discard', ({ x, y, color }) => {
+    game.world.player.launchToss(color, x, y);
     game.effects.burst(x, y, [game.world.shop.hex(color), '#fff'], 10);
     game.sound.catch_();
   });

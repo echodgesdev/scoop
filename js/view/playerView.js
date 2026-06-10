@@ -6,7 +6,7 @@ import {
   SCOOP_RADIUS,
   HANDOFF_DURATION_S
 } from '../game/config.js';
-import { LAND_TIME, SLOSH_HIST } from '../game/player.js';
+import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../game/player.js';
 import { scoopSheet, SCOOP_STATE, drawScoopSprite } from './sprites.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
@@ -61,7 +61,27 @@ export function drawPlayer(ctx, player, rainbow = false) {
 
     const isTop = i === stack.length - 1;
     const state = isTop ? SCOOP_STATE.CONE_TOP : SCOOP_STATE.CONE;
-    drawScoop(ctx, drawX, drawY, rainbow ? 'rainbow' : s.color, drawScale, state);
+    const colorKey = rainbow ? 'rainbow' : s.color;
+
+    // Squash-back bounce: a canceled (too-short) up-flick leaves the top scoop
+    // stretched, then it recoils through a damped squash back to size. The
+    // cos·decay term starts at +1 (tall + narrow) and wobbles down to rest;
+    // anchoring at the scoop's base makes it grow up / compress down, not float.
+    if (isTop && player.tossBump > 0) {
+      const q = 1 - player.tossBump / TOSS_BUMP_S;       // 0 -> 1
+      const wob = Math.cos(q * Math.PI * 3) * (1 - q);   // +1 stretched .. damps to 0
+      const sy = 1 + 0.30 * wob;
+      const sx = 1 - 0.22 * wob;
+      const baseY = drawY + SCOOP_RADIUS;
+      ctx.save();
+      ctx.translate(drawX, baseY);
+      ctx.scale(sx, sy);
+      ctx.translate(-drawX, -baseY);
+      drawScoop(ctx, drawX, drawY, colorKey, drawScale, state);
+      ctx.restore();
+    } else {
+      drawScoop(ctx, drawX, drawY, colorKey, drawScale, state);
+    }
 
     // The Scoop-Top sprite frame is the "deliver me next" highlight. Keep the
     // amber ring only as a fallback for when the sheet hasn't loaded.
@@ -70,6 +90,24 @@ export function drawPlayer(ctx, player, rainbow = false) {
     }
   }
   ctx.restore();
+
+  // Launched-scoop ghosts (committed toss): each rises, stretches tall, and fades
+  // out over TOSS_GHOST_S — a quick "flung away" flourish. Drawn in world space
+  // (after the handoff lean) so a toss mid-reach doesn't drag the ghost sideways.
+  for (const g of player.tossed) {
+    const q = Math.min(1, g.t / TOSS_GHOST_S);           // 0 -> 1
+    const rise = 58 * (1 - (1 - q) * (1 - q));           // easeOut upward travel
+    const gy = g.y - rise;
+    const sy = 1 + 0.55 * (1 - q);                       // launches tall, relaxes
+    const sx = 1 - 0.30 * (1 - q);
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1 - q) * 2);          // hold, then fade out late
+    ctx.translate(g.x, gy);
+    ctx.scale(sx, sy);
+    ctx.translate(-g.x, -gy);
+    drawScoop(ctx, g.x, gy, rainbow ? 'rainbow' : g.color, 1, SCOOP_STATE.DEFAULT);
+    ctx.restore();
+  }
 }
 
 /**

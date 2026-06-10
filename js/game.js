@@ -223,7 +223,8 @@ export class Game {
       onMoveEnd: () => {},
       onTap: () => this._deliver(),
       onSwipeUp: () => this._pop(),
-      onSwipeDown: () => {}
+      onSwipeDown: () => {},
+      onTossCancel: () => this._tossCancel()
     });
 
     // Presentation reactions: sound/haptics/effects/HUD subscribe to World events.
@@ -239,7 +240,7 @@ export class Game {
       const completedWave = Math.max(1, (wave || 1) - 1);
       setTimeout(() => this._runWaveCashout(completedWave), 700);
     });
-    this.bus.on('gameOver', () => this._endGame('Out of health! 😱'));
+    this.bus.on('gameOver', () => this._endGame('Game Over.'));
 
     // Window resize only re-letterboxes the (unchanged) virtual canvas; the
     // backing store is fixed per aspect. Fullscreen is just a bigger viewport.
@@ -549,6 +550,13 @@ export class Game {
   _pop() {
     if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.world.player.frozen) return;
     this.world.pop();
+  }
+
+  /** A too-short up-flick: no toss, just squash the top scoop back as feedback. */
+  _tossCancel() {
+    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.world.player.frozen) return;
+    if (this.world.player.stack.length === 0) return;
+    this.world.player.bumpToss();
   }
 
   _deliver() {

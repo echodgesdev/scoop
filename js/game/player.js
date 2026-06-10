@@ -22,6 +22,13 @@ import {
 // to size the squash; lives here because push() stamps it onto each scoop.
 export const LAND_TIME = 0.22;
 
+// Toss feedback (presentation, read by the view). A committed toss launches a
+// brief stretch-and-fade GHOST of the popped scoop; a too-short up-flick that
+// didn't commit squashes the top scoop back to size. Durations live here so the
+// view drives the same curve length the model culls on.
+export const TOSS_GHOST_S = 0.34;  // launched-scoop ghost lifetime
+export const TOSS_BUMP_S  = 0.30;  // squash-back bounce duration
+
 // Fake scoop "slosh" — NOT physics. A single loose damped-spring scalar leans
 // the scoop column opposite to the cone's motion (drag), then settles with a
 // soft wobble. The lean is derived from the cone's real per-frame displacement
@@ -69,6 +76,14 @@ export class Player {
     // Hard movement freeze (tutorial intro). Doesn't tick down; the game clears
     // it when control is handed over.
     this.frozen = false;
+
+    // Toss feedback (presentation; see TOSS_* above). `tossed` holds launched-
+    // scoop ghosts (each stores its launch point + age; the view derives the
+    // rise/stretch/fade). `tossBump` counts down a squash-back bounce on the top
+    // scoop after a canceled (too-short) up-flick.
+    /** @type {{ color: ScoopColor, x: number, y: number, t: number }[]} */
+    this.tossed = [];
+    this.tossBump = 0;
   }
 
   /**
@@ -128,6 +143,12 @@ export class Player {
     // decay continues even while frozen.
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt);
     if (this.handoffT < HANDOFF_DURATION_S) this.handoffT += dt;
+    if (this.tossBump > 0) this.tossBump = Math.max(0, this.tossBump - dt);
+    for (let i = this.tossed.length - 1; i >= 0; i--) {
+      const g = this.tossed[i];
+      g.t += dt;
+      if (g.t >= TOSS_GHOST_S) this.tossed.splice(i, 1);
+    }
     for (const s of this.stack) {
       if (s.land > 0) s.land = Math.max(0, s.land - dt);
     }
@@ -227,5 +248,19 @@ export class Player {
   /** @param {number} [duration] */
   triggerFlash(duration = 0.4) {
     this.flash = duration;
+  }
+
+  /**
+   * A committed toss: launch a stretch-and-fade ghost of the just-popped scoop
+   * from where it sat. Presentation only — the sim already removed the scoop.
+   * @param {ScoopColor} color @param {number} x @param {number} y
+   */
+  launchToss(color, x, y) {
+    this.tossed.push({ color, x, y, t: 0 });
+  }
+
+  /** A canceled (too-short) up-flick: squash the top scoop back to its size. */
+  bumpToss() {
+    this.tossBump = TOSS_BUMP_S;
   }
 }

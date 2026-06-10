@@ -12,6 +12,8 @@
  *   onHoldEnd()       pointer released (always)
  *   onTap(vx, vy)     quick touch with no drag
  *   onSwipeUp()/onSwipeDown()   a fast vertical flick
+ *   onTossCancel()    an upward gesture that fell short of a swipe (a started-
+ *                     then-abandoned toss)
  *
  * Keyboard stays fully intact alongside this.
  */
@@ -20,6 +22,8 @@ const DRAG_START_PX = 8;    // movement beyond this promotes a touch to a drag
 const SWIPE_MIN_PX  = 40;   // a release this far counts as a swipe…
 const SWIPE_MAX_MS  = 400;  // …if it happened within this window
 const SWIPE_AXIS    = 1.2;  // vertical must dominate horizontal by this factor
+const CANCEL_UP_PX  = 14;   // an upward release at least this far, but short of a
+                            // swipe, is a canceled toss (squash the top scoop back)
 
 export class TouchControls {
   /**
@@ -32,7 +36,8 @@ export class TouchControls {
    *   onMoveEnd: () => void,
    *   onTap: (vx: number, vy: number) => void,
    *   onSwipeUp: () => void,
-   *   onSwipeDown: () => void
+   *   onSwipeDown: () => void,
+   *   onTossCancel: () => void
    * }} opts
    */
   constructor(target, opts) {
@@ -98,6 +103,10 @@ export class TouchControls {
     const dist = Math.hypot(dx, dy);
     if (dist >= SWIPE_MIN_PX && dt <= SWIPE_MAX_MS && Math.abs(dy) > Math.abs(dx) * SWIPE_AXIS) {
       if (dy < 0) this.opts.onSwipeUp(); else this.opts.onSwipeDown();
+    } else if (dy < -CANCEL_UP_PX && Math.abs(dy) > Math.abs(dx)) {
+      // Upward-dominant but short of a swipe: a toss the user started then let go
+      // of early. Report it so the host can squash the top scoop back.
+      this.opts.onTossCancel();
     }
   }
 
