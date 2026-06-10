@@ -70,8 +70,8 @@ export function drawPlayer(ctx, player, rainbow = false) {
     if (isTop && player.tossBump > 0) {
       const q = 1 - player.tossBump / TOSS_BUMP_S;       // 0 -> 1
       const wob = Math.cos(q * Math.PI * 3) * (1 - q);   // +1 stretched .. damps to 0
-      const sy = 1 + 0.30 * wob;
-      const sx = 1 - 0.22 * wob;
+      const sy = 1 + 0.60 * wob;
+      const sx = 1 - 0.38 * wob;
       const baseY = drawY + SCOOP_RADIUS;
       ctx.save();
       ctx.translate(drawX, baseY);
@@ -98,10 +98,10 @@ export function drawPlayer(ctx, player, rainbow = false) {
     const q = Math.min(1, g.t / TOSS_GHOST_S);           // 0 -> 1
     const rise = 58 * (1 - (1 - q) * (1 - q));           // easeOut upward travel
     const gy = g.y - rise;
-    const sy = 1 + 0.55 * (1 - q);                       // launches tall, relaxes
-    const sx = 1 - 0.30 * (1 - q);
+    const sy = 1 + 0.90 * (1 - q);                       // launches tall, relaxes
+    const sx = 1 - 0.42 * (1 - q);
     ctx.save();
-    ctx.globalAlpha = Math.min(1, (1 - q) * 2);          // hold, then fade out late
+    ctx.globalAlpha = (1 - q) * (1 - q);                 // fade out fast (ease-in)
     ctx.translate(g.x, gy);
     ctx.scale(sx, sy);
     ctx.translate(-g.x, -gy);

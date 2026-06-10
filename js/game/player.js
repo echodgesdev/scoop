@@ -26,7 +26,7 @@ export const LAND_TIME = 0.22;
 // brief stretch-and-fade GHOST of the popped scoop; a too-short up-flick that
 // didn't commit squashes the top scoop back to size. Durations live here so the
 // view drives the same curve length the model culls on.
-export const TOSS_GHOST_S = 0.34;  // launched-scoop ghost lifetime
+export const TOSS_GHOST_S = 0.22;  // launched-scoop ghost lifetime (snappy fade)
 export const TOSS_BUMP_S  = 0.30;  // squash-back bounce duration
 
 // Fake scoop "slosh" — NOT physics. A single loose damped-spring scalar leans
