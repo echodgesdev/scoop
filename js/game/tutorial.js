@@ -1,5 +1,6 @@
 // @ts-check
 import { CONE_HEIGHT } from './config.js';
+import { glowRoundRect } from '../view/glow.js';
 
 /** @typedef {import('../game.js').Game} Game */
 
@@ -134,17 +135,16 @@ export class TutorialBase {
       ctx.fill();
     }
 
-    // Pill body — dark gradient slab with an accent glow + border.
+    // Pill body — dark gradient slab with an accent glow + border. The glow is
+    // a baked halo (cached per text width) instead of a per-frame shadowBlur.
+    glowRoundRect(ctx, left, topY, Math.round(w), h, 18, accent, 16);
     const grad = ctx.createLinearGradient(0, topY, 0, topY + h);
     grad.addColorStop(0, 'rgba(38, 38, 52, 0.94)');
     grad.addColorStop(1, 'rgba(14, 14, 22, 0.94)');
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = 16;
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.roundRect(left, topY, w, h, 18);
     ctx.fill();
-    ctx.shadowBlur = 0;
     ctx.lineWidth = 3;
     ctx.strokeStyle = accent;
     ctx.stroke();

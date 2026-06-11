@@ -108,12 +108,21 @@ export function nightCycleState(fraction, bounds) {
   };
 }
 
+// Memo of the last computed day state. Wave progress only changes on serves
+// (it's discrete), so the same input was being recomputed — five color lerps
+// and a fresh object — on every rendered frame. Keyed by the exact inputs.
+/** @type {{ f: number, w: number, h: number, state: ReturnType<typeof dayCycleState> } | null} */
+let _dayMemo = null;
+
 /**
  * Compute the cycle state for a given waveFraction (0..1) and viewport bounds.
  * @returns {{ skyTop: string, skyBottom: string, sunX: number, sunY: number, sunR: number, sunColor: string, sunGlow: number, floor: string }}
  */
 export function dayCycleState(fraction, bounds) {
   const t = Math.max(0, Math.min(1, fraction));
+  if (_dayMemo && _dayMemo.f === t && _dayMemo.w === bounds.width && _dayMemo.h === bounds.height) {
+    return _dayMemo.state;
+  }
 
   // Locate the surrounding pair of keyframes.
   const seg = t * (KEYFRAMES.length - 1);
@@ -130,7 +139,7 @@ export function dayCycleState(fraction, bounds) {
   const sunX = lerp(bounds.width * 0.10, bounds.width * 0.90, t);
   const sunY = baseY - arcHeight * Math.sin(Math.PI * t);
 
-  return {
+  const state = {
     skyTop:    lerpColor(A.skyTop, B.skyTop, lt),
     skyBottom: lerpColor(A.skyBottom, B.skyBottom, lt),
     sunColor:  lerpColor(A.sunColor, B.sunColor, lt),
@@ -140,4 +149,6 @@ export function dayCycleState(fraction, bounds) {
     sunY,
     sunR: 52
   };
+  _dayMemo = { f: t, w: bounds.width, h: bounds.height, state };
+  return state;
 }

@@ -3,6 +3,7 @@ import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
 import { dayCycleState, nightCycleState } from '../game/dayCycle.js';
 import { drawField } from './scoopsView.js';
 import { drawPlayer } from './playerView.js';
+import { glowCircle } from './glow.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
   PICKUP_TO_POWER,
@@ -186,7 +187,8 @@ function drawActivePowerup(ctx, game) {
  */
 function drawPowerupBubble(ctx, x, y, radius, type, glow, ringFrac) {
   const ring = PICKUP_RING_COLOR[type];
-  if (glow) { ctx.shadowColor = ring; ctx.shadowBlur = 16; }
+  // Baked halo instead of a per-frame shadowBlur pass.
+  if (glow) glowCircle(ctx, x, y, radius + 2, ring);
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
@@ -194,7 +196,6 @@ function drawPowerupBubble(ctx, x, y, radius, type, glow, ringFrac) {
   ctx.lineWidth = 3;
   ctx.strokeStyle = ring;
   ctx.stroke();
-  ctx.shadowBlur = 0;
 
   if (ringFrac >= 0) {
     ctx.beginPath();

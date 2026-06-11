@@ -3,6 +3,7 @@ import { STATE } from '../game/shop.js';
 import { drawScoop } from './playerView.js';
 import { SCOOP_STATE } from './sprites.js';
 import { SpriteSheet } from './spriteSheet.js';
+import { glowCircle, glowRoundRect } from './glow.js';
 import FACE_SPRITE from './sprites/faceSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
@@ -38,6 +39,30 @@ function bubbleWidthFor(orderLen) {
 }
 
 const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'];
+
+// Baked rainbow swatch (gradient circle + outline). Rainbow mode was creating
+// a fresh linear gradient per swatch per frame; this bakes one sprite at the
+// fixed swatch size and blits it.
+/** @type {HTMLCanvasElement | null} */
+let _rainbowSwatch = null;
+function rainbowSwatch() {
+  if (_rainbowSwatch) return _rainbowSwatch;
+  const d = SWATCH_R * 2 + 4;   // +2px margin so the stroke isn't clipped
+  const c = document.createElement('canvas');
+  c.width = c.height = d;
+  const g = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
+  const grad = g.createLinearGradient(2, 2, d - 2, d - 2);
+  RAINBOW_STOPS.forEach((col, i) => grad.addColorStop(i / (RAINBOW_STOPS.length - 1), col));
+  g.beginPath();
+  g.arc(d / 2, d / 2, SWATCH_R, 0, Math.PI * 2);
+  g.fillStyle = grad;
+  g.fill();
+  g.lineWidth = 2;
+  g.strokeStyle = '#333';
+  g.stroke();
+  _rainbowSwatch = c;
+  return c;
+}
 
 // Customer face sprite sheet (replaces the emoji faces). Frame indices:
 const FACE = Object.freeze({ DEFAULT: 0, HUNGRY: 1, UPSET: 2, ANGRY: 3, DROOL: 4, FROZEN: 5 });
@@ -159,27 +184,20 @@ export class Stations {
     }
     ctx.globalAlpha = 1;
 
-    // Coin body with a soft DARK drop shadow so it lifts off the scene.
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 5;
+    // Baked soft drop shadow (offset down) + colored ring glow, then the coin
+    // body and ring drawn crisp on top — no per-frame shadowBlur.
+    glowCircle(ctx, bx, by + 5, r, 'rgba(0, 0, 0, 0.5)');
+    glowCircle(ctx, bx, by, r + 3, ring, 0.9);
     ctx.beginPath();
     ctx.arc(bx, by, r, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
     ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
 
-    // Thick colored ring with a matching glow (the eye-catcher), drawn on the
-    // same circle path; then a faint inner ring for a minted-coin read.
-    ctx.shadowColor = ring;
-    ctx.shadowBlur = 14;
+    // Thick colored ring (the eye-catcher) on the same circle path; then a
+    // faint inner ring for a minted-coin read.
     ctx.lineWidth = 5;
     ctx.strokeStyle = ring;
     ctx.stroke();
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
     ctx.beginPath();
@@ -275,8 +293,9 @@ export class Stations {
     // two blend into one continuous pointer.
     const outline = active ? '#ffb703' : (servable ? '#06d6a0' : '#666');
     ctx.save();
-    if (active) { ctx.shadowColor = '#ffd166'; ctx.shadowBlur = 18; }
-    else if (servable) { ctx.shadowColor = '#06d6a0'; ctx.shadowBlur = 14; }
+    // Baked halo behind the whole bubble (replaces the per-frame shadowBlur).
+    if (active) glowRoundRect(ctx, left, top, bubbleW, BUBBLE_H, 14, '#ffd166', 18);
+    else if (servable) glowRoundRect(ctx, left, top, bubbleW, BUBBLE_H, 14, '#06d6a0', 14);
     // Tail first, so the body fill + border draw cleanly over its root.
     ctx.beginPath();
     ctx.moveTo(cx - 10, bubbleBottom - 1);
@@ -290,7 +309,6 @@ export class Stations {
     ctx.roundRect(left, top, bubbleW, BUBBLE_H, 14);
     ctx.fillStyle = servable ? '#eafff7' : 'rgba(255,255,255,0.96)';
     ctx.fill();
-    ctx.shadowBlur = 0;
     ctx.lineWidth = active ? 5 : 3;
     ctx.strokeStyle = outline;
     ctx.stroke();
@@ -304,15 +322,14 @@ export class Stations {
     const firstX = cx - rowW / 2 + SWATCH_R;
     for (let k = 0; k < n; k++) {
       const sx = firstX + k * step;
+      if (rainbow) {
+        const sw = rainbowSwatch();
+        ctx.drawImage(sw, sx - sw.width / 2, swatchY - sw.height / 2);
+        continue;
+      }
       ctx.beginPath();
       ctx.arc(sx, swatchY, SWATCH_R, 0, Math.PI * 2);
-      if (rainbow) {
-        const grad = ctx.createLinearGradient(sx - SWATCH_R, swatchY - SWATCH_R, sx + SWATCH_R, swatchY + SWATCH_R);
-        RAINBOW_STOPS.forEach((col, i) => grad.addColorStop(i / (RAINBOW_STOPS.length - 1), col));
-        ctx.fillStyle = grad;
-      } else {
-        ctx.fillStyle = hex(c.order.colors[k]);
-      }
+      ctx.fillStyle = hex(c.order.colors[k]);
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#333';

@@ -47,6 +47,16 @@ export class Hud {
     this._toastQueue = [];
     this._toastShowing = false;
 
+    // Last-written values for the per-frame HUD pull (_syncHud). The setters
+    // below early-out when nothing visibly changed, so the gauge's SVG filter,
+    // the health bar's transition, etc. aren't invalidated 60× a second — the
+    // DOM is only touched on actual changes. (These caches always mirror the
+    // DOM because the setters are the only writers.)
+    this._lastScore = NaN;
+    this._lastHealthQ = NaN;
+    this._lastGaugeOff = NaN;
+    this._lastComboKey = '';
+
     // Wave-transition timers & state. Created fresh in showWaveTransition.
     /** @type {number | null} */
     this._wtCountdownTimer = null;
@@ -393,6 +403,8 @@ export class Hud {
 
   /** @param {number} score */
   setScore(score) {
+    if (score === this._lastScore) return;
+    this._lastScore = score;
     // Score panel is just the number — the HUD's panel style + position is
     // identity enough; the "Score:" label was visual clutter.
     this.scoreEl.textContent = String(score);
@@ -406,6 +418,13 @@ export class Hud {
    *   as it nears the break; 0 (other modes) keeps the plain "N× combo" text.
    */
   setCombo(combo, fraction = 0, breakerTarget = 0) {
+    // Quantize the decay-bar fill to 2% steps so the per-frame pull only
+    // touches the DOM ~10×/s while the bar drains (the CSS width transition
+    // smooths between steps), instead of restarting a transition every frame.
+    const fillPct = combo > 1 ? Math.round(Math.max(0, Math.min(1, fraction)) * 50) * 2 : 0;
+    const key = `${combo}|${fillPct}|${breakerTarget}`;
+    if (key === this._lastComboKey) return;
+    this._lastComboKey = key;
     if (combo > 1) {
       if (breakerTarget > 0) {
         this.comboTextEl.textContent = `🔥 ${combo} / ${breakerTarget}`;
@@ -414,7 +433,7 @@ export class Hud {
         this.comboTextEl.textContent = `🔥 ${combo}× combo`;
         this.comboEl.classList.remove('near-break');
       }
-      this.comboDecayFillEl.style.width = `${Math.max(0, Math.min(1, fraction)) * 100}%`;
+      this.comboDecayFillEl.style.width = `${fillPct}%`;
       this.comboEl.classList.add('show');
     } else {
       this.comboEl.classList.remove('show', 'near-break');
@@ -434,7 +453,13 @@ export class Hud {
       const pct = Math.max(0, Math.min(1, fraction)) * 100;
       // Inline style so the CSS transition fires reliably. With dasharray
       // pinned to 100 in the stylesheet, dashoffset alone drives the arc.
-      this.gaugeFillEl.style.strokeDashoffset = String(100 - pct);
+      // Quantized + change-guarded: the ring carries a drop-shadow filter, so
+      // an every-frame write kept the compositor re-rendering it continuously.
+      const off = Math.round((100 - pct) * 10) / 10;
+      if (off !== this._lastGaugeOff) {
+        this._lastGaugeOff = off;
+        this.gaugeFillEl.style.strokeDashoffset = String(off);
+      }
     }
   }
 
@@ -470,7 +495,11 @@ export class Hud {
 
   /** @param {number} fraction */
   setHealth(fraction) {
-    const f = Math.max(0, Math.min(1, fraction));
+    // 0.5% steps — health only moves on damage/heal, so the guard makes this
+    // write-free on the steady-state frames in between.
+    const f = Math.round(Math.max(0, Math.min(1, fraction)) * 200) / 200;
+    if (f === this._lastHealthQ) return;
+    this._lastHealthQ = f;
     this.healthFillEl.style.width = `${f * 100}%`;
     // green -> amber -> red as it drains
     this.healthFillEl.style.background = `hsl(${120 * f}, 75%, 48%)`;

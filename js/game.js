@@ -63,6 +63,10 @@ export class Game {
     // aspect (clamped to portrait) so it fills the screen on mobile — there's
     // no forced-aspect / letterbox mode anymore.
     this.stage = document.getElementById('stage');
+    // Cached #stage bounding rect for _toVirtual (the pointermove hot path);
+    // null = stale, re-read lazily. Invalidated by _resize.
+    /** @type {DOMRect | null} */
+    this._stageRect = null;
     const _d = responsiveDims(window.innerWidth, window.innerHeight);
     /** @type {{ width: number, height: number }} Virtual (logical) play area. */
     this.bounds = { width: _d.width, height: _d.height };
@@ -275,12 +279,19 @@ export class Game {
 
   /**
    * Map a screen-space point (clientX/Y) into virtual canvas coordinates,
-   * via the live #stage rect. Used by the touch layer to steer the cone.
+   * via the #stage rect. Used by the touch layer to steer the cone — which
+   * means it runs on every pointermove, so the rect is CACHED (a live
+   * getBoundingClientRect forces a layout pass at input frequency, mid-drag).
+   * _resize invalidates it.
    * @param {number} clientX @param {number} clientY
    * @returns {{ x: number, y: number }}
    */
   _toVirtual(clientX, clientY) {
-    const rect = this.stage.getBoundingClientRect();
+    let rect = this._stageRect;
+    if (!rect) {
+      if (!this.stage) return { x: 0, y: 0 };
+      rect = this._stageRect = this.stage.getBoundingClientRect();
+    }
     const w = rect.width || 1;
     const h = rect.height || 1;
     return {
@@ -384,6 +395,9 @@ export class Game {
     this.stage.style.top = `${r.top}px`;
     this.stage.style.width = `${r.width}px`;
     this.stage.style.height = `${r.height}px`;
+    // Drop the cached #stage rect; the next pointer event re-reads it lazily
+    // (after this layout change has applied).
+    this._stageRect = null;
   }
 
   /** @param {boolean} [forceTutorial] play the tutorial regardless of the flag (How to Play) */

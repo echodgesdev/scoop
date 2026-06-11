@@ -1,6 +1,29 @@
 // @ts-check
 import { groundYFor } from '../game/config.js';
 
+// === Per-frame caches =========================================================
+// The day-cycle state only changes on serves (wave progress is discrete), so
+// the same gradients were being rebuilt — and the same hex-string math re-run —
+// on every rendered frame. Each cache is keyed by the values it bakes in and
+// rebuilds only when they change. (Night-cycle states change continuously, but
+// that sweep runs ~2s between waves; the caches just miss harmlessly there.)
+
+/** @type {{ key: string, grad: CanvasGradient | null }} */
+let _skyCache = { key: '', grad: null };
+function skyGradient(ctx, groundY, top, bottom) {
+  const key = groundY + '|' + top + '|' + bottom;
+  if (_skyCache.key !== key) {
+    const g = ctx.createLinearGradient(0, 0, 0, groundY);
+    g.addColorStop(0, top);
+    g.addColorStop(1, bottom);
+    _skyCache = { key, grad: g };
+  }
+  return /** @type {CanvasGradient} */ (_skyCache.grad);
+}
+
+/** @type {{ key: string, grad: CanvasGradient | null }} */
+let _haloCache = { key: '', grad: null };
+
 /**
  * Sky + sun pass. Drawn FIRST in the frame so everything else paints on top.
  * Sky gradient ends its bottom-anchor color at the horizon so dawn/sunset
@@ -10,21 +33,23 @@ import { groundYFor } from '../game/config.js';
 export function drawSkyAndSun(ctx, bounds, state) {
   const groundY = groundYFor(bounds.height);
 
-  const sky = ctx.createLinearGradient(0, 0, 0, groundY);
-  sky.addColorStop(0, state.skyTop);
-  sky.addColorStop(1, state.skyBottom);
-  ctx.fillStyle = sky;
+  ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
   ctx.fillRect(0, 0, bounds.width, bounds.height);
 
-  // Sun halo — radial gradient fading out.
+  // Sun halo — radial gradient fading out. Cached: position/color only change
+  // on serves.
   const haloR = state.sunR * 3;
-  const halo = ctx.createRadialGradient(
-    state.sunX, state.sunY, state.sunR * 0.5,
-    state.sunX, state.sunY, haloR
-  );
-  halo.addColorStop(0, hexWithAlpha(state.sunColor, 0.55 * state.sunGlow));
-  halo.addColorStop(1, hexWithAlpha(state.sunColor, 0));
-  ctx.fillStyle = halo;
+  const haloKey = state.sunColor + '|' + state.sunGlow + '|' + state.sunX + '|' + state.sunY + '|' + state.sunR;
+  if (_haloCache.key !== haloKey) {
+    const halo = ctx.createRadialGradient(
+      state.sunX, state.sunY, state.sunR * 0.5,
+      state.sunX, state.sunY, haloR
+    );
+    halo.addColorStop(0, hexWithAlpha(state.sunColor, 0.55 * state.sunGlow));
+    halo.addColorStop(1, hexWithAlpha(state.sunColor, 0));
+    _haloCache = { key: haloKey, grad: halo };
+  }
+  ctx.fillStyle = /** @type {CanvasGradient} */ (_haloCache.grad);
   ctx.beginPath();
   ctx.arc(state.sunX, state.sunY, haloR, 0, Math.PI * 2);
   ctx.fill();
@@ -109,10 +134,7 @@ const STARS = [
 export function drawNightSky(ctx, bounds, state) {
   const groundY = groundYFor(bounds.height);
 
-  const sky = ctx.createLinearGradient(0, 0, 0, groundY);
-  sky.addColorStop(0, state.skyTop);
-  sky.addColorStop(1, state.skyBottom);
-  ctx.fillStyle = sky;
+  ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
   ctx.fillRect(0, 0, bounds.width, bounds.height);
 
   // Stars (above the horizon only).
@@ -191,6 +213,11 @@ function luminance(hex) {
   return (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
 }
 
+// Ocean tint palette + water-body gradient caches (see the cache note up top).
+let _oceanTint = { key: '', shallow: '', deep: '', crest: '', foam: '', wet: '' };
+/** @type {{ key: string, grad: CanvasGradient | null }} */
+let _waterCache = { key: '', grad: null };
+
 /**
  * Cartoony ocean surf along the bottom of the beach. Painted AFTER the sand so
  * it covers the lower part of the sand band (which sits below the customers),
@@ -224,12 +251,21 @@ export function drawOcean(ctx, bounds, state, time) {
   const tideEnv = 0.5 + 0.5 * Math.max(-1, Math.min(1, s));
   const tideY = restY - tideTravel * tideEnv;
 
-  // Time-of-day tint. day≈1 at noon/dawn, ≈0.22 at midnight.
-  const day = Math.max(0.22, Math.min(1, luminance(state.skyTop) * 1.4));
-  const shallow = scaleHex(mixHex('#6fd6e0', state.skyBottom, 0.10), 0.6 + 0.4 * day);
-  const deep    = scaleHex(mixHex('#1f7fa6', state.skyBottom, 0.18), day);
-  const crest   = scaleHex('#bdeef5', 0.5 + 0.5 * day);
-  const foam    = scaleHex('#ffffff', 0.72 + 0.28 * day);
+  // Time-of-day tint — cached: the hex parsing/serializing only re-runs when
+  // the day state actually changes (on serves), not per frame.
+  const tintKey = state.skyTop + '|' + state.skyBottom + '|' + state.floor;
+  if (_oceanTint.key !== tintKey) {
+    const day = Math.max(0.22, Math.min(1, luminance(state.skyTop) * 1.4));
+    _oceanTint = {
+      key: tintKey,
+      shallow: scaleHex(mixHex('#6fd6e0', state.skyBottom, 0.10), 0.6 + 0.4 * day),
+      deep:    scaleHex(mixHex('#1f7fa6', state.skyBottom, 0.18), day),
+      crest:   scaleHex('#bdeef5', 0.5 + 0.5 * day),
+      foam:    scaleHex('#ffffff', 0.72 + 0.28 * day),
+      wet:     hexWithAlpha(scaleHex(state.floor, 0.7), 0.5)
+    };
+  }
+  const { shallow, deep, crest, foam } = _oceanTint;
 
   const step = Math.max(8, W / 64);
   // Wavy waterline: a long gentle swell + a faster shorter ripple, scrolling.
@@ -240,7 +276,7 @@ export function drawOcean(ctx, bounds, state, time) {
   ctx.save();
 
   // Wet-sand sheen just above the surf (where the tide recently was).
-  ctx.fillStyle = hexWithAlpha(scaleHex(state.floor, 0.7), 0.5);
+  ctx.fillStyle = _oceanTint.wet;
   ctx.beginPath();
   ctx.moveTo(0, edgeY(0));
   for (let x = 0; x <= W; x += step) ctx.lineTo(x, edgeY(x));
@@ -255,11 +291,19 @@ export function drawOcean(ctx, bounds, state, time) {
   for (let x = 0; x <= W; x += step) ctx.lineTo(x, edgeY(x));
   ctx.lineTo(W, bounds.height);
   ctx.closePath();
-  const grad = ctx.createLinearGradient(0, tideY, 0, bounds.height);
-  grad.addColorStop(0, shallow);
-  grad.addColorStop(0.55, mixHex(shallow, deep, 0.65));
-  grad.addColorStop(1, deep);
-  ctx.fillStyle = grad;
+  // The gradient's top anchor rides the tide; quantize it to 2px steps so the
+  // gradient object is reused across frames instead of rebuilt 60×/s (the tide
+  // covers a fixed ~50px range, so the cache cycles through a handful of keys).
+  const tideYq = Math.round(tideY / 2) * 2;
+  const waterKey = _oceanTint.key + '|' + tideYq + '|' + bounds.height;
+  if (_waterCache.key !== waterKey) {
+    const grad = ctx.createLinearGradient(0, tideYq, 0, bounds.height);
+    grad.addColorStop(0, shallow);
+    grad.addColorStop(0.55, mixHex(shallow, deep, 0.65));
+    grad.addColorStop(1, deep);
+    _waterCache = { key: waterKey, grad };
+  }
+  ctx.fillStyle = /** @type {CanvasGradient} */ (_waterCache.grad);
   ctx.fill();
 
   // 2. A couple of cartoony lighter crest lines drifting across the water.

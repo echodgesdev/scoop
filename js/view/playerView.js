@@ -8,6 +8,7 @@ import {
 } from '../game/config.js';
 import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../game/player.js';
 import { scoopSheet, SCOOP_STATE, drawScoopSprite } from './sprites.js';
+import { glowCircle } from './glow.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../game/player.js').Player} Player */
@@ -118,8 +119,7 @@ export function drawPlayer(ctx, player, rainbow = false) {
  */
 function drawTopRing(ctx, x, y, r) {
   ctx.save();
-  ctx.shadowColor = '#ffd166';
-  ctx.shadowBlur = 16;
+  glowCircle(ctx, x, y, r + 2.5, '#ffd166');
   ctx.strokeStyle = '#ffb703';
   ctx.lineWidth = 4;
   ctx.beginPath();
@@ -133,9 +133,10 @@ function drawCone(ctx, player) {
   const cx = player.x;
   const cy = player.y;
   ctx.save();
+  // Serve/catch flash: a baked halo that fades with the flash timer (the old
+  // shadowBlur glow cut off hard; this one tapers out).
   if (player.flash > 0) {
-    ctx.shadowColor = '#ffec5c';
-    ctx.shadowBlur = 30;
+    glowCircle(ctx, cx, cy, CONE_WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
   }
   ctx.fillStyle = '#d18a4a';
   ctx.strokeStyle = '#8a5a2a';
