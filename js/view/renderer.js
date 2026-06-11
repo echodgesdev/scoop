@@ -25,8 +25,11 @@ const ACTIVE_PAUSE_FRAC = 0.6;   // arc-frac..this: slight hold at the waypoint
  * and paints — never mutates.
  * @param {CanvasRenderingContext2D} ctx
  * @param {Game} game
+ * @param {number} [alpha] leftover sim-step fraction (0..1) — moving actors are
+ *   drawn interpolated between their previous and current sim positions, so
+ *   rendering at 90/120Hz over the 60Hz sim stays smooth.
  */
-export function drawFrame(ctx, game) {
+export function drawFrame(ctx, game, alpha = 1) {
   const { x, y } = game.effects.offset();
   ctx.save();
   ctx.translate(x, y);
@@ -49,8 +52,8 @@ export function drawFrame(ctx, game) {
     drawOcean(ctx, game.bounds, dayState, game.clock);
   }
 
-  drawField(ctx, world.field, rainbow);
-  drawPlayer(ctx, world.player, rainbow);
+  drawField(ctx, world.field, rainbow, alpha);
+  drawPlayer(ctx, world.player, rainbow, alpha);
   const pausePatience = world.powerups.pauseActive || !game.flags.patternTimer;
   game.stations.draw(ctx, world.shop.list, {
     activeIndex:    world.shop.customerAt(world.player.x),
@@ -59,7 +62,8 @@ export function drawFrame(ctx, game) {
     pausePatience,
     rainbow,
     time:           game.clock,
-    tipLabel:       game.tutorial.active
+    tipLabel:       game.tutorial.active,
+    alpha
   });
   // Tutorial hint pills — over the scene but under the effect bursts.
   if (game.tutorial.active) game.tutorial.draw(ctx, game);

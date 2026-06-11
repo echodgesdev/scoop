@@ -25,15 +25,18 @@
  *
  * @typedef {{ x: number, y: number, r: number, halfW: number }} Hitbox
  *
- * @typedef {{ x: number, y: number, vy: number, color: ScoopColor, dissolve?: number, speedMult?: number }} Scoop
+ * @typedef {{ x: number, y: number, prevY: number, vy: number, color: ScoopColor, dissolve?: number, speedMult?: number }} Scoop
  *   `dissolve` (seconds, 0..SCOOP_DISSOLVE_S) is present only while a missed
  *   scoop is fading out in the ground; absent means live/catchable.
  *   `speedMult` is the fall multiplier over default (1.0) the scoop spawned with;
  *   the view reads it to pick the falling-scoop sprite tier.
+ *   `prevY` is the y at the start of the latest sim step — the view lerps
+ *   prevY→y by the render alpha so motion stays smooth at any display rate.
  *
  * @typedef {object} ServedScoop
  * @property {ScoopColor} color   what the player actually handed over (may differ from a "wanted" slot under rainbow)
  * @property {number} t           flight progress 0..1
+ * @property {number} [prevT]     t at the start of the latest sim step (render interpolation)
  * @property {number} srcX        x-position the scoop was launched from (cone top at time of serve)
  * @property {number} srcY        y-position it was launched from
  *
@@ -51,8 +54,10 @@
  * @property {number} id
  * @property {number} slot         0..SLOT_COUNT-1
  * @property {number} x            current x
+ * @property {number} prevX        x at the start of the latest sim step (render interpolation)
  * @property {number} targetX      lane-shift target
  * @property {number} yOff         slide-in offset (0 = settled)
+ * @property {number} prevYOff     yOff at the start of the latest sim step (render interpolation)
  * @property {CustomerState} state
  * @property {number} timer
  * @property {number} waitT

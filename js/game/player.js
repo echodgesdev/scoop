@@ -195,6 +195,16 @@ export class Player {
     if (this.x > bounds.width - halfW) { this.x = bounds.width - halfW; this.vx = 0; }
   }
 
+  /**
+   * X interpolated between the last two sim steps — what the view should draw.
+   * `_prevX` is stamped at the top of every update() (it also feeds the slosh),
+   * so it is exactly the previous step's settled position.
+   * @param {number} alpha leftover sim-step fraction from the render loop (0..1)
+   */
+  drawX(alpha) {
+    return this._prevX + (this.x - this._prevX) * alpha;
+  }
+
   coneTopY() {
     return this.y - CONE_HEIGHT / 2;
   }

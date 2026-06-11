@@ -42,13 +42,12 @@ import { TouchControls } from './engine/touch.js';
 
 // Physics step: deterministic per-frame integration. The render loop accumulates
 // real time and runs as many fixed steps as fit. Effects are visual-only and
-// stay variable-step.
+// stay variable-step. Rendering runs at the display's native rate with movers
+// interpolated by the loop's alpha — a 60fps render cap was tried and reverted:
+// on a 90Hz panel it painted every 2nd vsync (45fps) while the sim stepped at
+// 60Hz, so painted frames advanced 1,1,2,1,1,2 steps — visible judder.
 const FIXED_DT = 1 / 60;
 const MAX_FRAME = 0.25;
-// Cap the RENDER rate. The sim is fixed-step at FIXED_DT (60Hz); on a 90/120Hz
-// phone, painting at the display rate just burns GPU/battery for no gameplay gain,
-// so the loop throttles rendering to this.
-const RENDER_FPS = 60;
 
 // Between-wave reset beat: a sped-up night cycle (sunset→midnight→dawn, crescent
 // moon arcing across) that plays after the cashout and before the wave overlay.
@@ -170,8 +169,8 @@ export class Game {
     // toggle the DOM on transitions, not every frame).
     this._dayHintShown = false;
     // Fixed-timestep loop (engine). Started in start(), stopped on game over.
-    // Render throttled to RENDER_FPS so high-refresh phones don't over-paint.
-    this.loop = new Loop(FIXED_DT, MAX_FRAME, RENDER_FPS);
+    // Renders every animation frame; movers interpolate by the render alpha.
+    this.loop = new Loop(FIXED_DT, MAX_FRAME);
 
     // Debug panel — its tuning controls forward straight to the World.
     this.debug = new DebugPanel(this.flags, {
@@ -434,7 +433,7 @@ export class Game {
     this.loop.start({
       shouldStep: () => this._stepping(),
       step: dt => this._step(dt),
-      render: dt => this._frame(dt)
+      render: (dt, alpha) => this._frame(dt, alpha)
     });
   }
 
@@ -514,8 +513,9 @@ export class Game {
    * clock, presentation-timer decay, the between-wave night-cycle sweep, visual
    * effects, the HUD pull, the tutorial overlay, and the draw.
    * @param {number} frame seconds since the last frame (clamped by the Loop)
+   * @param {number} [alpha] leftover sim-step fraction — movers draw interpolated
    */
-  _frame(frame) {
+  _frame(frame, alpha = 1) {
     // Smoothed FPS for the debug overlay (EMA). Guard against the first frame.
     if (frame > 0) this.fps = this.fps * 0.9 + (1 / frame) * 0.1;
     this.clock += frame;
@@ -549,7 +549,7 @@ export class Game {
     if (this.tutorial.active) this.tutorial.update(frame, this);
     this._syncDayHint();
 
-    drawFrame(this.ctx, this);
+    drawFrame(this.ctx, this, alpha);
   }
 
   /** @param {number} dt */

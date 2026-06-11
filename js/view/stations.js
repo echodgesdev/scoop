@@ -107,14 +107,17 @@ export class Stations {
     this.groundY = groundYFor(bounds.height);
   }
 
-  draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false, time = 0, tipLabel = false }) {
+  draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false, time = 0, tipLabel = false, alpha = 1 }) {
     for (let i = 0; i < customers.length; i++) {
       const c = customers[i];
-      const cx = c.x;
+      // Lane shifts + slide in/out interpolate between the last two sim steps
+      // (render alpha) so the motion is smooth at any display refresh rate.
+      const cx = c.prevX + (c.x - c.prevX) * alpha;
+      const yOff = c.prevYOff + (c.yOff - c.prevYOff) * alpha;
       // Face center sits CUSTOMER_FACE_OFFSET_PX from the sand top (negative
       // = above). Half-submerged feel is just below 0; current default keeps
       // a strip of face above the sand.
-      const faceY = this.groundY + CUSTOMER_FACE_OFFSET_PX + c.yOff;
+      const faceY = this.groundY + CUSTOMER_FACE_OFFSET_PX + yOff;
       const waiting = c.state === STATE.WAITING;
       const servable = waiting && canServe(i);
       const active = waiting && i === activeIndex;
@@ -140,10 +143,9 @@ export class Stations {
       if (c.tip && c.state !== STATE.LEAVING) this._drawTip(ctx, c.tip, cx, faceY, time, tipLabel);
 
       // Held mini-cone + flying-in / settled scoops. Drawn for every state
-      // so it slides off with the customer on LEAVING. Pass faceY in so the
-      // held cone tracks the customer's actual face position rather than
-      // an absolute ground line.
-      this._drawHeldCone(ctx, c, faceY);
+      // so it slides off with the customer on LEAVING. Pass the interpolated
+      // cx/faceY in so the held cone tracks the customer's drawn position.
+      this._drawHeldCone(ctx, c, cx, faceY, alpha);
     }
   }
 
@@ -225,12 +227,13 @@ export class Stations {
    * Customer's mini-cone next to their face. Stack grows upward as serveOne
    * accepts; each new entry flies in along an arc from where the player's
    * cone-top scoop was at serve time.
+   * @param {number} cx interpolated customer x (drawn position)
    */
-  _drawHeldCone(ctx, c, faceY) {
+  _drawHeldCone(ctx, c, cx, faceY, alpha = 1) {
     const served = c.order.served;
     if (!served || served.length === 0) return;
 
-    const baseX = c.x + MINI_CONE_OFFSET_X;
+    const baseX = cx + MINI_CONE_OFFSET_X;
     // Cone tip positioned MINI_CONE_FACE_OFFSET_PX below the face center,
     // so the cone "hangs" at the customer's chin level regardless of how
     // submerged they are. faceY already includes the slide-in offset.
@@ -259,8 +262,10 @@ export class Stations {
       const slotY = baseY - MINI_CONE_H - i * spacing - MINI_SCOOP_RADIUS * 0.2;
 
       // Ease-in-out from src to slot, with a sin-bump that arcs the path
-      // upward so the scoop reads as "tossed across".
-      const t = Math.max(0, Math.min(1, s.t));
+      // upward so the scoop reads as "tossed across". Flight progress is
+      // interpolated between sim steps (it's a fast 0.32s arc).
+      const st = s.prevT !== undefined ? s.prevT + (s.t - s.prevT) * alpha : s.t;
+      const t = Math.max(0, Math.min(1, st));
       const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
       const x = s.srcX + (slotX - s.srcX) * e;
       const linearY = s.srcY + (slotY - s.srcY) * e;

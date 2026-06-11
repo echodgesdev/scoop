@@ -113,6 +113,9 @@ export class ScoopField {
 
     for (let i = this.scoops.length - 1; i >= 0; i--) {
       const s = this.scoops[i];
+      // Stamp the pre-step position — the view lerps prevY→y by the render
+      // alpha so falling motion stays smooth at any display refresh rate.
+      s.prevY = s.y;
 
       // Dissolving: drift gently while fading, then cull. Not catchable.
       if (s.dissolve !== undefined) {
@@ -159,6 +162,7 @@ export class ScoopField {
     this.scoops.push({
       x: Math.random() * (bounds.width - 80) + 40,
       y: -SCOOP_RADIUS,
+      prevY: -SCOOP_RADIUS,
       vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * speedMult,
       speedMult,
       color

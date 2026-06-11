@@ -110,7 +110,8 @@ export class Shop {
     };
     /** @type {Customer} */
     const c = {
-      id: this._id++, slot, x, targetX: x, yOff: ARRIVE_OFFSET,
+      id: this._id++, slot, x, prevX: x, targetX: x,
+      yOff: ARRIVE_OFFSET, prevYOff: ARRIVE_OFFSET,
       state: STATE.ARRIVING, timer: 0, waitT: 0, mood: null, order
     };
     this.customers.push(c);
@@ -209,8 +210,10 @@ export class Shop {
       id: this._id++,
       slot,
       x,
+      prevX: x,
       targetX: x,
       yOff: ARRIVE_OFFSET,
+      prevYOff: ARRIVE_OFFSET,
       state: STATE.ARRIVING,
       timer: 0,
       waitT: 0,
@@ -253,10 +256,15 @@ export class Shop {
     }
 
     for (const c of this.customers) {
+      // Stamp pre-step positions — the view lerps prev→current by the render
+      // alpha so slides stay smooth at any display refresh rate.
+      c.prevX = c.x;
+      c.prevYOff = c.yOff;
       c.x = approach(c.x, c.targetX, sx);
 
       // Tick each in-flight served scoop toward 1; landed scoops stop at 1.
       for (const s of c.order.served) {
+        s.prevT = s.t;
         if (s.t < 1) s.t = Math.min(1, s.t + dt / SERVED_FLIGHT_S);
       }
 

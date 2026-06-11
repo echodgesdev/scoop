@@ -28,17 +28,24 @@ const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#
  * @param {CanvasRenderingContext2D} ctx
  * @param {Player} player
  * @param {boolean} [rainbow] repaint every tray scoop as rainbow (purely visual)
+ * @param {number} [alpha] render-interpolation fraction (previous→current x)
  */
-export function drawPlayer(ctx, player, rainbow = false) {
-  // Handoff lean: a sin-bumped offset toward the customer that snaps back by the
-  // end of HANDOFF_DURATION_S. Applied via translate so the cone and every scoop
-  // on it move together, like a coordinated "reach".
+export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
+  // One translate moves the cone and every scoop riding it together:
+  // 1. render interpolation — everything here is positioned off player.x, so
+  //    shifting by (drawX − x) draws the whole assembly at the interpolated x;
+  // 2. handoff lean — a sin-bumped offset toward the customer that snaps back
+  //    by the end of HANDOFF_DURATION_S (the coordinated "reach").
   ctx.save();
+  let tx = player.drawX(alpha) - player.x;
+  let ty = 0;
   if (player.handoffT < HANDOFF_DURATION_S) {
     const p = player.handoffT / HANDOFF_DURATION_S;
     const ease = Math.sin(p * Math.PI);
-    ctx.translate(player.handoffDx * ease, player.handoffDy * ease);
+    tx += player.handoffDx * ease;
+    ty += player.handoffDy * ease;
   }
+  if (tx !== 0 || ty !== 0) ctx.translate(tx, ty);
   drawCone(ctx, player);
 
   const stack = player.stack;
