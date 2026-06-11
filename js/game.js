@@ -274,6 +274,9 @@ export class Game {
     this.stations.layout(this.bounds);
     this.world.shop.layout(this.bounds.width);
     this._resize();
+    // Paint the ambient scene once so the title overlay sits over the dawn
+    // beach instead of a blank (black) canvas before the first start().
+    drawFrame(this.ctx, this);
   }
 
   /**
@@ -388,6 +391,11 @@ export class Game {
       this.world.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
       this.stations.layout(this.bounds);
       this.world.shop.layout(this.bounds.width);
+      // Reassigning canvas.width wipes the backing store to transparent, and
+      // the next rAF paint may be a frame away — long enough to flash the dark
+      // page background ("black frame" on mobile URL-bar / fullscreen changes).
+      // Repaint synchronously so there is never an unpainted composite.
+      drawFrame(this.ctx, this);
     }
     const r = fitRect(window.innerWidth, window.innerHeight, this.bounds.width, this.bounds.height);
     this.stage.style.left = `${r.left}px`;
