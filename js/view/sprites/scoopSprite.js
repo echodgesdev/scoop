@@ -22,7 +22,8 @@ const ROWS = [
 
 /** @type {import('../../types.js').SpriteSheetDef} */
 const SCOOP_SPRITE = {
-  image: 'scoop_sheet.png',
+  // Runtime path (relative to index.html) — consumers use it verbatim.
+  image: 'assets/scoop_sheet.png',
   imageSize: { width: COLS * FRAME, height: ROWS.length * FRAME },
   frame: { width: FRAME, height: FRAME },
   animations: ROWS.map((name, row) => ({

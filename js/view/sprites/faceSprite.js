@@ -9,7 +9,8 @@ const COLS = 6;
 
 /** @type {import('../../types.js').SpriteSheetDef} */
 const FACE_SPRITE = {
-  image: 'mascot_test.png',
+  // Runtime path (relative to index.html) — consumers use it verbatim.
+  image: 'assets/mascot_test.png',
   imageSize: { width: 614, height: FRAME },
   frame: { width: FRAME, height: FRAME },
   animations: [{

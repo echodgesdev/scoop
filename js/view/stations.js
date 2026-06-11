@@ -68,10 +68,8 @@ function rainbowSwatch() {
 const FACE = Object.freeze({ DEFAULT: 0, HUNGRY: 1, UPSET: 2, ANGRY: 3, DROOL: 4, FROZEN: 5 });
 // Emoji fallback by frame index, used until the sheet image loads.
 const FACE_EMOJI = ['🙂', '😋', '😟', '😠', '🤤', '🥶'];
-const faceSheet = new SpriteSheet({
-  ...FACE_SPRITE,
-  image: 'assets/' + String(FACE_SPRITE.image || '').split(/[\\/]/).pop()
-});
+// The def's `image` is the runtime path (sprite-editor export) — used verbatim.
+const faceSheet = new SpriteSheet(FACE_SPRITE);
 
 /**
  * The customer's face frame index for its state + patience. As patience drains

@@ -21,12 +21,10 @@ export const SCOOP_STATE = Object.freeze({
   CONE_TOP: 'Scoop Top'  // top of the tray stack (the "deliver me next" look)
 });
 
-// Build a renderer per def, loading each def's own image from the assets folder
-// (so renaming the sheet in the editor flows straight through — no hardcoded path).
-const baseImg = 'assets/' + String(SCOOP_SPRITE.image || '').split(/[\\/]/).pop();
-const fastImg = 'assets/' + String(SCOOP_FAST_SPRITE.image || '').split(/[\\/]/).pop();
-export const scoopSheet = new SpriteSheet({ ...SCOOP_SPRITE, image: baseImg });
-const fastSheet = new SpriteSheet({ ...SCOOP_FAST_SPRITE, image: fastImg });
+// Build a renderer per def. The def's `image` is the runtime path (the sprite
+// editor exports it as assets/<file>), so it's used verbatim — no rewriting.
+export const scoopSheet = new SpriteSheet(SCOOP_SPRITE);
+const fastSheet = new SpriteSheet(SCOOP_FAST_SPRITE);
 
 // Fall-speed tiers (checked high→low). `speedMult` is the scoop's fall multiplier
 // over the default (1.0); the wave ramp runs 1.0→2.2 (≈ +0.2 per wave), so:

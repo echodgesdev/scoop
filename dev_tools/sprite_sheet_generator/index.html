@@ -79,8 +79,8 @@
     <input type="file" id="fileInput" accept="image/*" />
   </div>
   <div>
-    <label>Load JSON (resume a session)</label>
-    <input type="file" id="jsonInput" accept="application/json,.json" />
+    <label>Load session (.json or a view/sprites .js)</label>
+    <input type="file" id="jsonInput" accept="application/json,.json,.js,text/javascript" />
   </div>
   <span id="imgInfo" class="mini"></span>
   <div class="spacer"></div>
@@ -210,7 +210,9 @@
         <button id="copyJsBtn">Copy as JS</button>
         <button id="downloadJsBtn">Download .js</button>
       </div>
-      <p class="hint">“as JS” emits a <b>default export</b> — save into <b>view/sprites/</b> (e.g. scoopSprite.js) and import it under any name. No translation step.</p>
+      <p class="hint">“as JS” emits a ready <b>view/sprites/</b> module: default export, <b>image</b> already
+        pointing at <b>assets/&lt;file&gt;</b> (the game uses it verbatim — keep the sheet PNG in assets/).
+        Round-trip: “Load session” accepts these .js files back, and Download reuses the loaded filename.</p>
       <textarea id="jsonOut" spellcheck="false" readonly></textarea>
     </section>
   </div>
@@ -239,6 +241,7 @@ function newAnim(name, frames) {
 
 const state = {
   imageName: '', img: null, imgW: 0, imgH: 0,
+  defName: '',      // filename of the loaded session def (.js/.json) — reused on download
   viewport: { w: 0, h: 0 },
   animations: [],   // see shape above
   anim: 0,          // current animation index
@@ -270,7 +273,7 @@ function loadImage(src, name) {
     $('imgInfo').textContent = `${name} — ${img.naturalWidth}×${img.naturalHeight}px`;
     renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
   };
-  img.onerror = () => { $('imgInfo').textContent = `⚠ couldn't load ${name}`; };
+  img.onerror = () => { $('imgInfo').textContent = `⚠ couldn't load ${name} — pick it with "Load image"`; };
   img.src = src;
 }
 
@@ -291,10 +294,12 @@ preview.addEventListener('drop', e => {
   if (f && f.type.startsWith('image/')) loadImage(URL.createObjectURL(f), f.name);
 });
 
-// --- JSON session loading ---------------------------------------------------
-// Restore a previous session from an exported JSON. The data (viewport, frames,
-// bodies, offsets) comes back immediately; the image itself can't be auto-loaded
-// from a path, so load the matching image after (it attaches without wiping this).
+// --- session loading (.json or a view/sprites .js def) ----------------------
+// Restore a session from an exported JSON OR one of the game's sprite-def ES
+// modules (js/view/sprites/*.js — including the hand-built "builder" style).
+// The data (viewport, frames, bodies, offsets) comes back immediately; when the
+// def's image points into assets/ and the tool is served over HTTP, the image
+// auto-loads from ../../assets/ too — the whole edit loop needs no manual steps.
 function bodyIn(b) {
   // Exported body (circle / rect / null) → internal shape that carries every
   // field, so the inputs can always read them.
@@ -326,14 +331,40 @@ function loadJSON(def) {
     ? `${state.imageName || 'session'} — restored (${state.animations.length} anim)`
     : `session restored — now load ${state.imageName || 'the image'} to preview`;
   renderAnims(); renderFrames(); syncInputs(); render(); exportJSON();
+
+  // Auto-fetch the sheet image: the def stores the game-runtime path
+  // (assets/<file>) and this tool sits two levels below the game root, so over
+  // HTTP ../../assets/<file> resolves. Falls back to the manual picker (the
+  // onerror message) when opened via file:// or the path moved.
+  if (!state.img && def.image) {
+    const base = String(def.image).split(/[\\/]/).pop();
+    loadImage('../../assets/' + base, base);
+  }
+}
+
+/**
+ * Parse a session file: plain JSON, or a sprite-def ES module (the game's
+ * view/sprites/*.js files — the generated JSON style AND the hand-built
+ * "builder" style both work, since the module body is simply evaluated with
+ * `export default` rewritten to a return). Local dev tool, local files.
+ */
+function parseDef(text, name) {
+  if (/\.js$/i.test(name)) {
+    return new Function(text.replace(/export\s+default\s+/, 'return '))();
+  }
+  return JSON.parse(text);
 }
 $('jsonInput').addEventListener('change', e => {
   const f = e.target.files[0];
   if (!f) return;
   const reader = new FileReader();
   reader.onload = () => {
-    try { loadJSON(JSON.parse(String(reader.result))); }
-    catch (err) { $('imgInfo').textContent = '⚠ JSON parse error'; }
+    try {
+      const def = parseDef(String(reader.result), f.name);
+      state.defName = /\.js$/i.test(f.name) ? f.name : '';
+      loadJSON(def);
+    }
+    catch (err) { $('imgInfo').textContent = `⚠ could not parse ${f.name}`; }
   };
   reader.readAsText(f);
 });
@@ -557,9 +588,16 @@ function bodyOut(b) {
     ? { shape: 'circle', x: b.x, y: b.y, radius: b.radius }
     : { shape: 'rect', x: b.x, y: b.y, width: b.width, height: b.height };
 }
+// The image path AS THE GAME LOADS IT: defs are imported by js/view/sprites/*
+// but URLs resolve relative to index.html, where the sheets live in assets/.
+// Exports bake this in so consumers can use def.image verbatim — no rewriting.
+function runtimeImage() {
+  const base = String(state.imageName || '').split(/[\\/]/).pop();
+  return base ? 'assets/' + base : '';
+}
 function buildJSON() {
   return {
-    image: state.imageName,
+    image: runtimeImage(),
     imageSize: { width: state.imgW, height: state.imgH },
     frame: { width: state.viewport.w, height: state.viewport.h },
     animations: state.animations.map(a => ({
@@ -584,25 +622,34 @@ $('downloadBtn').addEventListener('click', () => {
   a.click();
 });
 
-// Emit the def as a ready ES module — drops straight into game/scoopSprite.js,
-// no hand-translation. The game derives the collision body + sizes from this.
-// Emit the def as a ready ES module with a DEFAULT export — drops into a sprite
-// data file (e.g. view/sprites/scoopSprite.js) and imports under any name, so
-// there's no export-name to match.
+// Emit the def as a ready ES module with a DEFAULT export — saves straight into
+// js/view/sprites/ and imports under any name, no hand-translation: the image
+// path is the runtime one (assets/<file>) and the @type import matches that
+// directory. Round-trips: "Load session" reads these files back.
 function buildJS() {
   return '// @ts-check\n'
     + '// Sprite definition — generated by the sprite editor\n'
-    + '// (dev_tools/sprite_sheet_generator). Regenerate freely; do not hand-edit.\n'
+    + '// (dev_tools/sprite_sheet_generator). To tweak, load this file back into\n'
+    + '// the editor ("Load session") and re-download — do not hand-edit.\n'
     + "/** @type {import('../../types.js').SpriteSheetDef} */\n"
     + 'const SPRITE = ' + JSON.stringify(buildJSON(), null, 2) + ';\n'
     + 'export default SPRITE;\n';
+}
+// Download name: a loaded session keeps ITS filename (so round-tripping
+// scoopSprite.js overwrites scoopSprite.js); fresh sprites derive a
+// view/sprites-style camelCase name from the sheet image.
+function jsFileName() {
+  if (state.defName) return state.defName;
+  const base = String(state.imageName || 'sprite').split(/[\\/]/).pop().replace(/\.[^.]+$/, '');
+  const camel = base.replace(/[-_ ]+(\w)/g, (m, ch) => ch.toUpperCase()).replace(/[^\w]/g, '');
+  return (camel || 'sprite') + 'Sprite.js';
 }
 $('copyJsBtn').addEventListener('click', () => { navigator.clipboard?.writeText(buildJS()); });
 $('downloadJsBtn').addEventListener('click', () => {
   const blob = new Blob([buildJS()], { type: 'text/javascript' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = (state.imageName.replace(/\.[^.]+$/, '') || 'sprite') + '.js';
+  a.download = jsFileName();
   a.click();
 });
 

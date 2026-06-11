@@ -20,7 +20,8 @@ const OFFSET_Y = -(FRAME_H / 2 - BODY_R);  // ball at the cell bottom → lift o
 
 /** @type {import('../../types.js').SpriteSheetDef} */
 const SCOOP_FAST_SPRITE = {
-  image: 'scoop_sheet_falling.png',
+  // Runtime path (relative to index.html) — consumers use it verbatim.
+  image: 'assets/scoop_sheet_falling.png',
   imageSize: { width: COLS * FRAME_W, height: ROWS * FRAME_H },
   frame: { width: FRAME_W, height: FRAME_H },
   animations: Array.from({ length: ROWS }, (_, row) => ({
