@@ -403,17 +403,9 @@ body.day-hint #gauge::before {
   max-width: 600px;
 }
 
-#overlay button {
-  margin-top: 20px;
-  font-size: 28px;
-  padding: 12px 32px;
-  border-radius: 12px;
-  border: none;
-  background: #ffb703;
-  cursor: pointer;
-  font-family: inherit;
-  font-weight: bold;
-}
+/* (Overlay buttons are styled by .menu-buttons + the parlor theme at the end
+   of this file — a legacy `#overlay button` rule used to live here and its ID
+   specificity overrode every class-level button style inside the overlay.) */
 
 #overlay {
   /* Cross-fades with the HUD when transitioning between menu and gameplay. */
@@ -1112,6 +1104,13 @@ button.flash {
 }
 .menu-buttons.gameover-buttons #startBtn {
   font-size: 18px;
+}
+/* 4th button (Settings) — centered on its own full-width row instead of
+   dangling alone in the grid's first column. */
+.menu-buttons.gameover-buttons #settingsBtn {
+  grid-column: 1 / -1;
+  justify-self: center;
+  padding: 10px 28px;
 }
 
 /* =========================================================================
