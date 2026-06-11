@@ -758,13 +758,10 @@ body.menu-visible #hud {
   50%      { transform: scale(1.08); }
 }
 
-/* CTA flash on the Recipes button when there's something new to see. */
+/* CTA flash on the Recipes button when there's something new to see.
+   (Keyframes live in the parlor-theme section at the end of this file.) */
 button.flash {
   animation: button-flash 0.7s ease-in-out infinite alternate;
-}
-@keyframes button-flash {
-  from { box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 0 4px #ffb703; }
-  to   { box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 0 24px #ffb703, 0 0 12px #ff6fa3; }
 }
 
 /* === Debug wave-jump ======================================================= */
@@ -1653,4 +1650,201 @@ button.flash {
 body.menu-visible #pauseBtn {
   opacity: 0;
   pointer-events: none;
+}
+
+/* =========================================================================
+   Parlor theme — beach ice-cream-shop dressing for the menus.
+   Shared language: cream waffle cards with a striped, scallop-trimmed awning
+   across the top of every modal, and candy-pill buttons (mint = go, vanilla =
+   secondary, waffle brown = close). Appended last so it wins the cascade over
+   the per-modal basics above.
+   ========================================================================= */
+
+/* --- Title / game-over backdrop: golden-hour wash over the live beach scene
+       (the canvas paints the dawn beach behind this overlay now). --------- */
+#overlay {
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 211, 145, 0.22), rgba(255, 211, 145, 0) 60%),
+    linear-gradient(180deg, rgba(48, 26, 56, 0.45) 0%, rgba(82, 38, 24, 0.48) 55%, rgba(40, 19, 10, 0.66) 100%);
+}
+
+#overlay h1 {
+  font-size: 62px;
+  margin: 0;
+  color: #fff;
+  letter-spacing: 0.5px;
+  filter: drop-shadow(0 4px 0 rgba(90, 42, 16, 0.85)) drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+}
+/* Soft-serve gradient lettering (emoji cones sit outside the span so the
+   gradient clip never blanks a color glyph). */
+.title-word {
+  background: linear-gradient(180deg, #fff6e0 8%, #ffd166 48%, #ff6fa3 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+#overlay .tagline {
+  margin: 10px 0 2px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff3d6;
+  text-shadow: 0 2px 6px rgba(40, 16, 4, 0.65);
+}
+#title-best {
+  /* Little hanging shop-sign plank under the menu. */
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff3c0;
+  background: linear-gradient(180deg, #a4713d, #8a5a2a);
+  border: 2px solid #6d4521;
+  border-radius: 999px;
+  padding: 8px 24px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+#title-best:empty { display: none; }
+
+/* --- Modal cards: vanilla cream with a faint waffle crosshatch. ---------- */
+.recipes-modal,
+.challenges-modal,
+.settings-modal,
+.wave-transition-modal,
+.gameover-card {
+  position: relative;
+  overflow: hidden;             /* clips the awning to the rounded corners */
+  padding-top: 46px;            /* clear the awning strip */
+  background:
+    repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    linear-gradient(180deg, #fffaf0 0%, #ffefc8 100%);
+  border: 3px solid #b97a42;
+  border-radius: 18px;
+  box-shadow:
+    0 14px 34px rgba(40, 16, 4, 0.45),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.55);
+  color: #3a2a1a;
+}
+
+/* Striped awning with scalloped trim across each card's top. The mask keeps
+   a straight 16px band plus a row of semicircles (one per 26px stripe). */
+.recipes-modal::before,
+.challenges-modal::before,
+.settings-modal::before,
+.wave-transition-modal::before,
+.gameover-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 27px;
+  background: repeating-linear-gradient(90deg, #ff7b94 0 26px, #fff7ea 26px 52px);
+  -webkit-mask:
+    linear-gradient(#000 0 0) left top / 100% 16px no-repeat,
+    radial-gradient(circle 11px at 50% 0, #000 98%, transparent 100%) left 0 top 16px / 26px 11px repeat-x;
+  mask:
+    linear-gradient(#000 0 0) left top / 100% 16px no-repeat,
+    radial-gradient(circle 11px at 50% 0, #000 98%, transparent 100%) left 0 top 16px / 26px 11px repeat-x;
+  pointer-events: none;
+}
+
+.recipes-modal h2,
+.challenges-modal h2,
+.settings-modal h2,
+.wt-title {
+  color: #8a4a2a;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.wave-transition-modal .wt-title { color: #c1121f; }
+.pause-modal .wt-title { color: #8a4a2a; }
+
+/* --- Candy buttons -------------------------------------------------------- */
+.menu-buttons button,
+.wt-buttons button,
+.pause-settings-btn {
+  font-family: inherit;
+  font-weight: bold;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  background: linear-gradient(180deg, #2fe3b4, #06d6a0 55%, #04b58a);
+  box-shadow:
+    0 5px 0 #038f6d,
+    0 8px 16px rgba(40, 16, 4, 0.28),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+}
+.menu-buttons button:hover,
+.wt-buttons button:hover,
+.pause-settings-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.menu-buttons button:active,
+.wt-buttons button:active,
+.pause-settings-btn:active {
+  transform: translateY(4px);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.25),
+    0 3px 8px rgba(40, 16, 4, 0.25),
+    inset 0 2px 0 rgba(255, 255, 255, 0.3);
+}
+.menu-buttons button.secondary,
+.wt-buttons .secondary,
+.pause-settings-btn {
+  background: linear-gradient(180deg, #fffdf6, #ffeed2);
+  color: #7a5230;
+  border: 2px solid #e8c9a0;
+  text-shadow: none;
+  box-shadow:
+    0 5px 0 #d9b285,
+    0 8px 16px rgba(40, 16, 4, 0.2),
+    inset 0 2px 0 rgba(255, 255, 255, 0.85);
+}
+.menu-buttons button.secondary:active,
+.wt-buttons .secondary:active,
+.pause-settings-btn:active {
+  box-shadow:
+    0 1px 0 #d9b285,
+    0 3px 8px rgba(40, 16, 4, 0.18),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* Waffle-brown close buttons on the book-style modals. */
+#closeRecipesBtn,
+#closeChallengesBtn,
+#closeSettingsBtn {
+  border-radius: 999px;
+  background: linear-gradient(180deg, #d9a263, #bb7f47 60%, #a96e39);
+  box-shadow: 0 4px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+}
+#closeRecipesBtn:hover,
+#closeChallengesBtn:hover,
+#closeSettingsBtn:hover { filter: brightness(1.06); }
+#closeRecipesBtn:active,
+#closeChallengesBtn:active,
+#closeSettingsBtn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* The CTA flash keeps a bottom edge so candy buttons don't go flat mid-pulse. */
+@keyframes button-flash {
+  from { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 4px #ffb703; }
+  to   { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 24px #ffb703, 0 0 12px #ff6fa3; }
+}
+
+/* Warm the modal backdrops to match the golden-hour wash. */
+#recipesOverlay,
+#challengesOverlay,
+#settingsOverlay { background: rgba(32, 17, 8, 0.62); }
+#waveTransitionOverlay,
+#pauseOverlay { background: rgba(32, 17, 8, 0.55); }
+
+/* Challenge toast joins the palette: warm chocolate pill, golden trim. */
+#challengeToast {
+  background: rgba(58, 36, 18, 0.92);
+  border: 2px solid #ffd166;
 }

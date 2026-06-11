@@ -240,7 +240,10 @@ Per [scoop-solitaire-direction.md](C:/Users/edward.hodges/.claude/projects/c--Us
 
 ## Mobile Performance — heat / battery / black flashes
 
-**Status:** analyzed; quick wins shipped; the big lever (`shadowBlur` → baked glows) deferred.
+**Status:** main pass shipped 2026-06-11 — baked glows, gradient/tint caches,
+guarded HUD writes, display-rate rendering with sim interpolation, synchronous
+resize repaint. Remaining options if a device is still hot: ocean
+simplification (coarser `step`, fewer layers) and a 30fps battery-saver toggle.
 
 ### Symptom
 Game flashes black on mobile, phone gets hot and drains battery early in play. Suspected to correlate with the sprite renderer, possibly back to the engine separation.
@@ -249,9 +252,31 @@ Game flashes black on mobile, phone gets hot and drains battery early in play. S
 **Not a memory leak.** Particles are culled in `effects.update`, domain events fire only on discrete actions (catch/serve/expire — never per-frame), bus listeners are wired once, and the sprite renderer loads 3 sheet images at startup and allocates nothing per frame. The symptoms read as **sustained GPU load (over-painting)**, not a growing heap. Before chasing a leak, confirm the JS heap is flat in DevTools.
 
 ### Already shipped (no visual change)
-- **Render capped to 60 fps** — `engine/loop.js` gained a `maxFps` render throttle; `game.js` passes `RENDER_FPS = 60`. The loop painted on every `requestAnimationFrame`, so a 90/120 Hz phone rendered the full scene 90–120×/s while the sim is fixed at 60 Hz — pure battery/heat for no gameplay gain. No-op on 60 Hz; ~halves GPU work on 120 Hz. **Likely the main fix — verify first.**
+- **`shadowBlur` → baked glow sprites** (`view/glow.js`) — customer bubble +
+  tip-badge glows, the active power-up ring, the cone flash, and the tutorial
+  pills now blit cached halo canvases instead of running a Gaussian blur per
+  fill/stroke per frame. This was the top item in the cost table below.
+- **Gradient + color-math caches** — the day-cycle state (`dayCycle.js`), the
+  sky/sun gradients, the ocean tint hex math, and the water-body gradient
+  (`scene.js`) are memoized; they only change on serves but were rebuilt 60×/s.
+  The rainbow order swatch is baked once (`stations.js`).
+- **`backdrop-filter` removed** from the HUD panel + pause/fullscreen buttons —
+  it re-blurred the canvas backdrop on every painted frame.
+- **Guarded per-frame DOM writes** — `Hud.setScore/setHealth/setGauge/setCombo`
+  early-out (with quantization) when nothing visibly changed, so the gauge's
+  SVG drop-shadow filter and the bar transitions stop invalidating every frame.
+- **Display-rate rendering + sim interpolation** — replaces the earlier 60fps
+  render cap, which judders on 90 Hz panels (paints every 2nd vsync = 45fps
+  over a 60 Hz sim → 1,1,2 sim steps per painted frame). The loop now renders
+  every rAF and the view lerps movers (scoop y, cone x, customer x/yOff,
+  served-scoop flights) by the leftover-step alpha.
+- **Synchronous repaint after canvas realloc** — `canvas.width =` wipes the
+  backing store; `_resize` now redraws in the same task, killing the **black
+  flash** on URL-bar/fullscreen changes (debounce alone still flashed once).
 - **`loop.stop()` actually stops** — it used to re-arm mid-tick and render the frozen scene forever after game over.
-- **Debounced window `resize`** — the mobile URL-bar show/hide fires a burst of resizes, each reallocating the canvas backing store (a **black flash**) + repositioning actors. Coalesced into one resize after it settles → should kill the flashing.
+- **Debounced window `resize`** — the mobile URL-bar show/hide fires a burst of resizes; coalesced into one after it settles.
+- **`#stage` rect cached** for the touch layer's `_toVirtual` — it ran
+  `getBoundingClientRect()` (a layout pass) on every pointermove, mid-drag.
 
 ### Per-frame cost distribution (estimate — active play, ~5 customers)
 Ranked by op type, **not** a device profile; ordering is reliable, percentages are rough.
@@ -265,20 +290,20 @@ Ranked by op type, **not** a device profile; ordering is reliable, percentages a
 | **Effects** (particle arcs + pop-text) | ~5% | bursty |
 | **Off-canvas HUD repaint** (`styles.css` has ~31 `box-shadow`/`backdrop-filter`/`blur`; gauge + combo widths change every frame via `_syncHud`) | hidden but real | `backdrop-filter` re-composites the backdrop on each repaint |
 
-### Options (ranked)
-1. **`shadowBlur` → baked glow textures — biggest lever.** `shadowBlur` re-runs a blur into a temp buffer every frame (slow path on mobile). Bake each glow **once** into an offscreen canvas at load (no new PNG needed), then `drawImage` it — turns a per-frame blur into a cheap blit. Always-on sites are the customer **bubble + tip-badge** glows in `stations.js` (`_drawBubble`/`_drawTip`); also the active-power-up bubble (`renderer.js`) and cone-flash (`playerView.js`). Per-flavor glow color → tint one white glow texture. Self-contained: a small glow-texture helper + swapping the ~handful of `shadowBlur` sites; should not change the look.
-2. **Ocean simplification** — coarser `step` (e.g. `W/40`), fewer wave layers, drop the per-frame hex-string color mixing (precompute tints when the day-state changes, not every frame).
-3. **Cache the sky/ocean gradients** — rebuild only when the day-cycle state changes meaningfully, not every frame.
-4. **Battery-saver toggle** — optional 30 fps render cap (`RENDER_FPS = 30`) as a settings option for weak/old phones.
+### Remaining options (only if a device is still hot after the shipped pass)
+1. **Ocean simplification** — coarser `step` (e.g. `W/40`), fewer wave layers.
+   The tint math + water gradient are already cached; the remaining cost is the
+   ~5 full-width polyline fills per frame.
+2. **Battery-saver toggle** — an optional reduced-render mode for weak/old
+   phones. NOTE: a plain fps cap was tried and **reverted** — capping below the
+   display rate makes painted frames advance uneven sim-step counts (judder on
+   90 Hz panels). A battery saver should instead skip ALTERNATE vsyncs only
+   when the measured refresh rate is an exact multiple of the target.
 
 **Ruled out — scoops as squares instead of circles:** scoops already render as `ctx.drawImage` (textured quads); the `ctx.arc` circle path is only the offline fallback when a sheet hasn't loaded, so there are no circle fills in normal play. Shape isn't the cost.
 
 ### How to measure (do before/after)
 - **Remote-debug the phone.** Chrome DevTools → Performance: record ~5 s of play, read the Scripting / Rendering / **Painting** split + long tasks. iOS → Safari Web Inspector → Timelines.
-- **Debug → Show FPS** overlay for the aggregate (and to confirm the render cap brought 120 → 60).
-
-### Recommended order
-1. Test the **render cap** on the actual phone (FPS overlay). If it was 120 Hz, this alone may be enough.
-2. If still hot: **`shadowBlur` → baked glows**.
-3. If still hot: ocean simplification + gradient caching.
-4. Optional: 30 fps battery-saver toggle.
+- **Debug → Show FPS** overlay for the aggregate — after the interpolation
+  change it should read the display's native rate (60/90/120), with motion
+  smooth at all of them.
