@@ -63,6 +63,7 @@
  * @property {number} waitT
  * @property {'happy'|'angry'|null} mood
  * @property {Order} order
+ * @property {string|null} character  roster key / sprite-sheet row name of the assigned regular (see game/customers.js); null only if the roster is exhausted
  * @property {(PickupTypeName|'coin'|null)} [tip]  tipping mode: reward granted on order completion
  *
  * @typedef {object} Tuning

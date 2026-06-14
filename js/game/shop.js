@@ -8,6 +8,7 @@ import {
   SERVED_FLIGHT_S,
   DELIVERY_MODE
 } from './config.js';
+import { pickCustomer, CHARACTER_BY_NAME } from './customers.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').Customer} Customer */
@@ -63,6 +64,10 @@ export class Shop {
     this.width = 0;
     this.respawnTimer = 0;
     this._id = 0;
+    // Name of the regular who most recently left the board — the selection
+    // waterfall avoids re-spawning them right back (rule 2). Cleared on reset.
+    /** @type {string | null} */
+    this.lastDeparted = null;
     // When true the wave director's auto-spawn/reconcile is suspended so the
     // tutorial can stage a specific customer. Existing customers still animate.
     this.scripted = false;
@@ -85,6 +90,23 @@ export class Shop {
     this.bestCombo = 0;
     this.respawnTimer = 0;
     this.scripted = false;
+    this.lastDeparted = null;
+  }
+
+  /**
+   * Pick the regular for a new spawn via the selection waterfall: never a
+   * duplicate of one already on the board, and never an immediate repeat of the
+   * last to leave. `onScreen` spans every state (arriving/waiting/leaving) so a
+   * regular can't reappear while still sliding off. Falls back to null only if
+   * every regular is somehow on screen (more regulars than slots, so never).
+   * @returns {string | null}
+   */
+  _pickCharacter() {
+    /** @type {string[]} */
+    const onScreen = [];
+    for (const c of this.customers) if (c.character) onScreen.push(c.character);
+    const pick = pickCustomer({ onScreen, justLeft: this.lastDeparted });
+    return pick ? pick.name : null;
   }
 
   /**
@@ -112,7 +134,8 @@ export class Shop {
     const c = {
       id: this._id++, slot, x, prevX: x, targetX: x,
       yOff: ARRIVE_OFFSET, prevYOff: ARRIVE_OFFSET,
-      state: STATE.ARRIVING, timer: 0, waitT: 0, mood: null, order
+      state: STATE.ARRIVING, timer: 0, waitT: 0, mood: null, order,
+      character: this._pickCharacter()
     };
     this.customers.push(c);
     return c;
@@ -219,6 +242,7 @@ export class Shop {
       waitT: 0,
       mood: null,
       order,
+      character: this._pickCharacter(),  // which regular this is (selection waterfall)
       tip: this.tipRoller()  // tipping mode: power-up / coin reward, or null
     });
   }
@@ -303,6 +327,9 @@ export class Shop {
     for (const c of finishedLeaving) {
       const idx = this.customers.indexOf(c);
       if (idx >= 0) this.customers.splice(idx, 1);
+      // Remember who just freed a slot so the waterfall won't re-spawn them
+      // straight back into it.
+      if (c.character) this.lastDeparted = c.character;
     }
 
     if (expired > 0) { this.combo = 0; this.comboTimer = 0; }
@@ -473,6 +500,11 @@ export class Shop {
     this.score += gained;
     const colors = c.order.originalColors.slice();
     const tip = c.tip || null;
+
+    // Tally this regular's lifetime served count (seeds the per-customer
+    // "Served N times" challenge; in-session only for now).
+    const ch = c.character ? CHARACTER_BY_NAME.get(c.character) : null;
+    if (ch) ch.served += 1;
 
     c.state = STATE.LEAVING;
     c.mood = 'happy';

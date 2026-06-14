@@ -4,7 +4,7 @@ import { drawScoop } from './playerView.js';
 import { SCOOP_STATE } from './sprites.js';
 import { SpriteSheet } from './spriteSheet.js';
 import { glowCircle, glowRoundRect } from './glow.js';
-import FACE_SPRITE from './sprites/faceSprite.js';
+import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
   SCOOP_RADIUS,
@@ -18,12 +18,15 @@ import {
   groundYFor
 } from '../game/config.js';
 
-// Customers are now scaled to read at parity with the cone (face ≈ cone width,
+// Customers are scaled to read at parity with the cone (face ≈ cone width,
 // bigger than a falling scoop) so the serve half holds visual weight equal to
 // the fall half. Bubble + mini-cone assets scale with the face.
-// Faces render at the sprite's native frame size (not a hand-set knob); this is
-// also the reference the tip badge + speech bubble sit relative to.
-const FACE_SIZE = FACE_SPRITE.frame.height;
+// The customer sheet's cells are 256px, but faces display at FACE_SIZE on screen
+// (the bubble/tip/mini-cone offsets sit against this); the art is downscaled by
+// FACE_SCALE. Bump FACE_SIZE alone to grow the faces — sized here to read clearly
+// larger than a falling scoop (~70px across).
+const FACE_SIZE = 178;   // 102 × 1.75
+const FACE_SCALE = FACE_SIZE / CUSTOMER_SPRITE.frame.height;
 const BUBBLE_H = 96;
 const GAP = 18;          // between face and bubble
 const POP_TIME = 0.16;   // bubble scale-in duration
@@ -64,17 +67,19 @@ function rainbowSwatch() {
   return c;
 }
 
-// Customer face sprite sheet (replaces the emoji faces). Frame indices:
-const FACE = Object.freeze({ DEFAULT: 0, HUNGRY: 1, UPSET: 2, ANGRY: 3, DROOL: 4, FROZEN: 5 });
-// Emoji fallback by frame index, used until the sheet image loads.
-const FACE_EMOJI = ['🙂', '😋', '😟', '😠', '🤤', '🥶'];
+// Expression COLUMNS on the customer sheet (column 0 is the blank "Empty" face,
+// reserved for the unlock animation; the 6 moods follow, shifted one right of
+// the old single-row layout). A customer's row is their character.
+const FACE = Object.freeze({ EMPTY: 0, DEFAULT: 1, HUNGRY: 2, UPSET: 3, ANGRY: 4, DROOL: 5, FROZEN: 6 });
+// Emoji fallback by column, used until the sheet image loads (column 0 unused).
+const FACE_EMOJI = ['❔', '🙂', '😋', '😟', '😠', '🤤', '🥶'];
 // The def's `image` is the runtime path (sprite-editor export) — used verbatim.
-const faceSheet = new SpriteSheet(FACE_SPRITE);
+const faceSheet = new SpriteSheet(CUSTOMER_SPRITE);
 
 /**
- * The customer's face frame index for its state + patience. As patience drains
- * the sequence is 0,1,0,2,3 (Default → Hungry → Default → Upset → Angry), with
- * Drool (4) while servable and Frozen (5) while the pause power-up holds it.
+ * The customer's face COLUMN (see FACE) for its state + patience. As patience
+ * drains the sequence is Hungry → Default → Upset → Angry, with Drool while
+ * servable and Frozen while the pause power-up holds it.
  */
 function faceFor(customer, patience, servable, pausePatience) {
   if (customer.state === STATE.LEAVING) return customer.mood === 'happy' ? FACE.HUNGRY : FACE.ANGRY;
@@ -126,10 +131,11 @@ export class Stations {
         this._drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, hex, rainbow });
       }
 
-      // Face sprite at its native size (scale 1); falls back to the emoji until
-      // the sheet image loads.
+      // Face sprite: the customer's character picks the row, their mood picks the
+      // column. Downscaled from the 256px cell to FACE_SIZE. Falls back to the
+      // mood emoji until the sheet image loads (or if the character is unknown).
       const faceIdx = faceFor(c, patience, servable, pausePatience);
-      if (!faceSheet.draw(ctx, 0, faceIdx, cx, faceY, 1)) {
+      if (!faceSheet.draw(ctx, c.character || '', faceIdx, cx, faceY, FACE_SCALE)) {
         ctx.font = `${FACE_SIZE}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
