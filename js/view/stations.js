@@ -19,15 +19,19 @@ import {
   groundYFor
 } from '../game/config.js';
 
-// Customers are scaled to read at parity with the cone (face ≈ cone width,
-// bigger than a falling scoop) so the serve half holds visual weight equal to
-// the fall half. Bubble + mini-cone assets scale with the face.
-// The customer sheet's cells are 256px, but faces display at FACE_SIZE on screen
-// (the bubble/tip/mini-cone offsets sit against this); the art is downscaled by
-// FACE_SCALE. Bump FACE_SIZE alone to grow the faces — sized here to read clearly
-// larger than a falling scoop (~70px across).
-const FACE_SIZE = 178;   // 102 × 1.75
-const FACE_SCALE = FACE_SIZE / CUSTOMER_SPRITE.frame.height;
+// Customers read at parity with the cone (bigger than a falling scoop) so the
+// serve half holds visual weight equal to the fall half. The bubble / tip /
+// mini-cone offsets all sit against FACE_SIZE.
+//
+// The sheet's 256px cells carry a LOT of transparent padding around each head
+// (so every art size fits one sheet), so drawing a whole cell at FACE_SIZE makes
+// the head look tiny. So FACE_SIZE is the on-screen HEAD diameter, and we scale
+// the cell UP by the head's fill fraction — the head itself lands at FACE_SIZE
+// (and the bubble hugs it). Tune FACE_SIZE for head size; FACE_CELL_FILL only if
+// the art's padding changes.
+const FACE_SIZE = 168;        // on-screen head diameter (the layout anchor)
+const FACE_CELL_FILL = 0.70;  // fraction of the 256px cell the head fills (rest is padding)
+const FACE_SCALE = FACE_SIZE / (FACE_CELL_FILL * CUSTOMER_SPRITE.frame.height);
 const BUBBLE_H = 96;
 const GAP = 18;          // between face and bubble
 const POP_TIME = 0.16;   // bubble scale-in duration
@@ -110,52 +114,61 @@ function easeOut(t) {
 export class Stations {
   constructor() {
     this.groundY = 0;
+    this.width = 0;   // virtual canvas width — used to keep tip badges on-screen
   }
 
   layout(bounds) {
     this.groundY = groundYFor(bounds.height);
+    this.width = bounds.width;
   }
 
   draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false, time = 0, tipLabel = false, alpha = 1 }) {
-    for (let i = 0; i < customers.length; i++) {
-      const c = customers[i];
-      // Lane shifts + slide in/out interpolate between the last two sim steps
-      // (render alpha) so the motion is smooth at any display refresh rate.
+    // Precompute each customer's interpolated draw state once, then render in
+    // LAYERS across all of them — faces, held cones, bubbles, tips — so a
+    // customer that spawns next to another never covers the earlier one's bubble
+    // or tip. (Within a single loop, customer i+1's face would draw over
+    // customer i's bubble/tip.) Lane shifts + slide in/out interpolate between
+    // the last two sim steps (render alpha) so motion is smooth at any refresh.
+    const items = customers.map((c, i) => {
       const cx = c.prevX + (c.x - c.prevX) * alpha;
       const yOff = c.prevYOff + (c.yOff - c.prevYOff) * alpha;
-      // Face center sits CUSTOMER_FACE_OFFSET_PX from the sand top (negative
-      // = above). Half-submerged feel is just below 0; current default keeps
-      // a strip of face above the sand.
+      // Face center sits CUSTOMER_FACE_OFFSET_PX from the sand top.
       const faceY = this.groundY + CUSTOMER_FACE_OFFSET_PX + yOff;
       const waiting = c.state === STATE.WAITING;
       const servable = waiting && canServe(i);
       const active = waiting && i === activeIndex;
       const patience = c.order.timeLeft / c.order.duration;
+      return { c, cx, faceY, waiting, servable, active, patience };
+    });
 
-      if (waiting) {
-        const pop = easeOut(Math.min(1, c.waitT / POP_TIME));
-        this._drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, hex, rainbow });
-      }
-
-      // Face sprite: the customer's character picks the row, their mood picks the
-      // column. Downscaled from the 256px cell to FACE_SIZE. Falls back to the
-      // mood emoji until the sheet image loads (or if the character is unknown).
-      const faceIdx = faceFor(c, patience, servable, pausePatience);
-      if (!faceSheet.draw(ctx, c.character || '', faceIdx, cx, faceY, FACE_SCALE)) {
+    // Layer 1 — faces. The character picks the row, the mood picks the column;
+    // the cell is drawn at FACE_SCALE. Falls back to the mood emoji until the
+    // sheet image loads (or if the character is unknown).
+    for (const it of items) {
+      const faceIdx = faceFor(it.c, it.patience, it.servable, pausePatience);
+      if (!faceSheet.draw(ctx, it.c.character || '', faceIdx, it.cx, it.faceY, FACE_SCALE)) {
         ctx.font = `${FACE_SIZE}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(FACE_EMOJI[faceIdx] || '🙂', cx, faceY);
+        ctx.fillText(FACE_EMOJI[faceIdx] || '🙂', it.cx, it.faceY);
       }
+    }
 
-      // Tipping mode: a token by the face showing the reward this customer will
-      // tip on a completed order (until they leave).
-      if (c.tip && c.state !== STATE.LEAVING) this._drawTip(ctx, c.tip, cx, faceY, time, tipLabel);
+    // Layer 2 — held mini-cones + flying / settled served scoops (above faces so
+    // a neighbor can't hide them). Drawn for every state so it slides off on LEAVING.
+    for (const it of items) this._drawHeldCone(ctx, it.c, it.cx, it.faceY, alpha);
 
-      // Held mini-cone + flying-in / settled scoops. Drawn for every state
-      // so it slides off with the customer on LEAVING. Pass the interpolated
-      // cx/faceY in so the held cone tracks the customer's drawn position.
-      this._drawHeldCone(ctx, c, cx, faceY, alpha);
+    // Layer 3 — speech bubbles, above every face/cone.
+    for (const it of items) {
+      if (!it.waiting) continue;
+      const pop = easeOut(Math.min(1, it.c.waitT / POP_TIME));
+      this._drawBubble(ctx, it.c, it.cx, it.faceY, pop, { servable: it.servable, active: it.active, patience: it.patience, hex, rainbow });
+    }
+
+    // Layer 4 — tips on TOP of everything: a token showing the reward this
+    // customer will hand over on a completed order (until they leave).
+    for (const it of items) {
+      if (it.c.tip && it.c.state !== STATE.LEAVING) this._drawTip(ctx, it.c.tip, it.cx, it.faceY, time, tipLabel);
     }
   }
 
@@ -171,24 +184,27 @@ export class Stations {
    */
   _drawTip(ctx, tip, cx, faceY, time, showLabel) {
     const ring = PICKUP_RING_COLOR[tip] || '#ffd700';
-    const bob = Math.sin(time * 3) * 5;            // gentle float
-    const pulse = 1 + 0.07 * Math.sin(time * 5.5); // breathing scale
-    const r = 30 * pulse;
-    // Floats up-left of the face, clear of the speech bubble's tail above it.
-    const bx = cx - FACE_SIZE * 0.62;
-    const by = faceY - FACE_SIZE * 0.18 + bob;
+    const bob = Math.sin(time * 3) * 4;            // gentle float
+    const pulse = 1 + 0.06 * Math.sin(time * 5.5); // breathing scale
+    const r = 21 * pulse;                          // smaller badge (was 30)
+    // Sit on the customer's upper-left, OVERLAPPING the head, so the token reads
+    // as clearly theirs — not floating off toward a neighbor. Clamp to the canvas
+    // so the edge slots don't push it off-screen.
+    const by = faceY - FACE_SIZE * 0.30 + bob;
+    let bx = cx - FACE_SIZE * 0.30;
+    if (this.width) bx = Math.max(r + 5, Math.min(this.width - r - 5, bx));
 
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // Soft rotating sparkles around the badge to pull the eye.
+    // Soft rotating sparkles around the badge to pull the eye (tighter orbit).
     ctx.fillStyle = ring;
     for (let k = 0; k < 3; k++) {
       const a = time * 1.6 + k * (Math.PI * 2 / 3);
-      const sx = bx + Math.cos(a) * (r + 9);
-      const sy = by + Math.sin(a) * (r + 9);
-      const ss = 2.4 + 1.6 * (0.5 + 0.5 * Math.sin(time * 6 + k));
+      const sx = bx + Math.cos(a) * (r + 5);
+      const sy = by + Math.sin(a) * (r + 5);
+      const ss = 2 + 1.3 * (0.5 + 0.5 * Math.sin(time * 6 + k));
       ctx.globalAlpha = 0.85;
       ctx.beginPath();
       ctx.arc(sx, sy, ss, 0, Math.PI * 2);
@@ -196,24 +212,24 @@ export class Stations {
     }
     ctx.globalAlpha = 1;
 
-    // Baked soft drop shadow (offset down) + colored ring glow, then the coin
-    // body and ring drawn crisp on top — no per-frame shadowBlur.
-    glowCircle(ctx, bx, by + 5, r, 'rgba(0, 0, 0, 0.5)');
-    glowCircle(ctx, bx, by, r + 3, ring, 0.9);
+    // Baked soft drop shadow (offset down) + a tight colored ring glow, then the
+    // coin body and ring drawn crisp on top — no per-frame shadowBlur.
+    glowCircle(ctx, bx, by + 3, r, 'rgba(0, 0, 0, 0.45)');
+    glowCircle(ctx, bx, by, r + 1, ring, 0.85);
     ctx.beginPath();
     ctx.arc(bx, by, r, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
     ctx.fill();
 
-    // Thick colored ring (the eye-catcher) on the same circle path; then a
-    // faint inner ring for a minted-coin read.
-    ctx.lineWidth = 5;
+    // Colored ring (the eye-catcher) on the same circle path; then a faint inner
+    // ring for a minted-coin read.
+    ctx.lineWidth = 4;
     ctx.strokeStyle = ring;
     ctx.stroke();
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
     ctx.beginPath();
-    ctx.arc(bx, by, r - 6, 0, Math.PI * 2);
+    ctx.arc(bx, by, r - 5, 0, Math.PI * 2);
     ctx.stroke();
 
     // Reward icon.
@@ -223,12 +239,12 @@ export class Stations {
 
     // "TIP" tag beneath — onboarding affordance, shown only during the tutorial.
     if (showLabel) {
-      ctx.font = "bold 13px 'Comic Sans MS', sans-serif";
+      ctx.font = "bold 12px 'Comic Sans MS', sans-serif";
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.fillStyle = '#fff';
-      ctx.strokeText('TIP', bx, by + r + 9);
-      ctx.fillText('TIP', bx, by + r + 9);
+      ctx.strokeText('TIP', bx, by + r + 8);
+      ctx.fillText('TIP', bx, by + r + 8);
     }
     ctx.restore();
   }

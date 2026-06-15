@@ -420,6 +420,28 @@ body.day-hint #gauge::before {
   pointer-events: none;
 }
 
+/* Keep every full-screen overlay's content clear of the screen edges AND the
+   device safe areas (notch, rounded corners, home indicator). The page is
+   `viewport-fit=cover`, so without this the centered menus/modals can run under
+   a notch or off the edge on a real phone — desktop's F12 device sim reports no
+   safe-area insets, which is why it looks fine there but not in hand. These are
+   flex-centered containers, so the padding just shrinks the area the modal
+   centers in. */
+#overlay,
+#recipesOverlay,
+#challengesOverlay,
+#regularsOverlay,
+#settingsOverlay,
+#waveTransitionOverlay,
+#pauseOverlay {
+  box-sizing: border-box;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+}
+
 #hud {
   /* Mirror of #overlay's fade so the two cross-dissolve. The HUD is hidden
      while menus are up because none of its readouts are meaningful then. */
