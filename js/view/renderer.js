@@ -2,7 +2,7 @@
 import { drawSkyAndSun, drawNightSky, drawSand, drawOcean } from './scene.js';
 import { dayCycleState, nightCycleState } from '../game/dayCycle.js';
 import { drawField } from './scoopsView.js';
-import { drawPlayer } from './playerView.js';
+import { drawPlayer, coneTintFor } from './playerView.js';
 import { glowCircle } from './glow.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
@@ -40,20 +40,25 @@ export function drawFrame(ctx, game, alpha = 1) {
   // Background: sky + sun (or the between-wave night cycle: moon + fast sky),
   // then sand on top. Everything after this draws over the floor — actors stay
   // visible even when their positions overlap the sand region.
+  // The cone is recolored to track the time-of-day floor brightness (whichever
+  // cycle is active).
+  let coneTint;
   if (game.inNightCycle) {
     const nightState = nightCycleState(game.nightT, game.bounds);
     drawNightSky(ctx, game.bounds, nightState);
     drawSand(ctx, game.bounds, nightState);
     drawOcean(ctx, game.bounds, nightState, game.clock);
+    coneTint = coneTintFor(nightState.floor);
   } else {
     const dayState = dayCycleState(world.waves.waveFraction, game.bounds);
     drawSkyAndSun(ctx, game.bounds, dayState);
     drawSand(ctx, game.bounds, dayState);
     drawOcean(ctx, game.bounds, dayState, game.clock);
+    coneTint = coneTintFor(dayState.floor);
   }
 
   drawField(ctx, world.field, rainbow, alpha);
-  drawPlayer(ctx, world.player, rainbow, alpha);
+  drawPlayer(ctx, world.player, rainbow, alpha, coneTint);
   const pausePatience = world.powerups.pauseActive || !game.flags.patternTimer;
   game.stations.draw(ctx, world.shop.list, {
     activeIndex:    world.shop.customerAt(world.player.x),
@@ -63,6 +68,7 @@ export function drawFrame(ctx, game, alpha = 1) {
     rainbow,
     time:           game.clock,
     tipLabel:       game.tutorial.active,
+    coneX:          world.player.drawX(alpha),  // fades a bubble translucent as the cone passes behind it
     alpha
   });
   // Tutorial hint pills — over the scene but under the effect bursts.

@@ -45,6 +45,13 @@ const BUBBLE_PAD = 26;   // horizontal padding around the swatch row
 const SWATCH_SCOOP_SIZE = 40;
 const hudScoopSheet = new SpriteSheet(HUD_SCOOP_SPRITE);
 
+// A bubble fades toward this opacity as the cone (the player) passes horizontally
+// behind it, so the cone + tray stay readable through it. CONE_OVERLAP_HALF is
+// the cone's half-reach (cone + a scoop) added to the bubble half-width for the
+// proximity test.
+const BUBBLE_MIN_ALPHA = 0.4;
+const CONE_OVERLAP_HALF = 55;
+
 function bubbleWidthFor(orderLen) {
   const swatches = Math.max(1, orderLen);
   const row = swatches * SWATCH_R * 2 + (swatches - 1) * SWATCH_GAP;
@@ -122,7 +129,7 @@ export class Stations {
     this.width = bounds.width;
   }
 
-  draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false, time = 0, tipLabel = false, alpha = 1 }) {
+  draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false, time = 0, tipLabel = false, coneX = null, alpha = 1 }) {
     // Precompute each customer's interpolated draw state once, then render in
     // LAYERS across all of them — faces, held cones, bubbles, tips — so a
     // customer that spawns next to another never covers the earlier one's bubble
@@ -158,11 +165,19 @@ export class Stations {
     // a neighbor can't hide them). Drawn for every state so it slides off on LEAVING.
     for (const it of items) this._drawHeldCone(ctx, it.c, it.cx, it.faceY, alpha);
 
-    // Layer 3 — speech bubbles, above every face/cone.
+    // Layer 3 — speech bubbles, above every face/cone. A bubble fades toward
+    // translucent as the cone passes horizontally behind it (so the cone + tray
+    // read through it), ramping with overlap and bottoming out at BUBBLE_MIN_ALPHA.
     for (const it of items) {
       if (!it.waiting) continue;
       const pop = easeOut(Math.min(1, it.c.waitT / POP_TIME));
-      this._drawBubble(ctx, it.c, it.cx, it.faceY, pop, { servable: it.servable, active: it.active, patience: it.patience, hex, rainbow });
+      let bubbleAlpha = 1;
+      if (coneX != null) {
+        const range = bubbleWidthFor(it.c.order.colors.length) / 2 + CONE_OVERLAP_HALF;
+        const overlap = Math.max(0, 1 - Math.abs(it.cx - coneX) / range);
+        bubbleAlpha = 1 - (1 - BUBBLE_MIN_ALPHA) * overlap;
+      }
+      this._drawBubble(ctx, it.c, it.cx, it.faceY, pop, { servable: it.servable, active: it.active, patience: it.patience, hex, rainbow, alpha: bubbleAlpha });
     }
 
     // Layer 4 — tips on TOP of everything: a token showing the reward this
@@ -306,13 +321,15 @@ export class Stations {
     }
   }
 
-  _drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, hex, rainbow }) {
+  _drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, hex, rainbow, alpha = 1 }) {
     const bubbleBottom = faceY - FACE_SIZE / 2 - GAP;
     const top = bubbleBottom - BUBBLE_H;
     const bubbleW = bubbleWidthFor(c.order.colors.length);
     const left = cx - bubbleW / 2;
 
     ctx.save();
+    // Fade the whole bubble when the cone is behind it (1 = opaque).
+    if (alpha < 1) ctx.globalAlpha = alpha;
     // Scale-in pop, anchored at the tail (bottom-center, by the face).
     ctx.translate(cx, bubbleBottom);
     ctx.scale(pop, pop);

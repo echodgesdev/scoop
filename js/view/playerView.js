@@ -8,6 +8,8 @@ import {
 } from '../game/config.js';
 import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../game/player.js';
 import { scoopSheet, SCOOP_STATE, drawScoopSprite } from './sprites.js';
+import { SpriteSheet } from './spriteSheet.js';
+import CONE_SPRITE, { CONE_FRAME } from './sprites/coneSprite.js';
 import { glowCircle } from './glow.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
@@ -22,6 +24,75 @@ const SLOSH_ARC = 6;    // log-arc curvature (higher = sharper bow near the top)
 
 const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'];
 
+// === Cone sprite (layered, grayscale, day-recolored) ========================
+// A back layer + a front layer the scoop stack draws between. The grayscale art
+// is multiply-tinted to the scoop brown, dimmed by the day cycle. CONE_SPRITE_W
+// is the on-screen art width and CONE_SPRITE_DY nudges it vertically so the bowl
+// meets the bottom scoop — tune these two if the cone reads too big/small or the
+// scoops don't nest right.
+const coneSheet = new SpriteSheet(CONE_SPRITE);
+const CONE_FRAME_PX = CONE_SPRITE.frame.width;        // 256
+const CONE_SPRITE_W = 168;                            // on-screen cone width (px)
+const CONE_SPRITE_DY = -14;                           // sprite-center offset from player.y
+const CONE_BASE = '#d18a4a';                          // daylight cone brown (matches the old triangle)
+
+function _lum(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  return 0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255);
+}
+function _scaleHex(hex, f) {
+  const v = parseInt(hex.slice(1), 16);
+  const p = n => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+  return '#' + p(((v >> 16) & 255) * f) + p(((v >> 8) & 255) * f) + p((v & 255) * f);
+}
+const _DAWN_FLOOR_LUM = _lum('#e8b97a');   // brightest day-cycle floor = full cone brightness
+const _CONE_TINT_STEPS = 16;
+
+/**
+ * The cone's tint for the current time of day: the daylight brown scaled by the
+ * day-cycle floor's brightness (so the cone dims into dusk alongside the sand),
+ * quantized to a few brightness STEPS so the recolored sprite caches cheaply.
+ * @param {string} floorHex the active cycle state's `floor` color
+ */
+export function coneTintFor(floorHex) {
+  const b = Math.max(0.5, Math.min(1, _lum(floorHex) / _DAWN_FLOOR_LUM));
+  const stepped = Math.round(b * _CONE_TINT_STEPS) / _CONE_TINT_STEPS;
+  return _scaleHex(CONE_BASE, stepped);
+}
+
+// Recolored cone frames, baked once per (frame, tint): the grayscale art
+// multiplied by the tint, then clipped back to the sprite's own alpha. Bounded
+// by the tint-step count above (≤ a couple dozen small canvases).
+/** @type {Map<string, HTMLCanvasElement>} */
+const _coneCache = new Map();
+function tintedConeFrame(frame, tint) {
+  if (!coneSheet.ready) return null;
+  const key = frame + '|' + tint;
+  const hit = _coneCache.get(key);
+  if (hit) return hit;
+  const F = CONE_FRAME_PX;
+  const c = document.createElement('canvas');
+  c.width = c.height = F;
+  const g = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
+  g.drawImage(coneSheet.img, frame * F, 0, F, F, 0, 0, F, F);  // grayscale art
+  g.globalCompositeOperation = 'multiply';
+  g.fillStyle = tint;
+  g.fillRect(0, 0, F, F);
+  g.globalCompositeOperation = 'destination-in';               // keep only the cone's pixels
+  g.drawImage(coneSheet.img, frame * F, 0, F, F, 0, 0, F, F);
+  _coneCache.set(key, c);
+  return c;
+}
+
+/** Blit a recolored cone frame centered on the cone. @returns {boolean} whether it drew. */
+function drawConeFrame(ctx, player, frame, tint) {
+  const c = tintedConeFrame(frame, tint);
+  if (!c) return false;
+  const w = CONE_SPRITE_W;
+  ctx.drawImage(c, player.x - w / 2, player.y + CONE_SPRITE_DY - w / 2, w, w);
+  return true;
+}
+
 /**
  * Draw the cone + its tray. Reads the Player model's position, stack, slosh
  * history, handoff lean, and flash — never mutates it.
@@ -29,8 +100,9 @@ const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#
  * @param {Player} player
  * @param {boolean} [rainbow] repaint every tray scoop as rainbow (purely visual)
  * @param {number} [alpha] render-interpolation fraction (previous→current x)
+ * @param {string} [coneTint] day-recolored cone tint (see coneTintFor)
  */
-export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
+export function drawPlayer(ctx, player, rainbow = false, alpha = 1, coneTint = CONE_BASE) {
   // One translate moves the cone and every scoop riding it together:
   // 1. render interpolation — everything here is positioned off player.x, so
   //    shifting by (drawX − x) draws the whole assembly at the interpolated x;
@@ -46,7 +118,14 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
     ty += player.handoffDy * ease;
   }
   if (tx !== 0 || ty !== 0) ctx.translate(tx, ty);
-  drawCone(ctx, player);
+
+  // Serve/catch flash halo, then the cone BACK (behind the scoops). Falls back
+  // to the flat triangle until the cone sheet image loads.
+  if (player.flash > 0) {
+    glowCircle(ctx, player.x, player.y, CONE_WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
+  }
+  const coneReady = drawConeFrame(ctx, player, CONE_FRAME.BACK, coneTint);
+  if (!coneReady) drawTriangleCone(ctx, player);
 
   const stack = player.stack;
   for (let i = 0; i < stack.length; i++) {
@@ -97,6 +176,9 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
       drawTopRing(ctx, drawX, drawY, SCOOP_RADIUS * drawScale);
     }
   }
+
+  // Cone FRONT — over the scoops, so the bottom scoop nests into the bowl.
+  if (coneReady) drawConeFrame(ctx, player, CONE_FRAME.FRONT, coneTint);
   ctx.restore();
 
   // Launched-scoop ghosts (committed toss): each rises, stretches tall, and fades
@@ -135,16 +217,14 @@ function drawTopRing(ctx, x, y, r) {
   ctx.restore();
 }
 
-/** @param {CanvasRenderingContext2D} ctx @param {Player} player */
-function drawCone(ctx, player) {
+/**
+ * Flat-triangle cone — the fallback drawn only until the cone sheet image loads
+ * (the flash halo is drawn by the caller). @param {CanvasRenderingContext2D} ctx @param {Player} player
+ */
+function drawTriangleCone(ctx, player) {
   const cx = player.x;
   const cy = player.y;
   ctx.save();
-  // Serve/catch flash: a baked halo that fades with the flash timer (the old
-  // shadowBlur glow cut off hard; this one tapers out).
-  if (player.flash > 0) {
-    glowCircle(ctx, cx, cy, CONE_WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
-  }
   ctx.fillStyle = '#d18a4a';
   ctx.strokeStyle = '#8a5a2a';
   ctx.lineWidth = 3;

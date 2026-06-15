@@ -1,0 +1,75 @@
+{
+  "image": "assets/cone_sprites.png",
+  "imageSize": {
+    "width": 1024,
+    "height": 256
+  },
+  "frame": {
+    "width": 256,
+    "height": 256
+  },
+  "animations": [
+    {
+      "name": "row 0",
+      "frames": [
+        {
+          "x": 0,
+          "y": 0,
+          "body": {
+            "shape": "rect",
+            "x": 0,
+            "y": 40,
+            "width": 150,
+            "height": 171.5
+          },
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "x": 256,
+          "y": 0,
+          "body": {
+            "shape": "circle",
+            "x": 0,
+            "y": 0,
+            "radius": 115
+          },
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "x": 512,
+          "y": 0,
+          "body": {
+            "shape": "circle",
+            "x": 0,
+            "y": 0,
+            "radius": 115
+          },
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        },
+        {
+          "x": 768,
+          "y": 0,
+          "body": {
+            "shape": "circle",
+            "x": 0,
+            "y": 0,
+            "radius": 115
+          },
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ]
+    }
+  ]
+}
