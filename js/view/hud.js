@@ -253,7 +253,7 @@ export class Hud {
     const resetBtn = document.getElementById('resetProgressBtn');
     if (resetBtn && !resetBtn.dataset.wired) {
       resetBtn.addEventListener('click', () => {
-        if (window.confirm('Wipe ALL challenge progress and recipe completions? This cannot be undone.')) {
+        if (window.confirm('Wipe ALL progress — challenges, recipes, power-ups, and unlocked regulars? This cannot be undone.')) {
           this.onResetProgress();
           // Re-render any open modals so the wipe is visible immediately.
           this._renderRecipes();

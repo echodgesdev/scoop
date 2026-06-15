@@ -351,11 +351,17 @@ export class Game {
     this.world.onExpire(1);
   }
 
-  /** Settings: wipe challenges + recipes + regulars back to a fresh save. */
+  /**
+   * Settings: wipe ALL persisted progress back to a fresh save — challenge sets
+   * AND the power-up unlocks they grant (both live in the challenges store),
+   * recipe completions, and the regulars' unlock + served state. Power-up sources
+   * (tips, combo breaker) and the regulars collection read these, so the wipe
+   * re-locks power-ups and re-hides unlocked regulars.
+   */
   _resetProgress() {
-    this.world.challenges.reset();
-    this.world.recipes.reset();
-    this.world.regulars.reset();
+    this.world.challenges.reset();  // challenge progress + power-up/section unlocks
+    this.world.recipes.reset();     // recipe completion counts
+    this.world.regulars.reset();    // regulars unlock + served counts
   }
 
   /**

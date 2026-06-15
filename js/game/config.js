@@ -73,6 +73,11 @@ export const PICKUP_TYPES = [
   PICKUP_TYPE.RAINBOW
 ];
 
+// The non-power-up customer tip: a coin (bonus points), the sibling of the four
+// power-up tips. Kept OUT of PICKUP_TYPE/PICKUP_TYPES so it never leaks into the
+// power-up sets (unlocks, weights, active slot) — it's a reward, not a power-up.
+export const TIP_COIN = 'coin';
+
 /** @type {Readonly<{SPEED:'speed',PAUSE:'pause',RAINBOW:'rainbow'}>} */
 export const POWERUP_TYPE = Object.freeze({
   SPEED: 'speed',

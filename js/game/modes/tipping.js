@@ -1,5 +1,5 @@
 // @ts-check
-import { PICKUP_TYPE } from '../config.js';
+import { PICKUP_TYPE, TIP_COIN } from '../config.js';
 import { STATE } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
 
@@ -65,17 +65,27 @@ export class TippingMode {
     // of customers carry one (clamped so it never feels constant).
     const chance = Math.max(0.3, Math.min(0.9, 5 / Math.max(0.5, avgGap)));
     if (Math.random() > chance) return null;
+    // Only power-ups the player has UNLOCKED (via challenges) can be tipped; the
+    // coin is always available. So a fresh save (or one just reset) tips only
+    // coins until the early challenge sets unlock heart / speed / freeze / rainbow.
     const w = g.powerupWeights;
-    /** @type {(PickupTypeName | 'coin')[]} */
-    const types = [PICKUP_TYPE.HEART, PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW, 'coin'];
-    const weights = [w[0] || 0, w[1] || 0, w[2] || 0, w[3] || 0, TIP_COIN_WEIGHT];
+    /** @type {Record<string, number>} weight by power-up type (PICKUP order: heart, ⚡, ❄️, 🌈) */
+    const weightByType = {
+      [PICKUP_TYPE.HEART]: w[0] || 0,
+      [PICKUP_TYPE.FEATHER]: w[1] || 0,
+      [PICKUP_TYPE.PAUSE]: w[2] || 0,
+      [PICKUP_TYPE.RAINBOW]: w[3] || 0
+    };
+    /** @type {(PickupTypeName | typeof TIP_COIN)[]} */
+    const types = [...g.challenges.unlockedPowerupTypes(), TIP_COIN];
+    const weights = types.map(t => (t === TIP_COIN ? TIP_COIN_WEIGHT : (weightByType[t] || 0)));
     const total = weights.reduce((a, b) => a + b, 0) || 1;
     let r = Math.random() * total;
     for (let i = 0; i < types.length; i++) {
       r -= weights[i];
       if (r <= 0) return types[i];
     }
-    return 'coin';
+    return TIP_COIN;
   }
 
   /**
@@ -85,7 +95,7 @@ export class TippingMode {
    */
   grantTip(tip, x, y) {
     const g = this.world;
-    if (tip === 'coin') {
+    if (tip === TIP_COIN) {
       g.shop.addScore(TIP_COIN_POINTS);
       g.bus.emit('coin', { x, y, points: TIP_COIN_POINTS });
     } else {

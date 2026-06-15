@@ -428,31 +428,40 @@ export class World {
    * @param {number} x @param {number} y burst origin
    */
   _fireComboBreaker(x, y) {
-    this.shop.breakCombo();
     const type = this._pickSuperchargeType();
+    // No unlocked timed power-up to supercharge yet — leave the combo intact so
+    // it keeps building until the player unlocks one (via challenges).
+    if (!type) return;
+    this.shop.breakCombo();
     this.firePower(type, this.player.x, this.player.stackTopY(), COMBO_BREAKER_DURATION_MULT);
     this.bus.emit('comboBreak', { x, y });
   }
 
   /**
    * Pick which timed power-up the breaker supercharges — weighted by the power-up
-   * mix (⚡ speed / ❄️ freeze / 🌈 rainbow), uniform if unset. Heart is excluded:
-   * it heals instantly, so a duration multiplier is moot.
-   * @returns {PickupTypeName}
+   * mix (⚡ speed / ❄️ freeze / 🌈 rainbow), uniform if unset. Only types the
+   * player has UNLOCKED are eligible (heart is excluded regardless: it heals
+   * instantly, so a duration multiplier is moot). Returns null when none of the
+   * timed power-ups are unlocked yet, so the caller can skip the breaker.
+   * @returns {PickupTypeName | null}
    */
   _pickSuperchargeType() {
     const w = this.powerupWeights;
-    /** @type {PickupTypeName[]} */
-    const types = [PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW];
-    const weights = [w[1] || 0, w[2] || 0, w[3] || 0];
-    const total = weights.reduce((a, b) => a + b, 0);
-    if (total <= 0) return types[Math.floor(Math.random() * types.length)];
+    /** @type {Array<{ type: PickupTypeName, weight: number }>} */
+    const pool = [
+      { type: PICKUP_TYPE.FEATHER, weight: w[1] || 0 },
+      { type: PICKUP_TYPE.PAUSE,   weight: w[2] || 0 },
+      { type: PICKUP_TYPE.RAINBOW, weight: w[3] || 0 }
+    ].filter(p => this.challenges.isPowerupUnlocked(p.type));
+    if (pool.length === 0) return null;
+    const total = pool.reduce((a, p) => a + p.weight, 0);
+    if (total <= 0) return pool[Math.floor(Math.random() * pool.length)].type;
     let r = Math.random() * total;
-    for (let i = 0; i < types.length; i++) {
-      r -= weights[i];
-      if (r <= 0) return types[i];
+    for (const p of pool) {
+      r -= p.weight;
+      if (r <= 0) return p.type;
     }
-    return types[types.length - 1];
+    return pool[pool.length - 1].type;
   }
 
   /** Customers expired (patience ran out): take damage; decide death. @param {number} count */
