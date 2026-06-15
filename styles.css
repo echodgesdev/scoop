@@ -872,6 +872,97 @@ button.flash {
   margin: 6px 0 14px 0;
 }
 
+/* --- Regulars collection -------------------------------------------------- */
+#regularsOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#regularsOverlay.hidden { display: none; }
+
+.regulars-modal {
+  background: #fff3c0;
+  border: 4px solid #b85;
+  border-radius: 14px;
+  padding: 22px;
+  max-width: 640px;
+  width: 92%;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.regulars-modal h2 { margin: 0 0 4px 0; text-align: center; }
+.regulars-count {
+  text-align: center;
+  font-weight: bold;
+  color: #8a6a4a;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.regulars-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  padding: 4px 6px;
+  margin-bottom: 14px;
+}
+.regular-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 12px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid #e8c9a0;
+}
+.regular-card.locked { opacity: 0.75; }
+
+.regular-face {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background-image: url('assets/customer_sheet.png');
+  background-size: 840px 1680px;   /* 7×120 wide by 14×120 tall (sheet cells are 256px) */
+  background-repeat: no-repeat;
+  background-color: #ffe9b8;
+  border: 3px solid #d9b285;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+/* Locked regulars: the sheet's "Empty" sprite (a white shadow of the character)
+   colorized grey — a teaser that previews the eventual unlock flip (grey shadow →
+   full face). grayscale + brightness knock the white silhouette down to a clear
+   grey; the darker grey circle gives it contrast. */
+.regular-card.locked .regular-face {
+  background-color: #9b9b9b;
+  filter: grayscale(1) brightness(0.62);
+}
+
+.regular-name { font-weight: bold; color: #6a4a2a; }
+.regular-fav {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #7a5230;
+}
+.regular-blurb { font-size: 11px; color: #6a5238; line-height: 1.3; }
+.regular-blurb.locked-hint { font-style: italic; color: #9a8463; }
+.regular-served {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: bold;
+  color: #b07a32;
+}
+
 .challenge-set {
   background: rgba(255, 255, 255, 0.55);
   border-radius: 10px;
@@ -1105,8 +1196,10 @@ button.flash {
 .menu-buttons.gameover-buttons #startBtn {
   font-size: 18px;
 }
-/* 4th button (Settings) — centered on its own full-width row instead of
-   dangling alone in the grid's first column. */
+/* Top row holds Recipes | Play Again | Challenges; the remaining secondary
+   buttons (Regulars, Settings) each center on their own full-width row instead
+   of dangling alone in the grid's first column. */
+.menu-buttons.gameover-buttons #regularsBtn,
 .menu-buttons.gameover-buttons #settingsBtn {
   grid-column: 1 / -1;
   justify-self: center;
@@ -1615,6 +1708,13 @@ button.flash {
 .pause-modal .wt-title {
   color: #6a4a2a;
 }
+/* Pause menu has a 4th button (Regulars); center it on its own full-width row
+   so it doesn't dangle in the 3-column grid. Scoped to the pause button, so the
+   wave-transition overlay (3 buttons) is untouched. */
+.wt-buttons #pauseRegularsBtn {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
 
 /* =========================================================================
    In-game pause button (⏸) — bottom-right slot. Shown only while the
@@ -1705,6 +1805,7 @@ body.menu-visible #pauseBtn {
 /* --- Modal cards: vanilla cream with a faint waffle crosshatch. ---------- */
 .recipes-modal,
 .challenges-modal,
+.regulars-modal,
 .settings-modal,
 .wave-transition-modal,
 .gameover-card {
@@ -1727,6 +1828,7 @@ body.menu-visible #pauseBtn {
    a straight 16px band plus a row of semicircles (one per 26px stripe). */
 .recipes-modal::before,
 .challenges-modal::before,
+.regulars-modal::before,
 .settings-modal::before,
 .wave-transition-modal::before,
 .gameover-card::before {
@@ -1746,6 +1848,7 @@ body.menu-visible #pauseBtn {
 
 .recipes-modal h2,
 .challenges-modal h2,
+.regulars-modal h2,
 .settings-modal h2,
 .wt-title {
   color: #8a4a2a;
@@ -1812,6 +1915,7 @@ body.menu-visible #pauseBtn {
 /* Waffle-brown close buttons on the book-style modals. */
 #closeRecipesBtn,
 #closeChallengesBtn,
+#closeRegularsBtn,
 #closeSettingsBtn {
   border-radius: 999px;
   background: linear-gradient(180deg, #d9a263, #bb7f47 60%, #a96e39);
@@ -1821,9 +1925,11 @@ body.menu-visible #pauseBtn {
 }
 #closeRecipesBtn:hover,
 #closeChallengesBtn:hover,
+#closeRegularsBtn:hover,
 #closeSettingsBtn:hover { filter: brightness(1.06); }
 #closeRecipesBtn:active,
 #closeChallengesBtn:active,
+#closeRegularsBtn:active,
 #closeSettingsBtn:active {
   transform: translateY(3px);
   box-shadow: 0 1px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.25);
@@ -1838,6 +1944,7 @@ body.menu-visible #pauseBtn {
 /* Warm the modal backdrops to match the golden-hour wash. */
 #recipesOverlay,
 #challengesOverlay,
+#regularsOverlay,
 #settingsOverlay { background: rgba(32, 17, 8, 0.62); }
 #waveTransitionOverlay,
 #pauseOverlay { background: rgba(32, 17, 8, 0.55); }

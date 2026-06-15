@@ -8,7 +8,7 @@ import {
   SERVED_FLIGHT_S,
   DELIVERY_MODE
 } from './config.js';
-import { pickCustomer, CHARACTER_BY_NAME } from './customers.js';
+import { pickCustomer } from './customers.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').Customer} Customer */
@@ -500,11 +500,6 @@ export class Shop {
     this.score += gained;
     const colors = c.order.originalColors.slice();
     const tip = c.tip || null;
-
-    // Tally this regular's lifetime served count (seeds the per-customer
-    // "Served N times" challenge; in-session only for now).
-    const ch = c.character ? CHARACTER_BY_NAME.get(c.character) : null;
-    if (ch) ch.served += 1;
 
     c.state = STATE.LEAVING;
     c.mood = 'happy';

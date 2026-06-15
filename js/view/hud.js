@@ -1,8 +1,22 @@
 // @ts-check
 import { COLORS } from '../game/config.js';
 import { RECIPE_TARGET, GROUPS } from '../game/recipes.js';
+import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 
 const GROUP_BY_ID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
+
+// Regulars collection screen. Faces are cropped out of the shared sprite sheet
+// via CSS background-position: each regular's sheet ROW comes from the sprite
+// def (animation index), and a fixed COLUMN picks the expression. The .regular-
+// face tile size + background-size live in styles.css; keep them in step here.
+const REGULAR_FACE_TILE = 120;       // on-screen face tile (px); matches styles.css
+const REGULAR_FACE_COL = 1;          // column 1 = Default face — shown unlocked
+const REGULAR_EMPTY_COL = 0;         // column 0 = Empty white "shadow" — shown locked (CSS greys it)
+/** @type {Map<string, number>} regular name → sprite-sheet row (animation index) */
+const REGULAR_ROW_BY_NAME = new Map(CUSTOMER_SPRITE.animations.map((a, i) => [a.name, i]));
+// Favorite-flavor display names (the recipe book bakes these at seed time; the
+// collection card just needs the label next to the swatch).
+const FLAVOR_LABEL = { pink: 'Strawberry', mint: 'Mint', choco: 'Chocolate', vanilla: 'Vanilla', blueberry: 'Blueberry' };
 
 /** @typedef {import('../game/recipes.js').Recipes} Recipes */
 
@@ -16,9 +30,9 @@ function loadBest() {
 export class Hud {
   constructor({
     scoreEl, comboEl, healthFillEl, overlayEl, gaugeEl, flashEl,
-    recipesOverlayEl, challengesOverlayEl, settingsOverlayEl,
+    recipesOverlayEl, challengesOverlayEl, regularsOverlayEl, settingsOverlayEl,
     waveTransitionOverlayEl, pauseOverlayEl, challengeToastEl,
-    recipes, challenges, sound, onStart, onHowToPlay,
+    recipes, challenges, regulars, sound, onStart, onHowToPlay,
     getVolume, onSetVolume, getSensitivity, onSetSensitivity,
     getHaptics, onSetHaptics, onResetProgress, onPauseToggle
   }) {
@@ -30,6 +44,7 @@ export class Hud {
     this.flashEl = flashEl;
     this.recipesOverlayEl = recipesOverlayEl;
     this.challengesOverlayEl = challengesOverlayEl;
+    this.regularsOverlayEl = regularsOverlayEl;
     this.settingsOverlayEl = settingsOverlayEl;
     this.waveTransitionOverlayEl = waveTransitionOverlayEl;
     this.pauseOverlayEl = pauseOverlayEl;
@@ -38,6 +53,8 @@ export class Hud {
     this.recipes = recipes;
     /** @type {import('../game/challenges.js').Challenges} */
     this.challenges = challenges;
+    /** @type {import('../game/regulars.js').Regulars} */
+    this.regulars = regulars;
     /** @type {import('../engine/audio.js').Sound} */
     this.sound = sound;
 
@@ -140,6 +157,15 @@ export class Hud {
     const closeChallengesBtn = document.getElementById('closeChallengesBtn');
     if (closeChallengesBtn) closeChallengesBtn.addEventListener('click', () => this.hideChallenges());
 
+    const regularsBtn = document.getElementById('regularsBtn');
+    if (regularsBtn) regularsBtn.addEventListener('click', () => this.showRegulars());
+
+    const closeRegularsBtn = document.getElementById('closeRegularsBtn');
+    if (closeRegularsBtn && !closeRegularsBtn.dataset.wired) {
+      closeRegularsBtn.addEventListener('click', () => this.hideRegulars());
+      closeRegularsBtn.dataset.wired = '1';
+    }
+
     // Settings is a menu item on three overlays (home, game-over card, pause).
     // Each wires once via the dataset guard; #settingsBtn is recreated on every
     // overlay rewrite, so it re-wires itself then.
@@ -213,6 +239,11 @@ export class Hud {
       pauseChallengesBtn.addEventListener('click', () => this.showChallenges());
       pauseChallengesBtn.dataset.wired = '1';
     }
+    const pauseRegularsBtn = document.getElementById('pauseRegularsBtn');
+    if (pauseRegularsBtn && !pauseRegularsBtn.dataset.wired) {
+      pauseRegularsBtn.addEventListener('click', () => this.showRegulars());
+      pauseRegularsBtn.dataset.wired = '1';
+    }
 
     const resetBtn = document.getElementById('resetProgressBtn');
     if (resetBtn && !resetBtn.dataset.wired) {
@@ -222,6 +253,7 @@ export class Hud {
           // Re-render any open modals so the wipe is visible immediately.
           this._renderRecipes();
           this._renderChallenges();
+          this._renderRegulars();
         }
       });
       resetBtn.dataset.wired = '1';
@@ -343,6 +375,57 @@ export class Hud {
 
   hideRecipes() {
     if (this.recipesOverlayEl) this.recipesOverlayEl.classList.add('hidden');
+  }
+
+  /** Render the regulars collection and reveal the modal. */
+  showRegulars() {
+    this._renderRegulars();
+    if (this.regularsOverlayEl) this.regularsOverlayEl.classList.remove('hidden');
+  }
+
+  hideRegulars() {
+    if (this.regularsOverlayEl) this.regularsOverlayEl.classList.add('hidden');
+  }
+
+  /**
+   * Collection grid: a card per regular. Unlocked cards show the full face
+   * (cropped from the sprite sheet), name, favorite flavor, blurb, and served
+   * count. Locked cards show the same face as a darkened silhouette with "???"
+   * — a tease of who's still to come, and a preview of the eventual unlock flip.
+   */
+  _renderRegulars() {
+    if (!this.regulars || !this.regularsOverlayEl) return;
+    const listEl = this.regularsOverlayEl.querySelector('.regulars-grid');
+    const countEl = this.regularsOverlayEl.querySelector('.regulars-count');
+    if (!listEl) return;
+
+    const all = this.regulars.getAll();
+    if (countEl) countEl.textContent = `${this.regulars.unlockedCount()} / ${this.regulars.total} unlocked`;
+
+    const T = REGULAR_FACE_TILE;
+    const html = all.map(r => {
+      const row = REGULAR_ROW_BY_NAME.get(r.name) || 0;
+      // Unlocked → Default face (col 1); locked → the Empty white-shadow sprite
+      // (col 0), which CSS colorizes grey.
+      const col = r.unlocked ? REGULAR_FACE_COL : REGULAR_EMPTY_COL;
+      const pos = `background-position:-${col * T}px -${row * T}px`;
+      const cls = r.unlocked ? 'regular-card' : 'regular-card locked';
+      const name = r.unlocked ? r.name : '???';
+      const fav = r.unlocked
+        ? `<div class="regular-fav"><span class="recipe-swatch" style="background:${COLORS[r.favoriteFlavor]}"></span>${FLAVOR_LABEL[r.favoriteFlavor] || r.favoriteFlavor}</div>`
+        : '';
+      const blurb = r.unlocked
+        ? `<div class="regular-blurb">${r.blurb}</div>`
+        : `<div class="regular-blurb locked-hint">Serve them to unlock</div>`;
+      return `<div class="${cls}">
+        <div class="regular-face" style="${pos}"></div>
+        <div class="regular-name">${name}</div>
+        ${fav}
+        ${blurb}
+        <div class="regular-served">Served ${r.served}×</div>
+      </div>`;
+    }).join('');
+    listEl.innerHTML = html;
   }
 
   _renderRecipes() {
@@ -749,10 +832,15 @@ export class Hud {
     // Peek: would commitEarned advance the set? Easier to just call it,
     // since the visual decision matches the state decision.
     const result = this.challenges.commitEarned();
-    if (result.setAdvanced && rewardsEl) {
-      const rewards = result.rewards.map(r => `<span class="wt-reward">${this._rewardLabel(r)}</span>`).join('');
-      rewardsEl.innerHTML = `<div class="wt-rewards-title">🎁 Unlocked</div><div class="wt-reward-list">${rewards}</div>`;
-      rewardsEl.classList.remove('hidden');
+    if (result.setAdvanced) {
+      // Unlocked-rewards box — shown only when the set actually granted rewards.
+      // The late "bragging rights" sets advance with none, so skip the box (and
+      // its "🎁 Unlocked" header) but still run the new-challenge reveal below.
+      if (rewardsEl && result.rewards.length > 0) {
+        const rewards = result.rewards.map(r => `<span class="wt-reward">${this._rewardLabel(r)}</span>`).join('');
+        rewardsEl.innerHTML = `<div class="wt-rewards-title">🎁 Unlocked</div><div class="wt-reward-list">${rewards}</div>`;
+        rewardsEl.classList.remove('hidden');
+      }
       // Fade in the fresh set's 3 unchecked challenges after a brief beat.
       setTimeout(() => {
         if (challengesEl && result.nextSet) {
@@ -955,6 +1043,7 @@ export class Hud {
         <button id="recipesBtn" class="secondary${flashCls}">📖 Recipes</button>
         <button id="startBtn">▶ Play Again</button>
         <button id="challengesBtn" class="secondary">🎯 Challenges</button>
+        <button id="regularsBtn" class="secondary">😀 Regulars</button>
         <button id="settingsBtn" class="secondary">⚙️ Settings</button>
       </div>
     `;

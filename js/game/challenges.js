@@ -105,7 +105,8 @@ export const SETS = [
       { type: 'unlock_section', value: 'BEST_TWO_OF_THREE' }
     ]
   },
-  // Set 6 — recipe-focused.
+  // Set 6 — recipe-focused. Unlocks the last recipe section (Triple Threat, the
+  // three-different group); after this every section is available.
   {
     name: 'Connoisseur',
     challenges: [
@@ -114,10 +115,13 @@ export const SETS = [
       { id: 's6-combo',     type: 'combo_reach',      target: 15, title: 'Reach a 15× combo' }
     ],
     rewards: [
-      { type: 'unlock_section', value: 'DOUBLE_DATE' }
+      { type: 'unlock_section', value: 'TRIPLE_THREAT' }
     ]
   },
-  // Set 7 — late game.
+  // Sets 7–10 — endgame mastery goals. With the recipe pool trimmed to 7 groups,
+  // all sections are already unlocked by Set 6, so these are bragging-rights sets
+  // with no section reward (a future epic — e.g. regular unlocks or cosmetics —
+  // could re-attach rewards here).
   {
     name: 'Volume Dealer',
     challenges: [
@@ -125,9 +129,7 @@ export const SETS = [
       { id: 's7-pop-total', type: 'use_powerup_total',target: 30, title: 'Use 30 power-ups total' },
       { id: 's7-wave',      type: 'wave_reach',       target: 6,  title: 'Reach wave 6' }
     ],
-    rewards: [
-      { type: 'unlock_section', value: 'PAIR_UP' }
-    ]
+    rewards: []
   },
   // Set 8 — toward mastery.
   {
@@ -137,23 +139,19 @@ export const SETS = [
       { id: 's8-combo',     type: 'combo_reach',      target: 20, title: 'Reach a 20× combo' },
       { id: 's8-master',    type: 'master_recipes',   target: 5,  title: 'Master 5 recipes total' }
     ],
-    rewards: [
-      { type: 'unlock_section', value: 'ODD_TRIO' }
-    ]
+    rewards: []
   },
-  // Set 9 — deep game.
+  // Set 9 — deep game. (35 recipes total now, so "discover 35" = the full book.)
   {
     name: 'Sugar Overload',
     challenges: [
-      { id: 's9-discover',  type: 'discover_recipes', target: 35, title: 'Discover 35 recipes total' },
+      { id: 's9-discover',  type: 'discover_recipes', target: 35, title: 'Discover every recipe (35)' },
       { id: 's9-wave',      type: 'wave_reach',       target: 8,  title: 'Reach wave 8' },
       { id: 's9-master',    type: 'master_recipes',   target: 10, title: 'Master 10 recipes total' }
     ],
-    rewards: [
-      { type: 'unlock_section', value: 'HOLY_TRINITY' }
-    ]
+    rewards: []
   },
-  // Set 10 — the last recipe section (the second 3-different group).
+  // Set 10 — apex.
   {
     name: 'Apex',
     challenges: [
@@ -161,9 +159,7 @@ export const SETS = [
       { id: 's10-pop-wave', type: 'use_powerup_wave', target: 12, title: 'Use 12 power-ups in one wave' },
       { id: 's10-section',  type: 'complete_section', target: 5,  title: 'Master the Three\'s Company section', param: 'THREES_COMPANY' }
     ],
-    rewards: [
-      { type: 'unlock_section', value: 'TRIPLE_THREAT' }
-    ]
+    rewards: []
   }
 ];
 

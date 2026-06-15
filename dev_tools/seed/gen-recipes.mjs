@@ -1,12 +1,17 @@
 // seed/gen-recipes.mjs
 // Regenerates the explicit recipe catalog pasted into js/recipes.js (GROUPS).
 //
-// Catalog = EVERY 1-, 2-, and 3-scoop multiset of the 5 flavors (no 4-scoop,
-// so no four-of-a-kind), partitioned into uniform groups of EXACTLY 5:
-//   size 1: singles (5)                          -> 1 group
-//   size 2: 2-same (5) + 2-different (10)        -> 3 groups
-//   size 3: 3-same (5) + pair+1 (20) + 3-diff(10)-> 7 groups
-//   = 55 recipes, 11 groups of 5.
+// Catalog = a CURATED 35-recipe slice of the 1-, 2-, and 3-scoop multisets of
+// the 5 flavors (no 4-scoop, so no four-of-a-kind), in uniform groups of 5:
+//   size 1: singles (5)                                  -> 1 group
+//   size 2: 2-same (5) + 2-different (10)                -> 3 groups
+//   size 3: 3-same (5) + ONE pair+1 group (5) + ONE      -> 3 groups
+//           3-different group (5)
+//   = 35 recipes, 7 groups of 5.
+// The three-scoop slice keeps one group of EACH shape (three-of-a-kind,
+// pair-plus-one, three-different); the other pair+1 / 3-diff families are
+// intentionally dropped to keep the 3-scoop pool at 15. Value is FLAT per size
+// (1-scoop 50, 2-scoop 100, 3-scoop 150).
 //
 // Recipes are unordered multisets (color counts only), so the canonical id is
 // the sorted color join — matching js/recipes.js recipeIdFor(). The split
@@ -67,20 +72,18 @@ const aab4 = chunk5(aab);     // 4 groups
 const abc2 = chunk5(abc);     // 2 groups
 
 // --- group plan -------------------------------------------------------------
-// value rises with size and gently within a family (later-unlocked = pays more);
-// weight is the combo bump (1 for 1-2 scoop, 2 for 3-scoop).
+// Flat value per size (1-scoop 50, 2-scoop 100, 3-scoop 150); weight is the
+// combo bump (1 for 1-2 scoop, 2 for 3-scoop). The 3-scoop slice keeps one group
+// of each shape: THREES_COMPANY (3-same), BEST_TWO_OF_THREE (pair+1, = aab4[0]),
+// TRIPLE_THREAT (3-different, = abc2[1]). aab4[1..3] and abc2[0] are dropped.
 const GROUPS = [
-  { id: 'JUNIOR_SCOOP',      name: 'Junior Scoop',      size: 1, value: 60,  weight: 1, recipes: singles },
-  { id: 'DAILY_DOUBLE',      name: 'Daily Double',      size: 2, value: 140, weight: 1, recipes: twoSame },
-  { id: 'YIN_YANG',          name: 'Yin & Yang',        size: 2, value: 170, weight: 1, recipes: ab2[0] },
-  { id: 'ODD_COUPLE',        name: 'Odd Couple',        size: 2, value: 190, weight: 1, recipes: ab2[1] },
-  { id: 'THREES_COMPANY',    name: "Three's Company",   size: 3, value: 280, weight: 2, recipes: threeSame },
-  { id: 'BEST_TWO_OF_THREE', name: 'Best Two of Three', size: 3, value: 300, weight: 2, recipes: aab4[0] },
-  { id: 'DOUBLE_DATE',       name: 'Double Date',       size: 3, value: 320, weight: 2, recipes: aab4[1] },
-  { id: 'PAIR_UP',           name: 'Pair Up',           size: 3, value: 340, weight: 2, recipes: aab4[2] },
-  { id: 'ODD_TRIO',          name: 'Odd Trio',          size: 3, value: 360, weight: 2, recipes: aab4[3] },
-  { id: 'HOLY_TRINITY',      name: 'Holy Trinity',      size: 3, value: 400, weight: 2, recipes: abc2[0] },
-  { id: 'TRIPLE_THREAT',     name: 'Triple Threat',     size: 3, value: 440, weight: 2, recipes: abc2[1] }
+  { id: 'JUNIOR_SCOOP',      name: 'Junior Scoop',      size: 1, value: 50,  weight: 1, recipes: singles },
+  { id: 'DAILY_DOUBLE',      name: 'Daily Double',      size: 2, value: 100, weight: 1, recipes: twoSame },
+  { id: 'YIN_YANG',          name: 'Yin & Yang',        size: 2, value: 100, weight: 1, recipes: ab2[0] },
+  { id: 'ODD_COUPLE',        name: 'Odd Couple',        size: 2, value: 100, weight: 1, recipes: ab2[1] },
+  { id: 'THREES_COMPANY',    name: "Three's Company",   size: 3, value: 150, weight: 2, recipes: threeSame },
+  { id: 'BEST_TWO_OF_THREE', name: 'Best Two of Three', size: 3, value: 150, weight: 2, recipes: aab4[0] },
+  { id: 'TRIPLE_THREAT',     name: 'Triple Threat',     size: 3, value: 150, weight: 2, recipes: abc2[1] }
 ];
 
 // --- emit a paste-ready JS literal -----------------------------------------

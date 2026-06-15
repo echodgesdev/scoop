@@ -114,12 +114,14 @@ export class Game {
       flashEl:    document.getElementById('screen-flash'),
       recipesOverlayEl: document.getElementById('recipesOverlay'),
       challengesOverlayEl: document.getElementById('challengesOverlay'),
+      regularsOverlayEl: document.getElementById('regularsOverlay'),
       settingsOverlayEl: document.getElementById('settingsOverlay'),
       waveTransitionOverlayEl: document.getElementById('waveTransitionOverlay'),
       pauseOverlayEl: document.getElementById('pauseOverlay'),
       challengeToastEl: document.getElementById('challengeToast'),
       recipes:    this.world.recipes,
       challenges: this.world.challenges,
+      regulars:   this.world.regulars,
       sound:      this.sound,
       onStart:    () => this.start(),
       onHowToPlay: () => this.start(true),  // replays the tutorial on demand
@@ -349,10 +351,11 @@ export class Game {
     this.world.onExpire(1);
   }
 
-  /** Settings: wipe challenges + recipes back to a fresh save. */
+  /** Settings: wipe challenges + recipes + regulars back to a fresh save. */
   _resetProgress() {
     this.world.challenges.reset();
     this.world.recipes.reset();
+    this.world.regulars.reset();
   }
 
   /**

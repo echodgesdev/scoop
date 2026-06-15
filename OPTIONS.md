@@ -240,9 +240,12 @@ Per [scoop-solitaire-direction.md](C:/Users/edward.hodges/.claude/projects/c--Us
 
 ## Customer Regulars — unlockable characters
 
-**Status:** foundation shipped 2026-06-14 (sprite sheet + roster + selection
-waterfall, replacing the single-row `mascot_test.png` renderer). The unlock
-flow, the per-customer challenge, and persistence are designed-not-implemented.
+**Status:** phases 1, 2, 6 shipped 2026-06-14 — sprite sheet + roster + selection
+waterfall (replacing `mascot_test.png`), the persisted unlock/served store
+([game/regulars.js](js/game/regulars.js)), first-serve unlocking, and the
+Regulars collection screen. Still open: locked-spawn gating (phase 3), the
+wave-end unlock-flip animation (phase 4), and the "Served N times" challenge
+family (phase 5). See the per-phase breakdown below.
 
 ### Concept
 
@@ -303,55 +306,56 @@ order so the cascade still degrades gracefully:
 - **Cooldown / least-recently-seen bias** — widen `lastDeparted` to a short recent
   queue, or weight toward the least-recently-shown, so the same 2–3 don't cluster.
 
+### Shipped 2026-06-14 (phases 1, 2, 6)
+
+- **Unlock store + persistence (phase 1).** [game/regulars.js](js/game/regulars.js)
+  — a `Regulars` store (localStorage `scoop.regulars`) holding `{ unlocked, served }`
+  keyed by name, owned by World, wiped by the Settings reset. `served` now lives
+  here (no longer on the roster object). `drainPendingReveals()` exposes
+  just-unlocked names for the future flip animation.
+- **Unlock trigger (phase 2): first serve.** World `_onOrderComplete` calls
+  `regulars.recordServed(customer.character)`, which bumps `served` and unlocks on
+  the first completed order. Simple + legible; paces with play.
+- **Collection screen (phase 6).** `#regularsOverlay` (a card grid) reachable from
+  the title, pause, and game-over menus. Each card crops its face from the sprite
+  sheet via CSS `background-position`; unlocked cards show the Default face (col 1)
+  + name + favorite flavor + blurb + served count, locked cards show the sheet's
+  Empty white-shadow sprite (col 0) colorized grey + "???" (a tease that previews
+  the eventual unlock flip — grey shadow → full face).
+
 ### Remaining phases (designed, not implemented)
 
-1. **Unlock-flip animation (wave end).** When a regular is newly unlocked, play a
-   coin-flip reveal: their `Empty` (column 0) face shown on a coin that flips to
-   their `Default` (column 1). Fits the existing wave-transition overlay
-   ([game.js](js/game.js) `_beginWaveTransition` + the `wt-rewards` block in
-   [index.html](index.html)). Needs an unlock store (which regulars are known) and
-   a queue of "newly unlocked this wave".
-
-2. **Unlock trigger.** Decide what unlocks a regular. Options: first time one
-   appears; serving N total customers; a milestone challenge. Keep it a *reward*,
-   not a purchase — per the power-up/economy memory, no buy-with-score store.
-
-3. **"Served N times" challenge type.** New challenge family in
-   [game/challenges.js](js/game/challenges.js) reading per-character `served`.
-   Today `served` lives on the roster object; the challenge system will want it
-   surfaced the same way recipe/customer counts are.
-
-4. **Persistence.** `served` and the unlocked set must persist across sessions —
-   ride along with the existing challenge/recipe localStorage save rather than a
-   new store. Until then everything resets on reload.
-
-5. **Surface the blurb + favorite flavor.** Unlock card and/or a "regulars"
-   collection screen (reachable from the title menu alongside Recipes /
-   Challenges). Favorite flavor could later bias that customer's orders or grant a
-   bonus when matched — defer; keep the first cut cosmetic.
+1. **Locked gating in the waterfall (phase 3).** Add a stricter tier to
+   `pickCustomer` so only unlocked regulars (plus maybe one "mystery" candidate per
+   wave) spawn. Currently the waterfall draws from the FULL roster, so every
+   regular is served — and thus unlocked — fairly quickly. Gating is what makes the
+   unlock a real chase. (Cooldown / least-recently-seen bias is a softer optional
+   tier above the existing two.)
+2. **Unlock-flip animation (phase 4, wave end).** Consume
+   `regulars.drainPendingReveals()` at wave end and play a coin-flip reveal: the
+   regular's `Empty` (column 0) face on a coin that flips to their `Default`
+   (column 1). Fits the wave-transition overlay ([game.js](js/game.js)
+   `_beginWaveTransition` + the `wt-rewards` block in [index.html](index.html)).
+3. **"Served N times" challenge family (phase 5).** New challenge type in
+   [game/challenges.js](js/game/challenges.js) reading `regulars.servedCount(name)`.
+   Could re-attach rewards to the now-rewardless endgame sets (7–10).
 
 ### Open design questions
 
-1. **What's the unlock trigger?** First-appearance is simplest and most legible,
-   but means the whole roster unlocks fast. A milestone (total-served or
-   per-character) paces it out but needs a "locked candidate" surfaced so the
-   player knows who they're working toward.
-2. **Do locked regulars appear at all before unlock?** Either they only show up
-   once unlocked (clean), or they appear as the blank `Empty` face until earned
-   (mysterious, but muddies the mood-face read). Lean toward "unlocked only" for
-   the first cut.
-3. **Does favorite flavor do anything mechanical,** or stay flavor text? Defer —
-   start cosmetic, add a small matched-order bonus only if the collection needs a
-   gameplay hook.
+1. **What gates unlocks once phase 3 lands?** First-serve (current) unlocks the
+   whole roster fast. If gating restricts the spawn pool to unlocked-only, decide
+   how a NEW regular ever first appears — e.g. one "mystery candidate" mixed in per
+   wave, or unlock via a milestone rather than a serve.
+2. **Does favorite flavor do anything mechanical,** or stay flavor text? Defer —
+   start cosmetic (shown on the card), add a small matched-order bonus only if the
+   collection needs a gameplay hook.
 
-### Recommended order to implement
+### Recommended order for the rest
 
-1. Unlock store (known set) + persistence hook — no UI; `console.log` reveals.
-2. Locked gating tier in `pickCustomer` (roster = unlocked only).
-3. Wave-end unlock-flip animation in the transition overlay.
-4. "Served N times" challenge family + the regulars collection screen.
-5. Polish: favorite-flavor surfacing, cooldown/variety bias if clustering shows up
-   in playtests.
+1. Locked gating tier in `pickCustomer` + a "mystery candidate" so new regulars
+   still surface.
+2. Wave-end unlock-flip animation (drain `pendingReveals`).
+3. "Served N times" challenge family; optionally re-reward endgame sets 7–10.
 
 ---
 

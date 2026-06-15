@@ -216,7 +216,7 @@ export class Waves {
     if (pool.length === 0) {
       // Defensive fallback — at minimum the Junior Scoop section is always
       // unlocked, so this branch should only fire if WAVE_GROUPS is broken.
-      return { recipe: 'pink', colors: ['pink'], value: 60, weight: 1 };
+      return { recipe: 'pink', colors: ['pink'], value: 50, weight: 1 };
     }
 
     // 1. Bucket the pool by size and roll a size by the per-wave weights,

@@ -37,6 +37,7 @@ import { Waves, WAVE_EVENT } from './waves.js';
 import { PowerUps } from './powerups.js';
 import { Recipes } from './recipes.js';
 import { Challenges } from './challenges.js';
+import { Regulars } from './regulars.js';
 import { makeMode } from './modes/index.js';
 
 /** @typedef {import('../types.js').GameEventMap} GameEventMap */
@@ -69,6 +70,8 @@ export class World {
     // Progression (persisted) — owned by the sim, read by the HUD for its modals.
     this.recipes = new Recipes();
     this.challenges = new Challenges(this.recipes);
+    // Customer "regulars" unlock + served progression (persisted, keyed by name).
+    this.regulars = new Regulars();
     // Challenge requirement newly met → domain event; the HUD toast lives in
     // reactions. The sim never reaches the HUD directly.
     this.challenges.onEarned = ch => this.bus.emit('challengeEarned', { title: ch.title });
@@ -343,6 +346,10 @@ export class World {
     }
     this.challenges.recordCustomerServed();
     this.challenges.recordCombo(this.shop.combo);
+    // Regulars: bump this customer's lifetime served count and unlock them on
+    // their first completed order (persisted). The wave-end reveal reads
+    // regulars.drainPendingReveals() once that animation lands.
+    this.regulars.recordServed(customer.character);
 
     // Tip-sourced modes: grant the customer's tip (coin = points, else fire it).
     if (result.tip) this.mode.grantTip(result.tip, cx, cy);

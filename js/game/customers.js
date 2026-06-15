@@ -1,16 +1,16 @@
 // @ts-check
-// The customer ROSTER — the playable "regulars" on the customer sheet (sprite
-// rows 1..13; row 0 is the sheet's legend, not a character — see
-// view/sprites/customerSprite.js). Each regular carries the data the upcoming
-// "unlockable characters" epic hangs off of:
+// The customer ROSTER — the static catalog of playable "regulars" on the
+// customer sheet (sprite rows 1..13; row 0 is the sheet's legend, not a
+// character — see view/sprites/customerSprite.js). Each regular carries the data
+// the "unlockable characters" epic hangs off of:
 //   · favoriteFlavor — the scoop they love (seeds favorite-flavor challenges)
-//   · blurb          — one-line flavor text (shown on their unlock card)
-//   · served         — lifetime completed orders (seeds "Served N times")
+//   · blurb          — one-line flavor text (shown on their collection card)
 // `name` MUST match the sprite-sheet row name; the renderer resolves a customer
 // to their face row by that string.
 //
-// `served` is an in-session counter for now (resets on reload); persistence
-// rides along with the challenge/recipe save when that epic lands.
+// This module is pure catalog data + the selection waterfall. The MUTABLE
+// progression (which regulars are unlocked, lifetime served counts) lives in the
+// persisted Regulars store (game/regulars.js), keyed by `name`.
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 
@@ -19,27 +19,26 @@
  * @property {string} name             display name; must match the sprite-sheet row
  * @property {ScoopColor} favoriteFlavor
  * @property {string} blurb            one-line flavor text
- * @property {number} served           lifetime completed orders (runtime counter)
  */
 
 /** @type {CharacterDef[]} The 13 playable regulars (sprite rows 1..13). */
 export const CHARACTERS = [
-  { name: 'Annie',        favoriteFlavor: 'pink',      blurb: 'Overachiever — wants her scoop just so.',          served: 0 },
-  { name: 'Amara',        favoriteFlavor: 'choco',     blurb: "Globetrotter chasing the world's best cone.",       served: 0 },
-  { name: 'Sanjay',       favoriteFlavor: 'mint',      blurb: 'Codes by day, craves mint by night.',               served: 0 },
-  { name: 'Gerald',       favoriteFlavor: 'vanilla',   blurb: 'Retired, particular, tips in wisdom.',              served: 0 },
-  { name: 'Chad',         favoriteFlavor: 'blueberry', blurb: "Surf's up, scoops down. Brah.",                      served: 0 },
-  { name: 'Missy',        favoriteFlavor: 'pink',      blurb: 'Sweet tooth, zero patience.',                       served: 0 },
-  { name: 'Karen',        favoriteFlavor: 'vanilla',   blurb: 'Would like to speak to the scooper.',               served: 0 },
-  { name: 'Axel',         favoriteFlavor: 'choco',     blurb: 'Rides hard, eats harder.',                          served: 0 },
-  { name: 'Reginald',     favoriteFlavor: 'mint',      blurb: 'Insists on a spoon. And a napkin.',                 served: 0 },
-  { name: 'Chris',        favoriteFlavor: 'blueberry', blurb: 'Just happy to be here, honestly.',                  served: 0 },
-  { name: 'Freddie',      favoriteFlavor: 'pink',      blurb: 'Showman — demands a standing-ovation cone.',        served: 0 },
-  { name: 'Harvey Green', favoriteFlavor: 'mint',      blurb: 'A little green, a lot hungry.',                     served: 0 },
-  { name: 'Poop',         favoriteFlavor: 'choco',     blurb: '...how is he even ordering?',                       served: 0 }
+  { name: 'Annie',        favoriteFlavor: 'pink',      blurb: 'Overachiever — wants her scoop just so.' },
+  { name: 'Amara',        favoriteFlavor: 'choco',     blurb: "Globetrotter chasing the world's best cone." },
+  { name: 'Sanjay',       favoriteFlavor: 'mint',      blurb: 'Codes by day, craves mint by night.' },
+  { name: 'Gerald',       favoriteFlavor: 'vanilla',   blurb: 'Retired, particular, tips in wisdom.' },
+  { name: 'Chad',         favoriteFlavor: 'blueberry', blurb: "Surf's up, scoops down. Brah." },
+  { name: 'Missy',        favoriteFlavor: 'pink',      blurb: 'Sweet tooth, zero patience.' },
+  { name: 'Karen',        favoriteFlavor: 'vanilla',   blurb: 'Would like to speak to the scooper.' },
+  { name: 'Axel',         favoriteFlavor: 'choco',     blurb: 'Rides hard, eats harder.' },
+  { name: 'Reginald',     favoriteFlavor: 'mint',      blurb: 'Insists on a spoon. And a napkin.' },
+  { name: 'Chris',        favoriteFlavor: 'blueberry', blurb: 'Just happy to be here, honestly.' },
+  { name: 'Freddie',      favoriteFlavor: 'pink',      blurb: 'Showman — demands a standing-ovation cone.' },
+  { name: 'Harvey Green', favoriteFlavor: 'mint',      blurb: 'A little green, a lot hungry.' },
+  { name: 'Poop',         favoriteFlavor: 'choco',     blurb: '...how is he even ordering?' }
 ];
 
-/** Roster lookup by name (e.g. to bump `served` on a completed order). */
+/** Roster lookup by name. */
 export const CHARACTER_BY_NAME = new Map(CHARACTERS.map(c => [c.name, c]));
 
 /**
