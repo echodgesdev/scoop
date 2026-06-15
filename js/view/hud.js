@@ -37,7 +37,7 @@ export class Hud {
     scoreEl, comboEl, healthFillEl, overlayEl, gaugeEl, flashEl,
     recipesOverlayEl, challengesOverlayEl, regularsOverlayEl, settingsOverlayEl,
     waveTransitionOverlayEl, pauseOverlayEl, challengeToastEl,
-    recipes, challenges, regulars, sound, onStart, onHowToPlay,
+    recipes, challenges, regulars, sound, onStart, onHowToPlay, getInGame,
     getVolume, onSetVolume, getSensitivity, onSetSensitivity,
     getHaptics, onSetHaptics, onResetProgress, onPauseToggle
   }) {
@@ -96,6 +96,8 @@ export class Hud {
     /** @type {() => void} */
     this.onStart = onStart || (() => {});
     this.onHowToPlay = onHowToPlay || (() => {});
+    /** @type {() => boolean} true while an active run is in progress (How to Play is disabled then). */
+    this.getInGame = getInGame || (() => false);
     /** @type {() => number} */
     this.getVolume = getVolume || (() => 1);
     /** @type {(v: number) => void} */
@@ -144,10 +146,14 @@ export class Hud {
     const startBtn = document.getElementById('startBtn');
     if (startBtn) startBtn.addEventListener('click', () => this.onStart());
 
+    // How to Play lives in the Settings modal now (persistent element → guard
+    // against re-wiring). Close Settings first, then launch the tutorial. The
+    // button is disabled mid-run by showSettings, so a click can't restart an
+    // active game out from under the player.
     const howBtn = document.getElementById('howBtn');
-    if (howBtn) {
-      // Launches the interactive tutorial.
-      howBtn.addEventListener('click', () => this.onHowToPlay());
+    if (howBtn && !howBtn.dataset.wired) {
+      howBtn.addEventListener('click', () => { this.hideSettings(); this.onHowToPlay(); });
+      howBtn.dataset.wired = '1';
     }
 
     const recipesBtn = document.getElementById('recipesBtn');
@@ -650,6 +656,11 @@ export class Hud {
     }
     const haptics = /** @type {HTMLInputElement | null} */ (document.getElementById('hapticsToggle'));
     if (haptics) haptics.checked = this.getHaptics();
+    // How to Play restarts into the tutorial — disable it during an active run so
+    // it can't blow away the game in progress (it's reachable here via the pause
+    // menu). Enabled from the title / game-over, where there's nothing to lose.
+    const howBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('howBtn'));
+    if (howBtn) howBtn.disabled = this.getInGame();
     this.settingsOverlayEl.classList.remove('hidden');
   }
 

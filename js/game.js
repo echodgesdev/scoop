@@ -125,6 +125,7 @@ export class Game {
       sound:      this.sound,
       onStart:    () => this.start(),
       onHowToPlay: () => this.start(true),  // replays the tutorial on demand
+      getInGame:  () => this.running,       // disables How to Play during an active run
       getVolume:  () => this.sound.volume,
       onSetVolume: v => this.sound.setVolume(v),
       getSensitivity: () => this.touchGain,
