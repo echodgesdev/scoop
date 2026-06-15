@@ -690,6 +690,23 @@ body.menu-visible #hud {
   border-color: #888;
 }
 
+/* Scoop icons in the recipe book (one per wanted color), cropped from the HUD
+   scoop sheet. background-size is 7× the tile wide × 1 tile tall (single row);
+   keep the tile in step with RECIPE_SCOOP_TILE in view/hud.js. */
+.recipe-scoop {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  background-image: url('assets/hud_scoop_sheet.png');
+  background-size: 196px 28px;     /* 7×28 wide, one row tall (cells are 256px) */
+  background-repeat: no-repeat;
+}
+/* Unknown-recipe slot: the sheet's white "empty" scoop, colorized grey to match
+   the locked regular silhouettes. */
+.recipe-scoop.empty {
+  filter: grayscale(1) brightness(0.62);
+}
+
 .recipe-name {
   flex: 1;
   font-weight: bold;

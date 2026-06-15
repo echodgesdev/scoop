@@ -1,0 +1,32 @@
+{
+  "image": "assets/hud_scoop_sheet.png",
+  "imageSize": {
+    "width": 1792,
+    "height": 256
+  },
+  "frame": {
+    "width": 256,
+    "height": 256
+  },
+  "animations": [
+    {
+      "name": "anim 0",
+      "frames": [
+        {
+          "x": 0,
+          "y": 0,
+          "body": {
+            "shape": "circle",
+            "x": 0,
+            "y": 0,
+            "radius": 115
+          },
+          "offset": {
+            "x": 0,
+            "y": 0
+          }
+        }
+      ]
+    }
+  ]
+}

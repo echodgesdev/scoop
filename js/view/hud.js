@@ -2,6 +2,7 @@
 import { COLORS } from '../game/config.js';
 import { RECIPE_TARGET, GROUPS } from '../game/recipes.js';
 import CUSTOMER_SPRITE from './sprites/customerSprite.js';
+import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
 
 const GROUP_BY_ID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
 
@@ -17,6 +18,10 @@ const REGULAR_ROW_BY_NAME = new Map(CUSTOMER_SPRITE.animations.map((a, i) => [a.
 // Favorite-flavor display names (the recipe book bakes these at seed time; the
 // collection card just needs the label next to the swatch).
 const FLAVOR_LABEL = { pink: 'Strawberry', mint: 'Mint', choco: 'Chocolate', vanilla: 'Vanilla', blueberry: 'Blueberry' };
+
+// Recipe-book scoop icon tile (px). The .recipe-scoop background-size in
+// styles.css is 7× this wide × this tall — keep them in step.
+const RECIPE_SCOOP_TILE = 28;
 
 /** @typedef {import('../game/recipes.js').Recipes} Recipes */
 
@@ -460,17 +465,26 @@ export class Hud {
     listEl.innerHTML = html.join('');
   }
 
+  /** A single scoop icon cropped from the HUD scoop sheet. @param {number} col @param {boolean} [empty] */
+  _recipeScoop(col, empty = false) {
+    const T = RECIPE_SCOOP_TILE;
+    const cls = empty ? 'recipe-scoop empty' : 'recipe-scoop';
+    return `<span class="${cls}" style="background-position:-${col * T}px 0"></span>`;
+  }
+
   /** @param {ReturnType<Recipes['getAll']>[number]} r */
   _renderRecipeRow(r) {
     if (r.locked) {
-      const blanks = Array.from({ length: r.size }, () => '<span class="recipe-swatch locked"></span>').join('');
+      // Unknown recipe: one grey "empty" scoop per slot (the sheet's white scoop,
+      // colorized — same treatment as a locked regular's silhouette).
+      const blanks = Array.from({ length: r.size }, () => this._recipeScoop(HUD_SCOOP_COL.empty, true)).join('');
       return `<div class="recipe-row locked">
         <div class="recipe-colors">${blanks}</div>
         <div class="recipe-name">???</div>
         <div class="recipe-progress"><div class="recipe-progress-bar" style="width:0%"></div><span class="recipe-progress-text">?/${RECIPE_TARGET}</span></div>
       </div>`;
     }
-    const swatches = r.colors.map(c => `<span class="recipe-swatch" style="background:${COLORS[c]}"></span>`).join('');
+    const swatches = r.colors.map(c => this._recipeScoop(HUD_SCOOP_COL[c])).join('');
     const pct = Math.min(100, (r.count / RECIPE_TARGET) * 100);
     const star = r.mastered ? ' ⭐' : '';
     const cls = r.mastered ? 'recipe-row mastered' : 'recipe-row';

@@ -5,6 +5,7 @@ import { SCOOP_STATE } from './sprites.js';
 import { SpriteSheet } from './spriteSheet.js';
 import { glowCircle, glowRoundRect } from './glow.js';
 import CUSTOMER_SPRITE from './sprites/customerSprite.js';
+import HUD_SCOOP_SPRITE, { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
 import {
   SCOOP_RADIUS,
@@ -34,6 +35,11 @@ const POP_TIME = 0.16;   // bubble scale-in duration
 const SWATCH_R   = 17;
 const SWATCH_GAP = 9;    // edge-to-edge between swatches
 const BUBBLE_PAD = 26;   // horizontal padding around the swatch row
+// Wanted-color scoops render at this display size, centered on the same slots the
+// old color circles used (so the bubble-width math below is unchanged). The sheet
+// renderer falls back to those circles until the scoop image loads.
+const SWATCH_SCOOP_SIZE = 40;
+const hudScoopSheet = new SpriteSheet(HUD_SCOOP_SPRITE);
 
 function bubbleWidthFor(orderLen) {
   const swatches = Math.max(1, orderLen);
@@ -329,8 +335,15 @@ export class Stations {
     const rowW = n * SWATCH_R * 2 + (n - 1) * SWATCH_GAP;
     const swatchY = top + 30;
     const firstX = cx - rowW / 2 + SWATCH_R;
+    const scoopScale = SWATCH_SCOOP_SIZE / hudScoopSheet.frameW;
     for (let k = 0; k < n; k++) {
       const sx = firstX + k * step;
+      const color = c.order.colors[k];
+      // A scoop icon per wanted color (rainbow mode → the rainbow scoop).
+      const col = rainbow ? HUD_SCOOP_COL.rainbow : HUD_SCOOP_COL[color];
+      if (hudScoopSheet.draw(ctx, 0, col, sx, swatchY, scoopScale)) continue;
+      // Fallback until the scoop sheet image loads: the old color circle /
+      // baked rainbow swatch.
       if (rainbow) {
         const sw = rainbowSwatch();
         ctx.drawImage(sw, sx - sw.width / 2, swatchY - sw.height / 2);
@@ -338,7 +351,7 @@ export class Stations {
       }
       ctx.beginPath();
       ctx.arc(sx, swatchY, SWATCH_R, 0, Math.PI * 2);
-      ctx.fillStyle = hex(c.order.colors[k]);
+      ctx.fillStyle = hex(color);
       ctx.fill();
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#333';
