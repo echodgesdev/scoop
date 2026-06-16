@@ -149,15 +149,13 @@ export const PARTIAL_SERVE_EXTEND_S = 1.2;
 // a shorter sky cuts the fall distance (scoops arrive sooner) AND lifts the
 // whole play block up, growing the empty bottom band so a one-handed thumb rests
 // below the customers/orders instead of over them.
-export const FLOOR_Y_RATIO = 0.55;
+export const FLOOR_Y_RATIO = 0.50;
 // Cone sits deeper in the sand now (center ≈ on the sand line) so it reads as
 // planted in the ground rather than balancing on the surface. Shifts the cone
 // — and the whole stack riding on it — down with it.
 export const CONE_EMBED_PX = 55;              // positive = cone tip this many px below the sand top
 // Customers sit well down in the sand so their speech bubbles (which rise
-// ~160px above the face) clear the cone and its scoop stack instead of
-// overlapping the player.
-export const CUSTOMER_FACE_OFFSET_PX = 175;   // positive = face center this many px below the sand top
+export const CUSTOMER_FACE_OFFSET_PX = 240;   // positive = face center this many px below the sand top
 
 // === Handing animation =======================================================
 // On serve, the cone briefly leans toward the customer it just handed a

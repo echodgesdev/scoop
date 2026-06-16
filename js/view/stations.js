@@ -49,7 +49,7 @@ const hudScoopSheet = new SpriteSheet(HUD_SCOOP_SPRITE);
 // behind it, so the cone + tray stay readable through it. CONE_OVERLAP_HALF is
 // the cone's half-reach (cone + a scoop) added to the bubble half-width for the
 // proximity test.
-const BUBBLE_MIN_ALPHA = 0.4;
+const BUBBLE_MIN_ALPHA = 0.75;
 const CONE_OVERLAP_HALF = 55;
 
 function bubbleWidthFor(orderLen) {
