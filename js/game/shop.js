@@ -8,7 +8,7 @@ import {
   SERVED_FLIGHT_S,
   DELIVERY_MODE
 } from './config.js';
-import { pickCustomer } from './customers.js';
+import { pickCustomer, CHARACTERS } from './customers.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').Customer} Customer */
@@ -75,11 +75,21 @@ export class Shop {
     // or null for no tip. Game wires this; default = never tip.
     /** @type {() => (import('../types.js').PickupTypeName | 'coin' | null)} */
     this.tipRoller = () => null;
+    // The pool of regulars a new spawn can draw from. World narrows this to the
+    // unlocked set (+ the run's mystery candidate once their day arrives); default
+    // = the whole catalog (so the shop works standalone / in the tutorial).
+    /** @type {() => import('./customers.js').CharacterDef[]} */
+    this.rosterSource = () => CHARACTERS;
   }
 
   /** @param {() => (import('../types.js').PickupTypeName | 'coin' | null)} fn */
   setTipRoller(fn) {
     this.tipRoller = fn;
+  }
+
+  /** @param {() => import('./customers.js').CharacterDef[]} fn  the eligible-regulars provider */
+  setRosterSource(fn) {
+    this.rosterSource = fn;
   }
 
   reset() {
@@ -105,7 +115,7 @@ export class Shop {
     /** @type {string[]} */
     const onScreen = [];
     for (const c of this.customers) if (c.character) onScreen.push(c.character);
-    const pick = pickCustomer({ onScreen, justLeft: this.lastDeparted });
+    const pick = pickCustomer({ onScreen, justLeft: this.lastDeparted, roster: this.rosterSource() });
     return pick ? pick.name : null;
   }
 

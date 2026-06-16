@@ -240,12 +240,14 @@ Per [scoop-solitaire-direction.md](C:/Users/edward.hodges/.claude/projects/c--Us
 
 ## Customer Regulars — unlockable characters
 
-**Status:** phases 1, 2, 6 shipped 2026-06-14 — sprite sheet + roster + selection
-waterfall (replacing `mascot_test.png`), the persisted unlock/served store
-([game/regulars.js](js/game/regulars.js)), first-serve unlocking, and the
-Regulars collection screen. Still open: locked-spawn gating (phase 3), the
-wave-end unlock-flip animation (phase 4), and the "Served N times" challenge
-family (phase 5). See the per-phase breakdown below.
+**Status:** ALL PHASES SHIPPED. Phases 1/2/6 (2026-06-14): sprite sheet + roster
++ selection waterfall (replacing `mascot_test.png`), the persisted unlock/served
+store ([game/regulars.js](js/game/regulars.js)), first-serve unlocking, and the
+Regulars collection screen. Phases 3/4/5 (2026-06-16): locked-spawn gating with
+the per-run "mystery" mechanic, the day-end flip reveal, and the "serve a regular
+N times" challenge family. Favorite *flavor* → favorite *recipe*. See the
+per-phase breakdown below. Next ideas (not built): unlock regulars via challenges
+instead of / in addition to the mystery roll; a mechanical hook for favorite recipe.
 
 ### Concept
 
@@ -323,39 +325,41 @@ order so the cascade still degrades gracefully:
   Empty white-shadow sprite (col 0) colorized grey + "???" (a tease that previews
   the eventual unlock flip — grey shadow → full face).
 
-### Remaining phases (designed, not implemented)
+### Shipped 2026-06-16 (phases 3, 4, 5)
 
-1. **Locked gating in the waterfall (phase 3).** Add a stricter tier to
-   `pickCustomer` so only unlocked regulars (plus maybe one "mystery" candidate per
-   wave) spawn. Currently the waterfall draws from the FULL roster, so every
-   regular is served — and thus unlocked — fairly quickly. Gating is what makes the
-   unlock a real chase. (Cooldown / least-recently-seen bias is a softer optional
-   tier above the existing two.)
-2. **Unlock-flip animation (phase 4, wave end).** Consume
-   `regulars.drainPendingReveals()` at wave end and play a coin-flip reveal: the
-   regular's `Empty` (column 0) face on a coin that flips to their `Default`
-   (column 1). Fits the wave-transition overlay ([game.js](js/game.js)
-   `_beginWaveTransition` + the `wt-rewards` block in [index.html](index.html)).
-3. **"Served N times" challenge family (phase 5).** New challenge type in
-   [game/challenges.js](js/game/challenges.js) reading `regulars.servedCount(name)`.
-   Could re-attach rewards to the now-rewardless endgame sets (7–10).
+- **Locked-spawn gating + the "mystery" mechanic (phase 3).** The first 5 roster
+  entries are **starters** (`starter: true` in [game/customers.js](js/game/customers.js)),
+  always in the spawn pool — so it never starves (max ~4 on screen). The shop's
+  selection waterfall now draws from `world.eligibleRegulars()` (via
+  `shop.setRosterSource`): unlocked regulars **plus** this run's mystery candidate.
+  On each `World.reset`, one still-locked regular is rolled as the mystery
+  (`regulars.pickMysteryCandidate`) and a reveal day is picked in **[5,7]**; the
+  mystery only joins the pool once `waves.wave ≥ revealDay`, and unlocks when first
+  served. So a single life can unlock **at most one** new regular — you must die to
+  roll the next candidate. (Starters keep the roster from being burned in one run.)
+- **Day-end flip reveal (phase 4).** `game._beginWaveTransition` drains
+  `regulars.drainPendingReveals()` into `hud.showWaveTransition({ reveals })`, which
+  populates `.wt-reveal` with a CSS 3D **coin flip**: holds the grey `Empty`
+  silhouette (col 0), then flips to the full `Default` face (col 1). Same
+  customer-sheet crop as the collection faces.
+- **"Serve a regular N times" challenge family (phase 5).** New `serve_regular`
+  challenge type ([game/challenges.js](js/game/challenges.js), reads
+  `regulars.servedCount(param)`); `Challenges` now takes the `regulars` store.
+  Seeded into the endgame sets (Set 7 "Serve Gerald 15 times", Set 10 "Serve Annie
+  25 times") — both target STARTERS so they're always reachable.
+- **Favorite flavor → favorite recipe.** Each regular now stores a `favoriteRecipe`
+  (canonical recipe id, e.g. `pink+pink`); the collection card shows its color dots
+  + recipe name, resolved via `RECIPE_BY_ID` ([game/recipes.js](js/game/recipes.js)).
 
-### Open design questions
+### Open ideas (not built)
 
-1. **What gates unlocks once phase 3 lands?** First-serve (current) unlocks the
-   whole roster fast. If gating restricts the spawn pool to unlocked-only, decide
-   how a NEW regular ever first appears — e.g. one "mystery candidate" mixed in per
-   wave, or unlock via a milestone rather than a serve.
-2. **Does favorite flavor do anything mechanical,** or stay flavor text? Defer —
-   start cosmetic (shown on the card), add a small matched-order bonus only if the
-   collection needs a gameplay hook.
-
-### Recommended order for the rest
-
-1. Locked gating tier in `pickCustomer` + a "mystery candidate" so new regulars
-   still surface.
-2. Wave-end unlock-flip animation (drain `pendingReveals`).
-3. "Served N times" challenge family; optionally re-reward endgame sets 7–10.
+- **Challenge-gated unlocks.** The mystery roll is the only unlock path today; a
+  future option is unlocking specific regulars as challenge-set rewards (a new
+  `unlock_regular` reward type) — could re-reward the endgame sets.
+- **Favorite recipe as a mechanical hook.** Currently cosmetic; could grant a bonus
+  (extra tip / patience) when you serve a regular their favorite recipe.
+- **Reveal-day tuning.** Days 5–7 is a deep gate (a strong run). If unlocking feels
+  too rare, lower the window or unlock via a serve/score milestone instead.
 
 ---
 

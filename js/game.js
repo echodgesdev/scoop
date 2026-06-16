@@ -725,6 +725,8 @@ export class Game {
     this.effects.reset();
     this.hud.showWaveTransition({
       completedWave,
+      // Regulars unlocked this day (the mystery, served) get a coin-flip reveal.
+      reveals: this.world.regulars.drainPendingReveals(),
       onResume: () => this._endWaveTransition()
     });
   }

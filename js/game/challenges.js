@@ -16,7 +16,7 @@ const STORAGE_KEY = 'scoop.challenges';
  * @typedef {object} Challenge
  * @property {string} id            stable id for persistence
  * @property {string} title         displayed text
- * @property {'discover_recipes'|'master_recipes'|'complete_section'|'serve_customers'|'use_powerup_wave'|'use_powerup_type'|'use_powerup_total'|'combo_reach'|'wave_reach'} type
+ * @property {'discover_recipes'|'master_recipes'|'complete_section'|'serve_customers'|'serve_regular'|'use_powerup_wave'|'use_powerup_type'|'use_powerup_total'|'combo_reach'|'wave_reach'} type
  * @property {number} target        number to reach (where applicable)
  * @property {string} [param]       e.g. section id or pickup type
  */
@@ -126,7 +126,7 @@ export const SETS = [
     name: 'Volume Dealer',
     challenges: [
       { id: 's7-discover',  type: 'discover_recipes', target: 25, title: 'Discover 25 recipes total' },
-      { id: 's7-pop-total', type: 'use_powerup_total',target: 30, title: 'Use 30 power-ups total' },
+      { id: 's7-serve-reg', type: 'serve_regular',    target: 15, title: 'Serve Gerald 15 times', param: 'Gerald' },
       { id: 's7-wave',      type: 'wave_reach',       target: 6,  title: 'Reach Day 6' }
     ],
     rewards: []
@@ -155,7 +155,7 @@ export const SETS = [
   {
     name: 'Apex',
     challenges: [
-      { id: 's10-combo',    type: 'master_recipes',   target: 15, title: 'Master 15 recipes total' },
+      { id: 's10-serve-reg',type: 'serve_regular',    target: 25, title: 'Serve Annie 25 times', param: 'Annie' },
       { id: 's10-pop-wave', type: 'use_powerup_wave', target: 12, title: 'Use 12 power-ups in one day' },
       { id: 's10-section',  type: 'complete_section', target: 5,  title: 'Master the Three\'s Company section', param: 'THREES_COMPANY' }
     ],
@@ -171,9 +171,10 @@ const ALL_POWERUP_IDS = ['heart', 'feather', 'pause', 'rainbow'];
  * One canonical instance owned by Game.
  */
 export class Challenges {
-  /** @param {Recipes} recipes */
-  constructor(recipes) {
+  /** @param {Recipes} recipes @param {import('./regulars.js').Regulars} [regulars] */
+  constructor(recipes, regulars) {
     this.recipes = recipes;
+    this.regulars = regulars;
     this.state = this._load();
     // Per-wave runtime counter for "use X power-ups in one wave" — not
     // persisted; resets on each wave-up event.
@@ -368,6 +369,7 @@ export class Challenges {
       case 'discover_recipes': return s.discoveredCount;
       case 'master_recipes':   return s.masteredCount;
       case 'serve_customers':  return s.customersServed;
+      case 'serve_regular':    return this.regulars ? this.regulars.servedCount(/** @type {string} */ (ch.param)) : 0;
       case 'use_powerup_total':return s.powerupsUsedTotal;
       case 'use_powerup_type': return s.powerupsUsedByType[/** @type {PickupTypeName} */ (ch.param)] || 0;
       case 'use_powerup_wave': return this.powerupsUsedThisWave;

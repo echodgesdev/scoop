@@ -115,6 +115,10 @@ function generateActiveRecipes() {
 
 export const ALL_RECIPES = generateActiveRecipes();
 
+/** Lookup a recipe by its canonical id (recipeIdFor). Used to resolve a
+ *  regular's favoriteRecipe to its name + colors for the collection card. */
+export const RECIPE_BY_ID = new Map(ALL_RECIPES.map(r => [r.id, r]));
+
 // Wave -> accessible group ids. The pool grows by one group per wave (in GROUPS
 // order — singles → 2-scoop → the 3-scoop families), clamping at the full set.
 // recipesForWave further intersects this with the player's challenge-unlocked

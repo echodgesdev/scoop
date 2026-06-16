@@ -443,6 +443,7 @@ body.day-hint #gauge::before {
 #recipesOverlay,
 #challengesOverlay,
 #regularsOverlay,
+#powerupsOverlay,
 #settingsOverlay,
 #waveTransitionOverlay,
 #pauseOverlay {
@@ -966,9 +967,10 @@ button.flash {
 }
 .regulars-grid {
   flex: 1;
+  min-height: 0;        /* scroll inside the capped modal (see .powerups-grid) */
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
   padding: 4px 6px;
   margin-bottom: 14px;
@@ -1007,13 +1009,19 @@ button.flash {
 }
 
 .regular-name { font-weight: bold; color: #6a4a2a; }
+/* Favorite RECIPE: a heart, the recipe's color dots, and its name. */
 .regular-fav {
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
   font-size: 12px;
   color: #7a5230;
 }
+.regular-fav-pre { color: #e0607f; }
+.regular-fav-name { font-weight: 600; }
+.regular-fav .recipe-swatch { width: 13px; height: 13px; border-width: 1.5px; }
 .regular-blurb { font-size: 11px; color: #6a5238; line-height: 1.3; }
 .regular-blurb.locked-hint { font-style: italic; color: #9a8463; }
 .regular-served {
@@ -1026,9 +1034,11 @@ button.flash {
 /* Power-ups reference — coin-style cards (icon in a colored coin + description). */
 .powerups-grid {
   flex: 1;
+  min-height: 0;        /* let the grid SCROLL inside the capped modal instead of
+                           growing past it (and pushing Close off-screen) */
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));   /* 2-up on phones */
   gap: 12px;
   padding: 4px 6px;
   margin-bottom: 14px;
@@ -1061,6 +1071,40 @@ button.flash {
 }
 .powerup-name { font-weight: bold; color: #6a4a2a; font-size: 15px; }
 .powerup-desc { font-size: 12px; color: #6a5238; line-height: 1.35; }
+
+/* Day-end "New Regular!" reveal — a coin that holds the grey silhouette, then
+   flips to the regular's full face. Uses the same customer-sheet crop as the
+   collection faces (background-position set inline; size matches the 120px tile). */
+.wt-reveal { margin: 10px 0 2px; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.wt-reveal.hidden { display: none; }
+.wt-reveal-item { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.wt-reveal-coin { width: 120px; height: 120px; perspective: 700px; }
+.wt-reveal-inner {
+  position: relative;
+  width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  animation: wt-coin-flip 0.9s ease 0.4s both;   /* hold silhouette 0.4s, then flip */
+}
+.wt-reveal-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-image: url('assets/customer_sheet.png');
+  background-size: 840px 1680px;     /* 7×120 by 14×120 — matches REGULAR_FACE_TILE */
+  background-repeat: no-repeat;
+  background-color: #ffe9b8;
+  border: 3px solid #d9b285;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6), 0 4px 12px rgba(40, 16, 4, 0.35);
+  backface-visibility: hidden;
+}
+.wt-reveal-back { background-color: #9b9b9b; filter: grayscale(1) brightness(0.62); }
+.wt-reveal-front { transform: rotateY(180deg); }
+.wt-reveal-label { font-weight: bold; color: #8a4a2a; font-size: 16px; }
+@keyframes wt-coin-flip {
+  0%   { transform: rotateY(0deg)   scale(1);    }
+  50%  { transform: rotateY(90deg)  scale(1.08); }
+  100% { transform: rotateY(180deg) scale(1);    }
+}
 
 .challenge-set {
   background: rgba(255, 255, 255, 0.55);

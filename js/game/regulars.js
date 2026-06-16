@@ -4,18 +4,18 @@
 // sessions in localStorage, mirroring the Recipes / Challenges stores; one
 // canonical instance owned by World.
 //
-// Unlock trigger (epic phase 2): a regular unlocks the first time you complete
-// an order for them. The wave-end flip-reveal animation (epic phase 4) is not
-// built yet — `drainPendingReveals()` exposes the just-unlocked names so it can
-// hook in later without changing this store.
-import { CHARACTERS } from './customers.js';
+// Unlock trigger (epic phase 2): a regular unlocks the first time you complete an
+// order for them. STARTERS (customers.js `starter: true`) are unlocked from the
+// off; the rest unlock via the per-run mystery mechanic (world.js). The day-end
+// flip-reveal (phase 4) consumes `drainPendingReveals()`.
+import { CHARACTERS, CHARACTER_BY_NAME } from './customers.js';
 
 const STORAGE_KEY = 'scoop.regulars';
 
 /**
  * @typedef {object} RegularEntry
  * @property {string} name
- * @property {import('../types.js').ScoopColor} favoriteFlavor
+ * @property {string} favoriteRecipe   canonical recipe id
  * @property {string} blurb
  * @property {number} served    lifetime completed orders
  * @property {boolean} unlocked
@@ -57,8 +57,11 @@ export class Regulars {
     this.pendingReveals = [];
   }
 
-  /** @param {string} name */
-  isUnlocked(name) { return this.state.unlocked[name] === true; }
+  /** Starters are always unlocked; everyone else unlocks by being served once. @param {string} name */
+  isUnlocked(name) {
+    const def = CHARACTER_BY_NAME.get(name);
+    return (def && def.starter === true) || this.state.unlocked[name] === true;
+  }
   /** @param {string} name */
   servedCount(name) { return this.state.served[name] || 0; }
   /** How many regulars are unlocked (for the "N / total" header). */
@@ -76,7 +79,9 @@ export class Regulars {
     if (!name) return { count: 0, wasNewUnlock: false };
     const count = (this.state.served[name] || 0) + 1;
     this.state.served[name] = count;
-    const wasNewUnlock = this.state.unlocked[name] !== true;
+    // Newly unlocked = not already unlocked (starters never count — they're
+    // unlocked from the start, so serving one fires no reveal).
+    const wasNewUnlock = !this.isUnlocked(name);
     if (wasNewUnlock) {
       this.state.unlocked[name] = true;
       this.pendingReveals.push(name);
@@ -85,7 +90,17 @@ export class Regulars {
     return { count, wasNewUnlock };
   }
 
-  /** Take and clear the names unlocked since the last call (future flip reveal). */
+  /**
+   * Pick one still-locked regular to be this run's "mystery" candidate, or null
+   * if everyone's unlocked. @param {() => number} [rng]
+   */
+  pickMysteryCandidate(rng = Math.random) {
+    const locked = CHARACTERS.filter(c => !this.isUnlocked(c.name));
+    if (locked.length === 0) return null;
+    return locked[Math.floor(rng() * locked.length)].name;
+  }
+
+  /** Take and clear the names unlocked since the last call (the day-end flip reveal). */
   drainPendingReveals() {
     const out = this.pendingReveals;
     this.pendingReveals = [];
@@ -100,7 +115,7 @@ export class Regulars {
   getAll() {
     return CHARACTERS.map(c => ({
       name: c.name,
-      favoriteFlavor: c.favoriteFlavor,
+      favoriteRecipe: c.favoriteRecipe,
       blurb: c.blurb,
       served: this.servedCount(c.name),
       unlocked: this.isUnlocked(c.name)

@@ -3,8 +3,12 @@
 // customer sheet (sprite rows 1..13; row 0 is the sheet's legend, not a
 // character — see view/sprites/customerSprite.js). Each regular carries the data
 // the "unlockable characters" epic hangs off of:
-//   · favoriteFlavor — the scoop they love (seeds favorite-flavor challenges)
-//   · blurb          — one-line flavor text (shown on their collection card)
+//   · favoriteRecipe — canonical recipe id (recipeIdFor — see recipes.js) of their
+//                      go-to order; shown on their collection card.
+//   · blurb          — one-line flavor text (shown on their collection card).
+//   · starter        — true = unlocked from the start (the rest are mystery
+//                      unlocks: one locked regular per run starts appearing on a
+//                      random day and unlocks when first served — see world.js).
 // `name` MUST match the sprite-sheet row name; the renderer resolves a customer
 // to their face row by that string.
 //
@@ -12,30 +16,31 @@
 // progression (which regulars are unlocked, lifetime served counts) lives in the
 // persisted Regulars store (game/regulars.js), keyed by `name`.
 
-/** @typedef {import('../types.js').ScoopColor} ScoopColor */
-
 /**
  * @typedef {object} CharacterDef
  * @property {string} name             display name; must match the sprite-sheet row
- * @property {ScoopColor} favoriteFlavor
+ * @property {string} favoriteRecipe   canonical recipe id (e.g. 'pink+pink') of their go-to order
  * @property {string} blurb            one-line flavor text
+ * @property {boolean} [starter]       unlocked from the start (no mystery roll needed)
  */
 
-/** @type {CharacterDef[]} The 13 playable regulars (sprite rows 1..13). */
+/** @type {CharacterDef[]} The 13 playable regulars (sprite rows 1..13). The first
+ *  five are STARTERS (always available so the spawn pool is never starved); the
+ *  rest unlock one-per-run via the mystery mechanic. */
 export const CHARACTERS = [
-  { name: 'Annie',        favoriteFlavor: 'pink',      blurb: 'Overachiever — wants her scoop just so.' },
-  { name: 'Amara',        favoriteFlavor: 'choco',     blurb: "Globetrotter chasing the world's best cone." },
-  { name: 'Sanjay',       favoriteFlavor: 'mint',      blurb: 'Codes by day, craves mint by night.' },
-  { name: 'Gerald',       favoriteFlavor: 'vanilla',   blurb: 'Retired, particular, tips in wisdom.' },
-  { name: 'Chad',         favoriteFlavor: 'blueberry', blurb: "Surf's up, scoops down. Brah." },
-  { name: 'Missy',        favoriteFlavor: 'pink',      blurb: 'Sweet tooth, zero patience.' },
-  { name: 'Karen',        favoriteFlavor: 'vanilla',   blurb: 'Would like to speak to the scooper.' },
-  { name: 'Axel',         favoriteFlavor: 'choco',     blurb: 'Rides hard, eats harder.' },
-  { name: 'Reginald',     favoriteFlavor: 'mint',      blurb: 'Insists on a spoon. And a napkin.' },
-  { name: 'Chris',        favoriteFlavor: 'blueberry', blurb: 'Just happy to be here, honestly.' },
-  { name: 'Freddie',      favoriteFlavor: 'pink',      blurb: 'Showman — demands a standing-ovation cone.' },
-  { name: 'Harvey Green', favoriteFlavor: 'mint',      blurb: 'A little green, a lot hungry.' },
-  { name: 'Poop',         favoriteFlavor: 'choco',     blurb: '...how is he even ordering?' }
+  { name: 'Annie',        favoriteRecipe: 'pink+pink',          blurb: 'Overachiever — wants her scoop just so.',          starter: true },
+  { name: 'Amara',        favoriteRecipe: 'choco+choco+choco',  blurb: "Globetrotter chasing the world's best cone.",       starter: true },
+  { name: 'Sanjay',       favoriteRecipe: 'mint+mint',          blurb: 'Codes by day, craves mint by night.',               starter: true },
+  { name: 'Gerald',       favoriteRecipe: 'vanilla',            blurb: 'Retired, particular, tips in wisdom.',              starter: true },
+  { name: 'Chad',         favoriteRecipe: 'blueberry+blueberry',blurb: "Surf's up, scoops down. Brah.",                      starter: true },
+  { name: 'Missy',        favoriteRecipe: 'pink',               blurb: 'Sweet tooth, zero patience.' },
+  { name: 'Karen',        favoriteRecipe: 'mint+vanilla',       blurb: 'Would like to speak to the scooper.' },
+  { name: 'Axel',         favoriteRecipe: 'choco+choco',        blurb: 'Rides hard, eats harder.' },
+  { name: 'Reginald',     favoriteRecipe: 'mint',               blurb: 'Insists on a spoon. And a napkin.' },
+  { name: 'Chris',        favoriteRecipe: 'blueberry',          blurb: 'Just happy to be here, honestly.' },
+  { name: 'Freddie',      favoriteRecipe: 'pink+pink+pink',     blurb: 'Showman — demands a standing-ovation cone.' },
+  { name: 'Harvey Green', favoriteRecipe: 'mint+mint+mint',     blurb: 'A little green, a lot hungry.' },
+  { name: 'Poop',         favoriteRecipe: 'choco+choco+choco',  blurb: '...how is he even ordering?' }
 ];
 
 /** Roster lookup by name. */

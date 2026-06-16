@@ -38,6 +38,7 @@ import { PowerUps } from './powerups.js';
 import { Recipes } from './recipes.js';
 import { Challenges } from './challenges.js';
 import { Regulars } from './regulars.js';
+import { CHARACTERS, CHARACTER_BY_NAME } from './customers.js';
 import { makeMode } from './modes/index.js';
 
 /** @typedef {import('../types.js').GameEventMap} GameEventMap */
@@ -69,12 +70,21 @@ export class World {
 
     // Progression (persisted) — owned by the sim, read by the HUD for its modals.
     this.recipes = new Recipes();
-    this.challenges = new Challenges(this.recipes);
     // Customer "regulars" unlock + served progression (persisted, keyed by name).
+    // Created before Challenges so the "serve a regular N times" challenges can
+    // read it.
     this.regulars = new Regulars();
+    this.challenges = new Challenges(this.recipes, this.regulars);
     // Challenge requirement newly met → domain event; the HUD toast lives in
     // reactions. The sim never reaches the HUD directly.
     this.challenges.onEarned = ch => this.bus.emit('challengeEarned', { title: ch.title });
+
+    // This run's "mystery" regular: one locked regular (rolled in reset) who
+    // starts appearing on a random day [5,7] and unlocks when first served — so a
+    // single life can unlock at most one new regular. Null once everyone's unlocked.
+    /** @type {string | null} */
+    this._mysteryName = null;
+    this._mysteryRevealDay = 0;
 
     // Sim config (debug-tunable). Delivery method: how a tray serves an order
     // ('any' | 'sequential' | 'whole'). Typed as string since the debug dropdown
@@ -117,6 +127,9 @@ export class World {
     this.field.setDemandSource(() => this.shop.demandColors(this.player.colors()));
     // Some customers arrive with a tip; the mode's roller decides per spawn.
     this.shop.setTipRoller(() => this.mode.rollTip());
+    // Gate which regulars can walk up: unlocked ones, plus this run's mystery
+    // candidate once their reveal day arrives.
+    this.shop.setRosterSource(() => this.eligibleRegulars());
     this._applyModeConfig();
 
     // Active timed power-up indicator (mirrors the running power-up's countdown).
@@ -142,6 +155,21 @@ export class World {
   _groundY() { return groundYFor(this.bounds.height); }
 
   /**
+   * Which regulars can walk up right now: every unlocked one, plus this run's
+   * mystery candidate once the current day reaches their reveal day (and until
+   * they're served + unlocked, after which the unlocked filter already covers
+   * them). The shop's selection waterfall draws from this. @returns {import('./customers.js').CharacterDef[]}
+   */
+  eligibleRegulars() {
+    const pool = CHARACTERS.filter(c => this.regulars.isUnlocked(c.name));
+    if (this._mysteryName && this.waves.wave >= this._mysteryRevealDay && !this.regulars.isUnlocked(this._mysteryName)) {
+      const def = CHARACTER_BY_NAME.get(this._mysteryName);
+      if (def) pool.push(def);
+    }
+    return pool;
+  }
+
+  /**
    * Reset every model + progression-session counter for a fresh run. Flow,
    * presentation, and the loop are the coordinator's to reset.
    * @param {boolean} playWave0 whether the run opens on the tutorial wave
@@ -156,6 +184,11 @@ export class World {
     this.waves.reset(playWave0 ? 0 : 1);
     this.shop.setOrderTime(this.waves.tuning().patience);
     this.shop.reset();
+    // Roll this run's mystery regular: one locked regular who starts appearing on
+    // a random day [5,7] and unlocks when first served. One shot per life — you
+    // must start a fresh run (die) to roll the next candidate.
+    this._mysteryName = this.regulars.pickMysteryCandidate();
+    this._mysteryRevealDay = 5 + Math.floor(Math.random() * 3);
     this.health = MAX_HEALTH;
     this.activeBubble = null;
     this.puLeaving.length = 0;
@@ -344,12 +377,13 @@ export class World {
         this.challenges.recordMaster(ev.id);
       }
     }
+    // Regulars: bump this customer's lifetime served count and unlock them on
+    // their first completed order (persisted). Done BEFORE the challenge checks
+    // so a "serve a regular N times" challenge sees the up-to-date count. The
+    // day-end reveal reads regulars.drainPendingReveals().
+    this.regulars.recordServed(customer.character);
     this.challenges.recordCustomerServed();
     this.challenges.recordCombo(this.shop.combo);
-    // Regulars: bump this customer's lifetime served count and unlock them on
-    // their first completed order (persisted). The wave-end reveal reads
-    // regulars.drainPendingReveals() once that animation lands.
-    this.regulars.recordServed(customer.character);
 
     // Tip-sourced modes: grant the customer's tip (coin = points, else fire it).
     if (result.tip) this.mode.grantTip(result.tip, cx, cy);

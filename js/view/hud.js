@@ -1,6 +1,6 @@
 // @ts-check
 import { COLORS, PICKUP_TYPES } from '../game/config.js';
-import { RECIPE_TARGET, GROUPS } from '../game/recipes.js';
+import { RECIPE_TARGET, GROUPS, RECIPE_BY_ID } from '../game/recipes.js';
 import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from './powerupVisuals.js';
@@ -16,9 +16,6 @@ const REGULAR_FACE_COL = 1;          // column 1 = Default face — shown unlock
 const REGULAR_EMPTY_COL = 0;         // column 0 = Empty white "shadow" — shown locked (CSS greys it)
 /** @type {Map<string, number>} regular name → sprite-sheet row (animation index) */
 const REGULAR_ROW_BY_NAME = new Map(CUSTOMER_SPRITE.animations.map((a, i) => [a.name, i]));
-// Favorite-flavor display names (the recipe book bakes these at seed time; the
-// collection card just needs the label next to the swatch).
-const FLAVOR_LABEL = { pink: 'Strawberry', mint: 'Mint', choco: 'Chocolate', vanilla: 'Vanilla', blueberry: 'Blueberry' };
 
 // Recipe-book scoop icon tile (px). The .recipe-scoop background-size in
 // styles.css is 7× this wide × this tall — keep them in step.
@@ -367,6 +364,7 @@ export class Hud {
       case 'master_recipes':    return '⭐';
       case 'complete_section':  return '📚';
       case 'serve_customers':   return '🍦';
+      case 'serve_regular':     return '😀';
       case 'use_powerup_wave':
       case 'use_powerup_total': return '⚡';
       case 'combo_reach':       return '🔥';
@@ -425,16 +423,16 @@ export class Hud {
   }
 
   /**
-   * Reference grid: one coin-style card per power-up (icon in a colored coin +
-   * name + what it does). Static content sourced from powerupVisuals.js, so it
-   * only needs rendering once — but re-rendering on open is cheap and keeps it
-   * in sync if those tables change.
+   * Reference grid: one coin-style card per tip token — the four power-ups plus
+   * the coin ($) cash tip — each an icon in a colored coin + name + what it does.
+   * Static content sourced from powerupVisuals.js; re-rendering on open is cheap.
    */
   _renderPowerups() {
     if (!this.powerupsOverlayEl) return;
     const listEl = this.powerupsOverlayEl.querySelector('.powerups-grid');
     if (!listEl) return;
-    listEl.innerHTML = PICKUP_TYPES.map(t => `
+    const tokens = [...PICKUP_TYPES, 'coin'];   // 4 power-ups + the coin cash tip
+    listEl.innerHTML = tokens.map(t => `
       <div class="powerup-card">
         <div class="powerup-coin" style="--ring:${PICKUP_RING_COLOR[t]}">${PICKUP_ICONS[t]}</div>
         <div class="powerup-name">${PICKUP_NAME[t] || t}</div>
@@ -466,9 +464,14 @@ export class Hud {
       const pos = `background-position:-${col * T}px -${row * T}px`;
       const cls = r.unlocked ? 'regular-card' : 'regular-card locked';
       const name = r.unlocked ? r.name : '???';
-      const fav = r.unlocked
-        ? `<div class="regular-fav"><span class="recipe-swatch" style="background:${COLORS[r.favoriteFlavor]}"></span>${FLAVOR_LABEL[r.favoriteFlavor] || r.favoriteFlavor}</div>`
-        : '';
+      let fav = '';
+      if (r.unlocked) {
+        const recipe = RECIPE_BY_ID.get(r.favoriteRecipe);
+        if (recipe) {
+          const dots = recipe.colors.map(c => `<span class="recipe-swatch" style="background:${COLORS[c]}"></span>`).join('');
+          fav = `<div class="regular-fav"><span class="regular-fav-pre">♥</span>${dots}<span class="regular-fav-name">${recipe.name}</span></div>`;
+        }
+      }
       const blurb = r.unlocked
         ? `<div class="regular-blurb">${r.blurb}</div>`
         : `<div class="regular-blurb locked-hint">Serve them to unlock</div>`;
@@ -755,19 +758,47 @@ export class Hud {
   // === Wave transition (between-wave overlay with cross-offs + countdown) ===
 
   /**
+   * Day-end "New Regular!" reveal: a coin that flips from the grey silhouette to
+   * the regular's full face, one per regular newly unlocked this day (the
+   * mystery, once served). Fresh markup each call so the CSS flip replays; hidden
+   * when there's nothing to reveal.
+   * @param {string[]} names
+   */
+  _renderReveal(names) {
+    const el = this.waveTransitionOverlayEl && this.waveTransitionOverlayEl.querySelector('.wt-reveal');
+    if (!el) return;
+    if (!names || names.length === 0) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+    const T = REGULAR_FACE_TILE;
+    el.innerHTML = names.map(name => {
+      const row = REGULAR_ROW_BY_NAME.get(name) || 0;
+      const back  = `background-position:-${REGULAR_EMPTY_COL * T}px -${row * T}px`;  // silhouette
+      const front = `background-position:-${REGULAR_FACE_COL * T}px -${row * T}px`;   // full face
+      return `<div class="wt-reveal-item">
+        <div class="wt-reveal-coin"><div class="wt-reveal-inner">
+          <div class="wt-reveal-face wt-reveal-back" style="${back}"></div>
+          <div class="wt-reveal-face wt-reveal-front" style="${front}"></div>
+        </div></div>
+        <div class="wt-reveal-label">New Regular — <b>${name}</b>!</div>
+      </div>`;
+    }).join('');
+    el.classList.remove('hidden');
+  }
+
+  /**
    * Pauses gameplay, runs the cross-off animation on any earned-but-not-
    * committed challenges, optionally fades in a freshly-unlocked set, then
    * starts a 3-second countdown to Resume. Any button click cancels the
    * countdown and converts the centre button to "Play".
    *
-   * @param {{ completedWave: number, onResume: () => void }} opts
+   * @param {{ completedWave: number, reveals?: string[], onResume: () => void }} opts
    */
-  showWaveTransition({ completedWave, onResume }) {
+  showWaveTransition({ completedWave, reveals = [], onResume }) {
     if (!this.waveTransitionOverlayEl || !this.challenges) {
       // No overlay markup — resume immediately so the player isn't stuck.
       onResume();
       return;
     }
+    this._renderReveal(reveals);
     this._wtResume = onResume;
     this._wtInterrupted = false;
     this._wtClearCountdown();
