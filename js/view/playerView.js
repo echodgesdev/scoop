@@ -26,7 +26,7 @@ const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#
 
 // === Cone sprite (layered, grayscale, day-recolored) ========================
 // A back layer + a front layer the scoop stack draws between. The grayscale art
-// is multiply-tinted to the scoop brown, dimmed by the day cycle. CONE_SPRITE_W
+// is recolored to a warm golden-orange (dimmed by the day cycle). CONE_SPRITE_W
 // is the on-screen art width and CONE_SPRITE_DY nudges it vertically so the bowl
 // meets the bottom scoop — tune these two if the cone reads too big/small or the
 // scoops don't nest right.
@@ -34,7 +34,10 @@ const coneSheet = new SpriteSheet(CONE_SPRITE);
 const CONE_FRAME_PX = CONE_SPRITE.frame.width;        // 256
 const CONE_SPRITE_W = 168;                            // on-screen cone width (px)
 const CONE_SPRITE_DY = -14;                           // sprite-center offset from player.y
-const CONE_BASE = '#d18a4a';                          // daylight cone brown (matches the old triangle)
+// The cone's daylight color — a vibrant, yellowy-orange waffle (not a dull
+// brown). It's the multiply tint: the light wafer reads as ~this color while the
+// dark grid/outlines stay dark. Bump brighter / more yellow for more pop.
+const CONE_BASE = '#e9931c';
 
 function _lum(hex) {
   const v = parseInt(hex.slice(1), 16);
@@ -46,23 +49,25 @@ function _scaleHex(hex, f) {
   return '#' + p(((v >> 16) & 255) * f) + p(((v >> 8) & 255) * f) + p((v & 255) * f);
 }
 const _DAWN_FLOOR_LUM = _lum('#e8b97a');   // brightest day-cycle floor = full cone brightness
-const _CONE_TINT_STEPS = 16;
+const _CONE_TINT_STEPS = 13;
 
 /**
- * The cone's tint for the current time of day: the daylight brown scaled by the
- * day-cycle floor's brightness (so the cone dims into dusk alongside the sand),
- * quantized to a few brightness STEPS so the recolored sprite caches cheaply.
+ * The cone's tint for the current time of day: CONE_BASE scaled by the day-cycle
+ * floor's brightness (so the cone dims into dusk alongside the sand) but never
+ * below 0.40, quantized to a few brightness STEPS so the recolored sprite caches
+ * cheaply.
  * @param {string} floorHex the active cycle state's `floor` color
  */
 export function coneTintFor(floorHex) {
-  const b = Math.max(0.5, Math.min(1, _lum(floorHex) / _DAWN_FLOOR_LUM));
+  const b = Math.max(0.40, Math.min(1, _lum(floorHex) / _DAWN_FLOOR_LUM));
   const stepped = Math.round(b * _CONE_TINT_STEPS) / _CONE_TINT_STEPS;
   return _scaleHex(CONE_BASE, stepped);
 }
 
 // Recolored cone frames, baked once per (frame, tint): the grayscale art
-// multiplied by the tint, then clipped back to the sprite's own alpha. Bounded
-// by the tint-step count above (≤ a couple dozen small canvases).
+// multiplied by the tint (the light wafer takes the tint color; the dark
+// grid/outlines stay dark), then clipped back to the sprite's alpha. Bounded by
+// the tint-step count above (≤ a couple dozen small canvases).
 /** @type {Map<string, HTMLCanvasElement>} */
 const _coneCache = new Map();
 function tintedConeFrame(frame, tint) {
