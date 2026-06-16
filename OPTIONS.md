@@ -245,14 +245,17 @@ Per [scoop-solitaire-direction.md](C:/Users/edward.hodges/.claude/projects/c--Us
 store ([game/regulars.js](js/game/regulars.js)), first-serve unlocking, and the
 Regulars collection screen. Phases 3/4/5 (2026-06-16): locked-spawn gating with
 the per-run "mystery" mechanic, the day-end flip reveal, and the "serve a regular
-N times" challenge family. Favorite *flavor* → favorite *recipe*. See the
-per-phase breakdown below. Next ideas (not built): unlock regulars via challenges
-instead of / in addition to the mystery roll; a mechanical hook for favorite recipe.
+N times" challenge family. Favorite *flavor* → favorite *recipe*. The roster now
+splits **5 starters / 4 challenge-reward / 4 mystery** — and the challenge-set
+reward ladder that drives the four challenge unlocks (plus the coin/power-up
+unlocks) is its own section below: **Challenge Reward Ladder**. See the per-phase
+breakdown below. Next idea (not built): a mechanical hook for favorite recipe
+(currently cosmetic).
 
 ### Concept
 
 Customers are no longer one anonymous face cycling moods — they're a roster of
-named **regulars**, each with a favorite flavor, a one-line blurb, and a lifetime
+named **regulars**, each with a favorite recipe, a one-line blurb, and a lifetime
 **Served** count. The overarching epic: regulars are **unlockable**. The first
 time you serve a new one (or hit some trigger), a wave-end animation reveals them
 — their blank "Empty" face appears inside a coin and flips to their default face.
@@ -301,10 +304,11 @@ assigns `c.character` in both spawn paths and bumps `CHARACTER_BY_NAME.served` o
 order completion (in-session only for now). Roster (13) > slots (5), so the pool
 never empties.
 
-**Add stricter tiers above these two as the epic grows**, keeping strict→loose
-order so the cascade still degrades gracefully:
-- **Locked gating** — only unlocked regulars (plus maybe one "mystery" locked one
-  per wave as the unlock candidate) are eligible.
+**Locked gating** is now handled one level up, at the *roster source* rather than
+inside the waterfall: `pickCustomer` is fed `world.eligibleRegulars()` (unlocked
+starters/regulars + this run's mystery candidate), so locked characters simply
+aren't candidates. Further tiers can still be added inside the cascade as the epic
+grows, keeping strict→loose order so it degrades gracefully:
 - **Cooldown / least-recently-seen bias** — widen `lastDeparted` to a short recent
   queue, or weight toward the least-recently-shown, so the same 2–3 don't cluster.
 
@@ -321,22 +325,24 @@ order so the cascade still degrades gracefully:
 - **Collection screen (phase 6).** `#regularsOverlay` (a card grid) reachable from
   the title, pause, and game-over menus. Each card crops its face from the sprite
   sheet via CSS `background-position`; unlocked cards show the Default face (col 1)
-  + name + favorite flavor + blurb + served count, locked cards show the sheet's
+  + name + favorite recipe + blurb + served count, locked cards show the sheet's
   Empty white-shadow sprite (col 0) colorized grey + "???" (a tease that previews
   the eventual unlock flip — grey shadow → full face).
 
 ### Shipped 2026-06-16 (phases 3, 4, 5)
 
-- **Locked-spawn gating + the "mystery" mechanic (phase 3).** The first 5 roster
-  entries are **starters** (`starter: true` in [game/customers.js](js/game/customers.js)),
+- **Locked-spawn gating + the "mystery" mechanic (phase 3).** Five roster entries
+  are **starters** (`starter: true` in [game/customers.js](js/game/customers.js)),
   always in the spawn pool — so it never starves (max ~4 on screen). The shop's
   selection waterfall now draws from `world.eligibleRegulars()` (via
   `shop.setRosterSource`): unlocked regulars **plus** this run's mystery candidate.
-  On each `World.reset`, one still-locked regular is rolled as the mystery
-  (`regulars.pickMysteryCandidate`) and a reveal day is picked in **[5,7]**; the
-  mystery only joins the pool once `waves.wave ≥ revealDay`, and unlocks when first
-  served. So a single life can unlock **at most one** new regular — you must die to
-  roll the next candidate. (Starters keep the roster from being burned in one run.)
+  On each `World.reset`, one still-locked **mystery-pool** regular (`mystery: true`
+  — Missy/Axel/Reginald/Chris; challenge-reward regulars are excluded) is rolled as
+  the mystery (`regulars.pickMysteryCandidate`) and a reveal day is picked in
+  **[3,7]**; the mystery only joins the pool once `waves.wave ≥ revealDay`, and
+  unlocks when first served. So a single life can unlock **at most one** mystery
+  regular — you must die to roll the next candidate. (Starters keep the roster from
+  being burned in one run; the other four regulars unlock from challenge sets.)
 - **Day-end flip reveal (phase 4).** `game._beginWaveTransition` drains
   `regulars.drainPendingReveals()` into `hud.showWaveTransition({ reveals })`, which
   populates `.wt-reveal` with a CSS 3D **coin flip**: holds the grey `Empty`
@@ -345,7 +351,7 @@ order so the cascade still degrades gracefully:
 - **"Serve a regular N times" challenge family (phase 5).** New `serve_regular`
   challenge type ([game/challenges.js](js/game/challenges.js), reads
   `regulars.servedCount(param)`); `Challenges` now takes the `regulars` store.
-  Seeded into the endgame sets (Set 7 "Serve Gerald 15 times", Set 10 "Serve Annie
+  Seeded into the late sets (Set 8 "Serve Gerald 15 times", Set 10 "Serve Annie
   25 times") — both target STARTERS so they're always reachable.
 - **Favorite flavor → favorite recipe.** Each regular now stores a `favoriteRecipe`
   (canonical recipe id, e.g. `pink+pink`); the collection card shows its color dots
@@ -353,13 +359,85 @@ order so the cascade still degrades gracefully:
 
 ### Open ideas (not built)
 
-- **Challenge-gated unlocks.** The mystery roll is the only unlock path today; a
-  future option is unlocking specific regulars as challenge-set rewards (a new
-  `unlock_regular` reward type) — could re-reward the endgame sets.
 - **Favorite recipe as a mechanical hook.** Currently cosmetic; could grant a bonus
   (extra tip / patience) when you serve a regular their favorite recipe.
-- **Reveal-day tuning.** Days 5–7 is a deep gate (a strong run). If unlocking feels
-  too rare, lower the window or unlock via a serve/score milestone instead.
+- **Reveal-day tuning.** Days 3–7 spreads the mystery across early-to-mid runs. If
+  unlocking feels too rare/common, tighten the window or gate on a serve/score
+  milestone instead of a day.
+
+> **Note:** challenge-gated unlocks (once an open idea) shipped — four regulars
+> (Freddie/Harvey Green/Karen/Poop) now unlock via the `unlock_regular` challenge
+> reward; see the **Challenge Reward Ladder** section below.
+
+---
+
+## Challenge Reward Ladder
+
+**Status:** SHIPPED 2026-06-16. The 10 challenge sets ([game/challenges.js](js/game/challenges.js))
+are now the spine of progression: each set is the *only* source of its feature, and
+clearing one is the gate for the next. This replaced the old model where challenge
+rewards were recipe-book sections.
+
+### The ladder
+
+Each set is 3 goals; clearing all 3 grants the set's reward. The unlock order:
+
+| Set | Name | Reward |
+|----:|------|--------|
+| 1 | Getting Started | 🪙 **Coin** tips (the tutorial set) |
+| 2 | Taste the Rainbow | 🌈 Rainbow power-up |
+| 3 | Making Regulars | 😀 **Freddie** (regular) |
+| 4 | Heart on the Line | ❤️ Heart power-up |
+| 5 | Local Legend | 😀 **Harvey Green** (regular) |
+| 6 | Brain Freeze | ❄️ Freeze power-up |
+| 7 | Speak to the Manager | 😀 **Karen** (regular) |
+| 8 | Quickstep | ⚡ Speed power-up |
+| 9 | The Whole Crew | 😀 **Poop** (regular) |
+| 10 | Top Scooper | — (bragging rights; final cutscene TBD) |
+
+Reward types (`Reward.type` in challenges.js): `unlock_coin`, `unlock_powerup`,
+`unlock_regular`. Applied once via `_applyReward` (coin sets `unlocks.coin`,
+power-ups set `unlocks.powerups[x]`, regulars call `regulars.unlock(name)`).
+
+### Two hard rules
+
+1. **A set's goals only require features unlocked by EARLIER sets.** A set never
+   asks you to *use* the power-up it itself unlocks — so the power-up-use goal for
+   Rainbow lives in Set 3 (after Set 2 grants it), Heart's in Set 5, etc. The
+   power-up-granting sets (2/4/6/8) gate on combo / serve / master goals instead.
+2. **The next set won't appear until the current run ENDS.** Clearing a set's goals
+   unlocks its reward *immediately* (mid-run, via `commitEarned()` — so you can use
+   that Rainbow right away), but the *next* set's challenges stay hidden until you
+   die. The day-end overlay shows "Challenge set complete! Finish this run to
+   unlock the next set of challenges." (`.wt-finish-note`). Mechanically:
+   `commitEarned()` applies rewards + reports `setComplete` but does **not** bump
+   `currentSet`; `advanceSet()` does the bump, and it's called only at the start of
+   the *following* run ([game.js](js/game.js) `start()`), so a player clears at most
+   one set per life.
+
+### Coin / power-up gating
+
+Tips can only pay out tokens the player has unlocked. [modes/tipping.js](js/game/modes/tipping.js)
+`rollTip()` builds its weighted pool from `challenges.unlockedPowerupTypes()` and
+appends the coin only when `challenges.isCoinUnlocked()` — so during the Day-0
+tutorial (Set 1 not yet cleared) **nothing tips**, coins begin once Set 1 clears,
+and each power-up joins the tip mix as its set is cleared. The power-ups modal
+([view/hud.js](js/view/hud.js) `_renderPowerups`) shows the same lock state (coin
+via `isCoinUnlocked`, power-ups via `isPowerupUnlocked`).
+
+### Recipe sections decoupled
+
+Recipe-book sections are **no longer challenge rewards** — they unlock purely by
+**day** (`WAVE_GROUPS` in [game/recipes.js](js/game/recipes.js)); `Waves` is
+constructed with a `() => null` section-gate. This freed all 10 challenge sets to
+hand out the coin / power-ups / regulars ladder above.
+
+### Open ideas (not built)
+
+- **Set 10 cutscene.** Set 10 currently rewards nothing (`rewards: []`) — the
+  intended payoff is a short "you beat the game" cutscene, TBD.
+- **Reward variety.** The ladder is one-reward-per-set; a set could grant a small
+  bundle (e.g. a regular *and* a cosmetic) once there are more reward types.
 
 ---
 

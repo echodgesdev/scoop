@@ -91,13 +91,25 @@ export class Regulars {
   }
 
   /**
-   * Pick one still-locked regular to be this run's "mystery" candidate, or null
-   * if everyone's unlocked. @param {() => number} [rng]
+   * Pick one still-locked RANDOM-pool regular (customers.js `mystery: true`) to be
+   * this run's mystery candidate, or null if none are left. Challenge-reward
+   * regulars are excluded — they only unlock from their challenge set.
+   * @param {() => number} [rng]
    */
   pickMysteryCandidate(rng = Math.random) {
-    const locked = CHARACTERS.filter(c => !this.isUnlocked(c.name));
-    if (locked.length === 0) return null;
-    return locked[Math.floor(rng() * locked.length)].name;
+    const pool = CHARACTERS.filter(c => c.mystery && !this.isUnlocked(c.name));
+    if (pool.length === 0) return null;
+    return pool[Math.floor(rng() * pool.length)].name;
+  }
+
+  /**
+   * Force-unlock a regular (a challenge-set reward). No flip reveal — the
+   * challenge "🎁 Unlocked" display announces it. @param {string} name
+   */
+  unlock(name) {
+    if (!name || this.isUnlocked(name)) return;
+    this.state.unlocked[name] = true;
+    this._save();
   }
 
   /** Take and clear the names unlocked since the last call (the day-end flip reveal). */

@@ -21,23 +21,28 @@
  * @property {string} name             display name; must match the sprite-sheet row
  * @property {string} favoriteRecipe   canonical recipe id (e.g. 'pink+pink') of their go-to order
  * @property {string} blurb            one-line flavor text
- * @property {boolean} [starter]       unlocked from the start (no mystery roll needed)
+ * @property {boolean} [starter]       unlocked from the start (no unlock needed)
+ * @property {boolean} [mystery]       eligible for the per-run random encounter (days 3–7);
+ *                                     unlocked by serving them. Challenge-reward regulars
+ *                                     (Freddie/Harvey Green/Karen/Poop) have neither flag —
+ *                                     they unlock only from their challenge set (challenges.js).
  */
 
-/** @type {CharacterDef[]} The 13 playable regulars (sprite rows 1..13). The first
- *  five are STARTERS (always available so the spawn pool is never starved); the
- *  rest unlock one-per-run via the mystery mechanic. */
+/** @type {CharacterDef[]} The 13 playable regulars (sprite rows 1..13):
+ *  · 5 STARTERS (always available so the spawn pool is never starved)
+ *  · 4 MYSTERY (random encounters, days 3–7)
+ *  · 4 CHALLENGE rewards (no flag) — Freddie/Harvey Green/Karen/Poop. */
 export const CHARACTERS = [
   { name: 'Annie',        favoriteRecipe: 'pink+pink',          blurb: 'Overachiever — wants her scoop just so.',          starter: true },
   { name: 'Amara',        favoriteRecipe: 'choco+choco+choco',  blurb: "Globetrotter chasing the world's best cone.",       starter: true },
   { name: 'Sanjay',       favoriteRecipe: 'mint+mint',          blurb: 'Codes by day, craves mint by night.',               starter: true },
   { name: 'Gerald',       favoriteRecipe: 'vanilla',            blurb: 'Retired, particular, tips in wisdom.',              starter: true },
   { name: 'Chad',         favoriteRecipe: 'blueberry+blueberry',blurb: "Surf's up, scoops down. Brah.",                      starter: true },
-  { name: 'Missy',        favoriteRecipe: 'pink',               blurb: 'Sweet tooth, zero patience.' },
+  { name: 'Missy',        favoriteRecipe: 'pink',               blurb: 'Sweet tooth, zero patience.',                       mystery: true },
+  { name: 'Axel',         favoriteRecipe: 'choco+choco',        blurb: 'Rides hard, eats harder.',                          mystery: true },
+  { name: 'Reginald',     favoriteRecipe: 'mint',               blurb: 'Insists on a spoon. And a napkin.',                 mystery: true },
+  { name: 'Chris',        favoriteRecipe: 'blueberry',          blurb: 'Just happy to be here, honestly.',                  mystery: true },
   { name: 'Karen',        favoriteRecipe: 'mint+vanilla',       blurb: 'Would like to speak to the scooper.' },
-  { name: 'Axel',         favoriteRecipe: 'choco+choco',        blurb: 'Rides hard, eats harder.' },
-  { name: 'Reginald',     favoriteRecipe: 'mint',               blurb: 'Insists on a spoon. And a napkin.' },
-  { name: 'Chris',        favoriteRecipe: 'blueberry',          blurb: 'Just happy to be here, honestly.' },
   { name: 'Freddie',      favoriteRecipe: 'pink+pink+pink',     blurb: 'Showman — demands a standing-ovation cone.' },
   { name: 'Harvey Green', favoriteRecipe: 'mint+mint+mint',     blurb: 'A little green, a lot hungry.' },
   { name: 'Poop',         favoriteRecipe: 'choco+choco+choco',  blurb: '...how is he even ordering?' }

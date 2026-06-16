@@ -65,9 +65,9 @@ export class TippingMode {
     // of customers carry one (clamped so it never feels constant).
     const chance = Math.max(0.3, Math.min(0.9, 5 / Math.max(0.5, avgGap)));
     if (Math.random() > chance) return null;
-    // Only power-ups the player has UNLOCKED (via challenges) can be tipped; the
-    // coin is always available. So a fresh save (or one just reset) tips only
-    // coins until the early challenge sets unlock heart / speed / freeze / rainbow.
+    // Only tokens the player has UNLOCKED can be tipped — coin (Set 1) and the
+    // power-ups (Sets 2/4/6/8). So during the Day-0 tutorial nothing tips; coins
+    // start once Set 1 clears, and the power-ups join their mix as they unlock.
     const w = g.powerupWeights;
     /** @type {Record<string, number>} weight by power-up type (PICKUP order: heart, ⚡, ❄️, 🌈) */
     const weightByType = {
@@ -77,15 +77,17 @@ export class TippingMode {
       [PICKUP_TYPE.RAINBOW]: w[3] || 0
     };
     /** @type {(PickupTypeName | typeof TIP_COIN)[]} */
-    const types = [...g.challenges.unlockedPowerupTypes(), TIP_COIN];
-    const weights = types.map(t => (t === TIP_COIN ? TIP_COIN_WEIGHT : (weightByType[t] || 0)));
+    const types = [...g.challenges.unlockedPowerupTypes()];
+    const weights = types.map(t => weightByType[t] || 0);
+    if (g.challenges.isCoinUnlocked()) { types.push(TIP_COIN); weights.push(TIP_COIN_WEIGHT); }
+    if (types.length === 0) return null;   // nothing unlocked yet → no tip
     const total = weights.reduce((a, b) => a + b, 0) || 1;
     let r = Math.random() * total;
     for (let i = 0; i < types.length; i++) {
       r -= weights[i];
       if (r <= 0) return types[i];
     }
-    return TIP_COIN;
+    return types[types.length - 1];
   }
 
   /**

@@ -1739,6 +1739,17 @@ button.flash {
   margin-bottom: 4px;
 }
 
+/* "Finish your run to unlock the next set" nudge shown once a set is cleared
+   (the next set stays hidden until the game ends). */
+.wt-finish-note {
+  text-align: center;
+  color: #ffd166;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 4px 12px;
+  opacity: 0.95;
+}
+
 /* Cross-off animation — three beats per earned row:
    1. Progress bar slides from 0% to 100%.
    2. Checkmark pops in with fanfare (scale-bounce + glow).

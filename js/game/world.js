@@ -103,7 +103,9 @@ export class World {
     this.patienceOverride = null;
 
     this.waves    = new Waves(
-      () => this.challenges.unlockedSectionIds(),
+      // Recipe sections now unlock purely by DAY (recipes.js WAVE_GROUPS), not by
+      // challenges — so no section gating here.
+      () => null,
       id => this.recipes.isDiscovered(id)
     );
     this.powerups = new PowerUps();
@@ -184,11 +186,11 @@ export class World {
     this.waves.reset(playWave0 ? 0 : 1);
     this.shop.setOrderTime(this.waves.tuning().patience);
     this.shop.reset();
-    // Roll this run's mystery regular: one locked regular who starts appearing on
-    // a random day [5,7] and unlocks when first served. One shot per life — you
-    // must start a fresh run (die) to roll the next candidate.
+    // Roll this run's mystery regular: one locked random-pool regular who starts
+    // appearing on a random day [3,7] and unlocks when first served. One shot per
+    // life — you must start a fresh run (die) to roll the next candidate.
     this._mysteryName = this.regulars.pickMysteryCandidate();
-    this._mysteryRevealDay = 5 + Math.floor(Math.random() * 3);
+    this._mysteryRevealDay = 3 + Math.floor(Math.random() * 5);
     this.health = MAX_HEALTH;
     this.activeBubble = null;
     this.puLeaving.length = 0;

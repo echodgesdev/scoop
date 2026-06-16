@@ -5,8 +5,6 @@ import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from './powerupVisuals.js';
 
-const GROUP_BY_ID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
-
 // Regulars collection screen. Faces are cropped out of the shared sprite sheet
 // via CSS background-position: each regular's sheet ROW comes from the sprite
 // def (animation index), and a fixed COLUMN picks the expression. The .regular-
@@ -342,10 +340,8 @@ export class Hud {
       const names = { heart: '❤️ Heart', feather: '⚡ Speed', pause: '❄️ Freeze', rainbow: '🌈 Rainbow' };
       return names[r.value] || r.value;
     }
-    if (r.type === 'unlock_section') {
-      const g = GROUP_BY_ID[r.value];
-      return g ? `📖 ${g.name}` : `📖 ${r.value}`;
-    }
+    if (r.type === 'unlock_coin') return '🪙 Coin tips';
+    if (r.type === 'unlock_regular') return `😀 ${r.value}`;
     return r.value;
   }
 
@@ -434,8 +430,11 @@ export class Hud {
     if (!listEl) return;
     const tokens = [...PICKUP_TYPES, 'coin'];   // 4 power-ups + the coin cash tip
     listEl.innerHTML = tokens.map(t => {
-      // The coin tip is always available; power-ups unlock via the challenge sets.
-      const unlocked = t === 'coin' || !this.challenges || this.challenges.isPowerupUnlocked(t);
+      // Everything unlocks via the challenge sets — the coin tip from Set 1, the
+      // power-ups from later sets. (No challenges store → treat all as unlocked.)
+      const unlocked = !this.challenges
+        ? true
+        : (t === 'coin' ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
       const cls = unlocked ? 'powerup-card' : 'powerup-card locked';
       const desc = unlocked ? (PICKUP_DESC[t] || '') : '🔒 Unlock by clearing challenges';
       return `<div class="${cls}">
@@ -448,7 +447,7 @@ export class Hud {
 
   /**
    * Collection grid: a card per regular. Unlocked cards show the full face
-   * (cropped from the sprite sheet), name, favorite flavor, blurb, and served
+   * (cropped from the sprite sheet), name, favorite recipe, blurb, and served
    * count. Locked cards show the same face as a darkened silhouette with "???"
    * — a tease of who's still to come, and a preview of the eventual unlock flip.
    */
@@ -928,46 +927,46 @@ export class Hud {
   }
 
   /**
-   * After cross-offs: if the current set just advanced, fade in the new
-   * set's challenges. Either way, start the countdown to resume.
+   * After cross-offs: commit the day's earned challenges, show any rewards they
+   * granted, and — if the set is now fully cleared — nudge the player to finish
+   * the run (the NEXT set stays hidden until the game ends). Either way, start
+   * the countdown to resume.
    * @param {HTMLElement | null} rewardsEl
    * @param {HTMLElement | null} challengesEl
    */
   _afterCrossOffs(rewardsEl, challengesEl) {
     if (!this.challenges) return;
-    // Peek: would commitEarned advance the set? Easier to just call it,
-    // since the visual decision matches the state decision.
+    // Commit now so the saved state matches what the player is seeing. This
+    // also APPLIES any newly-earned rewards (unlock coin/regular/power-up) once.
     const result = this.challenges.commitEarned();
-    if (result.setAdvanced) {
-      // Unlocked-rewards box — shown only when the set actually granted rewards.
-      // The late "bragging rights" sets advance with none, so skip the box (and
-      // its "🎁 Unlocked" header) but still run the new-challenge reveal below.
-      if (rewardsEl && result.rewards.length > 0) {
-        const rewards = result.rewards.map(r => `<span class="wt-reward">${this._rewardLabel(r)}</span>`).join('');
-        rewardsEl.innerHTML = `<div class="wt-rewards-title">🎁 Unlocked</div><div class="wt-reward-list">${rewards}</div>`;
-        rewardsEl.classList.remove('hidden');
-      }
-      // Fade in the fresh set's 3 unchecked challenges after a brief beat.
+    // Unlocked-rewards box — only when this commit actually granted rewards.
+    const hasRewards = rewardsEl && result.rewards.length > 0;
+    if (hasRewards) {
+      const rewards = result.rewards.map(r => `<span class="wt-reward">${this._rewardLabel(r)}</span>`).join('');
+      rewardsEl.innerHTML = `<div class="wt-rewards-title">🎁 Unlocked</div><div class="wt-reward-list">${rewards}</div>`;
+      rewardsEl.classList.remove('hidden');
+    }
+    // Once the set is complete, the next set won't appear until this run ends —
+    // swap the challenge list for a "finish your run" nudge (after a beat so the
+    // reward box, if any, lands first).
+    if (this.challenges.isCurrentSetComplete() && challengesEl) {
       setTimeout(() => {
-        if (challengesEl && result.nextSet) {
-          const html = result.nextSet.challenges.map(ch => this._renderChallengeRow(ch)).join('');
-          challengesEl.classList.add('fading-out');
-          setTimeout(() => {
-            challengesEl.innerHTML = `<div class="wt-new-label">New Challenges</div>${html}`;
-            challengesEl.classList.remove('fading-out');
-            challengesEl.classList.add('fading-in');
-            this._startWtCountdown();
-          }, 300);
-        } else {
+        challengesEl.classList.add('fading-out');
+        setTimeout(() => {
+          challengesEl.innerHTML =
+            `<div class="wt-new-label">Challenge set complete!</div>` +
+            `<div class="wt-finish-note">Finish this run to unlock the next set of challenges.</div>`;
+          challengesEl.classList.remove('fading-out');
+          challengesEl.classList.add('fading-in');
           this._startWtCountdown();
-        }
-      }, 700);
+        }, 300);
+      }, hasRewards ? 700 : 0);
     } else {
       this._startWtCountdown();
     }
-    // NOTE: commitEarned has already run, so the saved state matches what
-    // the player is seeing. Game.js's _endWaveTransition calls commitEarned
-    // again — that's a no-op now (no remaining earned challenges).
+    // NOTE: commitEarned is idempotent (rewardsClaimed guard), so _endGame's
+    // later commit is a no-op. The next set is only revealed by advanceSet(),
+    // which runs at the start of the FOLLOWING run — never mid-life.
   }
 
   _startWtCountdown() {

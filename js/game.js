@@ -424,9 +424,13 @@ export class Game {
     this.hud.hideOverlay();
     this.effects.reset();
     this.stations.layout(this.bounds);
-    // Wave 0 (the tutorial wave) only plays until the first challenge set is
-    // cleared — after that we jump straight to Wave 1. "How to Play" and the
-    // debug "force tutorial" flag override and replay it.
+    // Reveal the next challenge set if last run completed the current one — the
+    // "next set appears only after the game ends" pacing. Must run BEFORE the
+    // tutorial-skip check below reads currentSet.
+    this.world.challenges.advanceSet();
+    // Day 0 (the tutorial) only plays until the first challenge set is cleared —
+    // after that we jump straight to Day 1. "How to Play" and the debug "force
+    // tutorial" flag override and replay it.
     const playWave0 = forceTutorial || this.showTutorial || !this.world.challenges.firstSetCleared();
     // Reset the simulation (models + progression-session counters). The mode is
     // rebuilt inside, so re-derive the presentation tutorial from it afterward.

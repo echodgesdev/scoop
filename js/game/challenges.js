@@ -1,16 +1,20 @@
 // @ts-check
-import { GROUPS } from './recipes.js';
-
 /** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
 /** @typedef {import('./recipes.js').Recipes} Recipes */
 
 const STORAGE_KEY = 'scoop.challenges';
 
 // === Master challenge sets ===================================================
-// Each set is 3 challenges; completing all 3 advances the player to the next
-// set and unlocks the set's rewards. Sets are front-loaded: the early sets
-// unlock the four power-ups quickly, then later sets gate recipe sections so
-// gameplay variety grows alongside player skill.
+// Each set is 3 challenges. Completing all 3 unlocks the set's reward IMMEDIATELY
+// (mid-run) — a tip token or a "regular" customer — but the NEXT set's challenges
+// stay hidden until the current run ends (see commitEarned / advanceSet), so the
+// player can clear at most one set per life. Crucially, a set's goals only ever
+// require features unlocked by EARLIER sets (a set never asks you to use the
+// power-up it itself unlocks). Unlock ladder:
+//   1 Coin · 2 Rainbow · 3 Freddie · 4 Heart · 5 Harvey Green · 6 Freeze ·
+//   7 Karen · 8 Speed · 9 Poop · 10 — (bragging rights; final cutscene TBD).
+// Recipe sections are NOT challenge rewards anymore — they unlock by day (see
+// recipes.js WAVE_GROUPS); the random regulars unlock via in-game encounters.
 
 /**
  * @typedef {object} Challenge
@@ -18,13 +22,13 @@ const STORAGE_KEY = 'scoop.challenges';
  * @property {string} title         displayed text
  * @property {'discover_recipes'|'master_recipes'|'complete_section'|'serve_customers'|'serve_regular'|'use_powerup_wave'|'use_powerup_type'|'use_powerup_total'|'combo_reach'|'wave_reach'} type
  * @property {number} target        number to reach (where applicable)
- * @property {string} [param]       e.g. section id or pickup type
+ * @property {string} [param]       e.g. pickup type, regular name, or section id
  */
 
 /**
  * @typedef {object} Reward
- * @property {'unlock_powerup'|'unlock_section'} type
- * @property {string} value         powerup type name OR section id
+ * @property {'unlock_powerup'|'unlock_coin'|'unlock_regular'} type
+ * @property {string} value         powerup type name, 'coin', or a regular's name
  */
 
 /**
@@ -36,134 +40,109 @@ const STORAGE_KEY = 'scoop.challenges';
 
 /** @type {ChallengeSet[]} */
 export const SETS = [
-  // Set 1 — foundational, sized to exactly match completing Wave 0 (serve one
-  // of each of the 5 junior flavors). All three targets are guaranteed by that
-  // playthrough — discover 5 + serve 5 land on the 5th serve, and reaching
-  // Wave 1 fires on the Wave 0→1 transition — so finishing the tutorial wave
-  // always unlocks the Heart (no fragile combo gate).
+  // Set 1 — the tutorial set: its three goals are guaranteed by finishing Day 0
+  // (serve one of each junior flavor). Clearing it unlocks Coin tips.
   {
     name: 'Getting Started',
     challenges: [
-      { id: 's1-discover',  type: 'discover_recipes', target: 5, title: 'Discover 5 flavors' },
-      { id: 's1-serve',     type: 'serve_customers',  target: 5, title: 'Serve 5 customers' },
-      { id: 's1-wave',      type: 'wave_reach',       target: 1, title: 'Reach Day 1' }
+      { id: 's1-1', type: 'discover_recipes', target: 5, title: 'Discover 5 flavors' },
+      { id: 's1-2', type: 'serve_customers',  target: 5, title: 'Serve 5 customers' },
+      { id: 's1-3', type: 'wave_reach',       target: 1, title: 'Reach Day 1' }
     ],
-    rewards: [
-      { type: 'unlock_powerup', value: 'heart' },
-      { type: 'unlock_section', value: 'DAILY_DOUBLE' }
-    ]
+    rewards: [{ type: 'unlock_coin', value: 'coin' }]
   },
-  // Set 2 — introduces the "use a power-up" verb (a power-up fires from a tip
-  // or the combo breaker).
+  // Set 2 → Rainbow. (Goals: only Coin available, so no power-up-use goal yet.)
+  {
+    name: 'Taste the Rainbow',
+    challenges: [
+      { id: 's2-1', type: 'serve_customers',  target: 15, title: 'Serve 15 customers total' },
+      { id: 's2-2', type: 'combo_reach',      target: 4,  title: 'Reach a 4× combo' },
+      { id: 's2-3', type: 'discover_recipes', target: 8,  title: 'Discover 8 recipes total' }
+    ],
+    rewards: [{ type: 'unlock_powerup', value: 'rainbow' }]
+  },
+  // Set 3 → Freddie (character). Rainbow is now available to use.
+  {
+    name: 'Making Regulars',
+    challenges: [
+      { id: 's3-1', type: 'use_powerup_type', target: 2,  title: 'Use 2 🌈 Rainbow power-ups', param: 'rainbow' },
+      { id: 's3-2', type: 'discover_recipes', target: 12, title: 'Discover 12 recipes total' },
+      { id: 's3-3', type: 'wave_reach',       target: 3,  title: 'Reach Day 3' }
+    ],
+    rewards: [{ type: 'unlock_regular', value: 'Freddie' }]
+  },
+  // Set 4 → Heart.
   {
     name: 'Heart on the Line',
     challenges: [
-      { id: 's2-pop-heart', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❤️ power-ups', param: 'heart' },
-      { id: 's2-discover',  type: 'discover_recipes', target: 5,  title: 'Discover 5 recipes total' },
-      { id: 's2-combo',     type: 'combo_reach',      target: 5,  title: 'Reach a 5× combo' }
+      { id: 's4-1', type: 'combo_reach',      target: 5,  title: 'Reach a 5× combo' },
+      { id: 's4-2', type: 'serve_customers',  target: 30, title: 'Serve 30 customers total' },
+      { id: 's4-3', type: 'master_recipes',   target: 2,  title: 'Master 2 recipes (10/10)' }
     ],
-    rewards: [
-      { type: 'unlock_powerup', value: 'feather' },
-      { type: 'unlock_section', value: 'YIN_YANG' }
-    ]
+    rewards: [{ type: 'unlock_powerup', value: 'heart' }]
   },
-  // Set 3 — speed unlocked.
+  // Set 5 → Harvey Green (character). Heart now available to use.
+  {
+    name: 'Local Legend',
+    challenges: [
+      { id: 's5-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❤️ Heart power-ups', param: 'heart' },
+      { id: 's5-2', type: 'discover_recipes', target: 18, title: 'Discover 18 recipes total' },
+      { id: 's5-3', type: 'wave_reach',       target: 4,  title: 'Reach Day 4' }
+    ],
+    rewards: [{ type: 'unlock_regular', value: 'Harvey Green' }]
+  },
+  // Set 6 → Freeze (Ice).
+  {
+    name: 'Brain Freeze',
+    challenges: [
+      { id: 's6-1', type: 'combo_reach',      target: 6,  title: 'Reach a 6× combo' },
+      { id: 's6-2', type: 'master_recipes',   target: 4,  title: 'Master 4 recipes total' },
+      { id: 's6-3', type: 'serve_customers',  target: 50, title: 'Serve 50 customers total' }
+    ],
+    rewards: [{ type: 'unlock_powerup', value: 'pause' }]
+  },
+  // Set 7 → Karen (character). Freeze now available to use.
+  {
+    name: 'Speak to the Manager',
+    challenges: [
+      { id: 's7-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❄️ Freeze power-ups', param: 'pause' },
+      { id: 's7-2', type: 'discover_recipes', target: 25, title: 'Discover 25 recipes total' },
+      { id: 's7-3', type: 'wave_reach',       target: 5,  title: 'Reach Day 5' }
+    ],
+    rewards: [{ type: 'unlock_regular', value: 'Karen' }]
+  },
+  // Set 8 → Speed (Feather).
   {
     name: 'Quickstep',
     challenges: [
-      { id: 's3-pop-speed', type: 'use_powerup_type', target: 5,  title: 'Use 5 ⚡ power-ups', param: 'feather' },
-      { id: 's3-discover',  type: 'discover_recipes', target: 8,  title: 'Discover 8 recipes total' },
-      { id: 's3-serve',     type: 'serve_customers',  target: 25, title: 'Serve 25 customers total' }
+      { id: 's8-1', type: 'combo_reach',      target: 7,  title: 'Reach a 7× combo (max!)' },
+      { id: 's8-2', type: 'serve_regular',    target: 15, title: 'Serve Gerald 15 times', param: 'Gerald' },
+      { id: 's8-3', type: 'master_recipes',   target: 6,  title: 'Master 6 recipes total' }
     ],
-    rewards: [
-      { type: 'unlock_powerup', value: 'pause' },
-      { type: 'unlock_section', value: 'ODD_COUPLE' }
-    ]
+    rewards: [{ type: 'unlock_powerup', value: 'feather' }]
   },
-  // Set 4 — star struck unlocked.
+  // Set 9 → Poop (character). Speed now available to use.
   {
-    name: 'Star Struck',
+    name: 'The Whole Crew',
     challenges: [
-      { id: 's4-pop-pause', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❄️ power-ups', param: 'pause' },
-      { id: 's4-pop-wave',  type: 'use_powerup_wave', target: 5,  title: 'Use 5 power-ups in one day' },
-      { id: 's4-combo',     type: 'combo_reach',      target: 6,  title: 'Reach a 6× combo' }
+      { id: 's9-1', type: 'use_powerup_type', target: 5,  title: 'Use 5 ⚡ Speed power-ups', param: 'feather' },
+      { id: 's9-2', type: 'wave_reach',       target: 7,  title: 'Reach Day 7' },
+      { id: 's9-3', type: 'discover_recipes', target: 35, title: 'Discover every recipe (35)' }
     ],
-    rewards: [
-      { type: 'unlock_powerup', value: 'rainbow' },
-      { type: 'unlock_section', value: 'THREES_COMPANY' }
-    ]
+    rewards: [{ type: 'unlock_regular', value: 'Poop' }]
   },
-  // Set 5 — rainbow unlocked. All powerups are now available.
+  // Set 10 — bragging rights. No feature reward yet (a final cutscene is TBD).
   {
-    name: 'Full Spectrum',
+    name: 'Top Scooper',
     challenges: [
-      { id: 's5-pop-rb',    type: 'use_powerup_type', target: 3,  title: 'Use 3 🌈 power-ups', param: 'rainbow' },
-      { id: 's5-discover',  type: 'discover_recipes', target: 15, title: 'Discover 15 recipes total' },
-      { id: 's5-wave',      type: 'wave_reach',       target: 4,  title: 'Reach Day 4' }
-    ],
-    rewards: [
-      { type: 'unlock_section', value: 'BEST_TWO_OF_THREE' }
-    ]
-  },
-  // Set 6 — recipe-focused. Unlocks the last recipe section (Triple Threat, the
-  // three-different group); after this every section is available.
-  {
-    name: 'Connoisseur',
-    challenges: [
-      { id: 's6-master',    type: 'master_recipes',   target: 3,  title: 'Master 3 recipes (10/10)' },
-      { id: 's6-pop-wave',  type: 'use_powerup_wave', target: 8,  title: 'Use 8 power-ups in one day' },
-      { id: 's6-combo',     type: 'combo_reach',      target: 7,  title: 'Reach a 7× combo (max!)' }
-    ],
-    rewards: [
-      { type: 'unlock_section', value: 'TRIPLE_THREAT' }
-    ]
-  },
-  // Sets 7–10 — endgame mastery goals. With the recipe pool trimmed to 7 groups,
-  // all sections are already unlocked by Set 6, so these are bragging-rights sets
-  // with no section reward (a future epic — e.g. regular unlocks or cosmetics —
-  // could re-attach rewards here).
-  {
-    name: 'Volume Dealer',
-    challenges: [
-      { id: 's7-discover',  type: 'discover_recipes', target: 25, title: 'Discover 25 recipes total' },
-      { id: 's7-serve-reg', type: 'serve_regular',    target: 15, title: 'Serve Gerald 15 times', param: 'Gerald' },
-      { id: 's7-wave',      type: 'wave_reach',       target: 6,  title: 'Reach Day 6' }
-    ],
-    rewards: []
-  },
-  // Set 8 — toward mastery.
-  {
-    name: 'Royal Treatment',
-    challenges: [
-      { id: 's8-section-js',type: 'complete_section', target: 5,  title: 'Master the Junior Scoop section', param: 'JUNIOR_SCOOP' },
-      { id: 's8-combo',     type: 'serve_customers',  target: 75, title: 'Serve 75 customers total' },
-      { id: 's8-master',    type: 'master_recipes',   target: 5,  title: 'Master 5 recipes total' }
-    ],
-    rewards: []
-  },
-  // Set 9 — deep game. (35 recipes total now, so "discover 35" = the full book.)
-  {
-    name: 'Sugar Overload',
-    challenges: [
-      { id: 's9-discover',  type: 'discover_recipes', target: 35, title: 'Discover every recipe (35)' },
-      { id: 's9-wave',      type: 'wave_reach',       target: 8,  title: 'Reach Day 8' },
-      { id: 's9-master',    type: 'master_recipes',   target: 10, title: 'Master 10 recipes total' }
-    ],
-    rewards: []
-  },
-  // Set 10 — apex.
-  {
-    name: 'Apex',
-    challenges: [
-      { id: 's10-serve-reg',type: 'serve_regular',    target: 25, title: 'Serve Annie 25 times', param: 'Annie' },
-      { id: 's10-pop-wave', type: 'use_powerup_wave', target: 12, title: 'Use 12 power-ups in one day' },
-      { id: 's10-section',  type: 'complete_section', target: 5,  title: 'Master the Three\'s Company section', param: 'THREES_COMPANY' }
+      { id: 's10-1', type: 'master_recipes',   target: 12, title: 'Master 12 recipes total' },
+      { id: 's10-2', type: 'use_powerup_wave', target: 10, title: 'Use 10 power-ups in one day' },
+      { id: 's10-3', type: 'serve_regular',    target: 25, title: 'Serve Annie 25 times', param: 'Annie' }
     ],
     rewards: []
   }
 ];
 
-const ALL_SECTION_IDS = GROUPS.map(g => g.id);
 const ALL_POWERUP_IDS = ['heart', 'feather', 'pause', 'rainbow'];
 
 /**
@@ -198,6 +177,8 @@ export class Challenges {
       currentSet: 0,
       /** @type {Record<string, boolean>} */
       completed: {},
+      /** @type {Record<number, boolean>} sets whose rewards have been granted (so they fire once) */
+      rewardsClaimed: {},
       stats: {
         discoveredCount: 0,
         masteredCount: 0,
@@ -213,8 +194,8 @@ export class Challenges {
       unlocks: {
         /** @type {Record<string, boolean>} */
         powerups: {},
-        /** @type {Record<string, boolean>} — JUNIOR_SCOOP is always implicitly unlocked */
-        sections: {}
+        /** @type {boolean} coin tips (Set 1 reward) */
+        coin: false
       }
     };
     try {
@@ -231,9 +212,10 @@ export class Challenges {
             },
             unlocks: {
               powerups: { ...(parsed.unlocks?.powerups || {}) },
-              sections: { ...(parsed.unlocks?.sections || {}) }
+              coin: parsed.unlocks?.coin === true
             },
-            completed: { ...(parsed.completed || {}) }
+            completed: { ...(parsed.completed || {}) },
+            rewardsClaimed: { ...(parsed.rewardsClaimed || {}) }
           };
         }
       }
@@ -267,22 +249,8 @@ export class Challenges {
     return /** @type {PickupTypeName[]} */ (ALL_POWERUP_IDS.filter(t => this.isPowerupUnlocked(t)));
   }
 
-  /** @param {string} sectionId */
-  isSectionUnlocked(sectionId) {
-    // Junior Scoop is always available so the player has something to play
-    // before completing the first set.
-    if (sectionId === 'JUNIOR_SCOOP') return true;
-    return this.state.unlocks.sections[sectionId] === true;
-  }
-
-  /** @returns {Set<string>} */
-  unlockedSectionIds() {
-    const set = new Set(['JUNIOR_SCOOP']);
-    for (const id of ALL_SECTION_IDS) {
-      if (this.state.unlocks.sections[id]) set.add(id);
-    }
-    return set;
-  }
+  /** Coin tips unlock from Set 1 (the tutorial); gated like the power-ups. */
+  isCoinUnlocked() { return this.state.unlocks.coin === true; }
 
   /**
    * True once the first challenge set (the Wave 0 tutorial goals) has been
@@ -414,21 +382,26 @@ export class Challenges {
     return set.challenges.filter(ch => !this.state.completed[ch.id] && this._getProgress(ch) >= ch.target);
   }
 
+  /** Is every challenge in the current set complete? */
+  isCurrentSetComplete() {
+    const set = SETS[this.state.currentSet];
+    return !!set && set.challenges.every(c => this.state.completed[c.id]);
+  }
+
   /**
-   * Finalise any earned challenges in the current set. If all 3 are now
-   * completed, apply the set's rewards and advance currentSet. Returns
-   * the list of just-committed ids and (when set advanced) the new set
-   * descriptor so the HUD can fade in fresh challenges.
-   *
-   * @returns {{ committed: string[], setAdvanced: boolean, rewards: Reward[], nextSetIndex: number, nextSet: ReturnType<Challenges['getCurrentSet']> }}
+   * Mark any earned challenges in the current set as completed and, the moment
+   * the set first becomes fully complete, GRANT its rewards (once). Does NOT
+   * advance to the next set — that waits for game-over (advanceSet), so a player
+   * clears at most one set per life. Called at day-end and game-over.
+   * @returns {{ committed: string[], rewards: Reward[], setComplete: boolean }}
    */
   commitEarned() {
-    const set = SETS[this.state.currentSet];
+    const idx = this.state.currentSet;
+    const set = SETS[idx];
     /** @type {string[]} */
     const committed = [];
     /** @type {Reward[]} */
     const rewards = [];
-    let setAdvanced = false;
 
     if (set) {
       for (const ch of set.challenges) {
@@ -438,31 +411,37 @@ export class Challenges {
           committed.push(ch.id);
         }
       }
-      if (set.challenges.every(c => this.state.completed[c.id])) {
-        for (const r of set.rewards) {
-          this._applyReward(r);
-          rewards.push(r);
-        }
-        this.state.currentSet += 1;
-        setAdvanced = true;
+      // Grant rewards exactly once, the first time the set is fully complete.
+      if (this.isCurrentSetComplete() && !this.state.rewardsClaimed[idx]) {
+        this.state.rewardsClaimed[idx] = true;
+        for (const r of set.rewards) { this._applyReward(r); rewards.push(r); }
       }
     }
 
     this._notifiedEarned = {};
     this._save();
-    return {
-      committed,
-      setAdvanced,
-      rewards,
-      nextSetIndex: this.state.currentSet,
-      nextSet: this.getCurrentSet()
-    };
+    return { committed, rewards, setComplete: this.isCurrentSetComplete() };
+  }
+
+  /**
+   * Reveal the next set — called only at game-over, so finishing a set's goals
+   * mid-run doesn't surface the next set until this life ends. @returns {boolean} advanced
+   */
+  advanceSet() {
+    const idx = this.state.currentSet;
+    if (this.isCurrentSetComplete() && idx < SETS.length - 1) {
+      this.state.currentSet = idx + 1;
+      this._save();
+      return true;
+    }
+    return false;
   }
 
   /** @param {Reward} r */
   _applyReward(r) {
     if (r.type === 'unlock_powerup') this.state.unlocks.powerups[r.value] = true;
-    else if (r.type === 'unlock_section') this.state.unlocks.sections[r.value] = true;
+    else if (r.type === 'unlock_coin') this.state.unlocks.coin = true;
+    else if (r.type === 'unlock_regular' && this.regulars) this.regulars.unlock(r.value);
   }
 
   // === Read API for HUD =====================================================
