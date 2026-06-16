@@ -1,3 +1,16 @@
+:root {
+  /* The shared "parlor card" look — a cream waffle surface (45°/-45° crosshatch
+     over a warm gradient) with a brown rim. Used by the modals AND the in-game
+     chrome (HUD panel, pause / fullscreen buttons). Change it ONCE here and every
+     card follows. (Element-specific bits — border width, radius, drop shadow —
+     stay on each rule, since they scale with the element.) */
+  --waffle-surface:
+    repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    linear-gradient(180deg, #fffaf0 0%, #ffefc8 100%);
+  --waffle-edge: #b97a42;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -38,19 +51,18 @@ html, body {
 }
 
 .panel {
-  /* Glassy slab WITHOUT backdrop-filter: blurring the backdrop re-runs on the
-     GPU every time the canvas underneath repaints — i.e. every frame — and was
-     one of the biggest mobile costs. A more opaque gradient + highlight +
-     shadow keeps the depth read at a fraction of the price. */
-  background: linear-gradient(180deg, rgba(255, 253, 246, 0.92), rgba(255, 247, 228, 0.78));
-  border: 2px solid rgba(255, 255, 255, 0.65);
+  /* Waffle card (see :root --waffle-surface) with an inset-white sheen. No
+     backdrop-filter — blurring the canvas backdrop is a per-frame GPU cost. */
+  background: var(--waffle-surface);
+  border: 2px solid var(--waffle-edge);
   border-radius: 16px;
   padding: 9px 16px;
   font-size: 22px;
   font-weight: bold;
+  color: #3a2a1a;
   box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    0 6px 16px rgba(40, 16, 4, 0.3),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.5);
 }
 
 .stack-left {
@@ -1345,13 +1357,13 @@ button.flash {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgba(255, 255, 255, 0.65);
+  border: 2px solid var(--waffle-edge);
   border-radius: 14px;
   color: #3a2a1a;
-  /* No backdrop-filter (per-frame GPU blur over the canvas) — see .panel. */
-  background: linear-gradient(180deg, rgba(255, 253, 246, 0.9), rgba(255, 247, 228, 0.72));
+  /* Waffle card — see :root --waffle-surface. */
+  background: var(--waffle-surface);
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 16px rgba(40, 16, 4, 0.3), inset 0 0 0 2px rgba(255, 255, 255, 0.5);
   opacity: 0.7;
   transition: opacity 0.2s ease;
 }
@@ -1804,13 +1816,13 @@ button.flash {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgba(255, 255, 255, 0.65);
+  border: 2px solid var(--waffle-edge);
   border-radius: 14px;
   color: #3a2a1a;
-  /* No backdrop-filter (per-frame GPU blur over the canvas) — see .panel. */
-  background: linear-gradient(180deg, rgba(255, 253, 246, 0.92), rgba(255, 247, 228, 0.78));
+  /* Waffle card — see :root --waffle-surface. */
+  background: var(--waffle-surface);
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 16px rgba(40, 16, 4, 0.3), inset 0 0 0 2px rgba(255, 255, 255, 0.5);
   opacity: 1;
   pointer-events: auto;
   transition: opacity 0.3s ease;
@@ -1881,11 +1893,8 @@ body.menu-visible #pauseBtn {
   position: relative;
   overflow: hidden;             /* clips the awning to the rounded corners */
   padding-top: 46px;            /* clear the awning strip */
-  background:
-    repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
-    repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
-    linear-gradient(180deg, #fffaf0 0%, #ffefc8 100%);
-  border: 3px solid #b97a42;
+  background: var(--waffle-surface);
+  border: 3px solid var(--waffle-edge);
   border-radius: 18px;
   box-shadow:
     0 14px 34px rgba(40, 16, 4, 0.45),
