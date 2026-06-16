@@ -46,7 +46,7 @@ export const SETS = [
     challenges: [
       { id: 's1-discover',  type: 'discover_recipes', target: 5, title: 'Discover 5 flavors' },
       { id: 's1-serve',     type: 'serve_customers',  target: 5, title: 'Serve 5 customers' },
-      { id: 's1-wave',      type: 'wave_reach',       target: 1, title: 'Reach Wave 1' }
+      { id: 's1-wave',      type: 'wave_reach',       target: 1, title: 'Reach Day 1' }
     ],
     rewards: [
       { type: 'unlock_powerup', value: 'heart' },
@@ -85,8 +85,8 @@ export const SETS = [
     name: 'Star Struck',
     challenges: [
       { id: 's4-pop-pause', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❄️ power-ups', param: 'pause' },
-      { id: 's4-pop-wave',  type: 'use_powerup_wave', target: 5,  title: 'Use 5 power-ups in one wave' },
-      { id: 's4-combo',     type: 'combo_reach',      target: 10, title: 'Reach a 10× combo' }
+      { id: 's4-pop-wave',  type: 'use_powerup_wave', target: 5,  title: 'Use 5 power-ups in one day' },
+      { id: 's4-combo',     type: 'combo_reach',      target: 6,  title: 'Reach a 6× combo' }
     ],
     rewards: [
       { type: 'unlock_powerup', value: 'rainbow' },
@@ -99,7 +99,7 @@ export const SETS = [
     challenges: [
       { id: 's5-pop-rb',    type: 'use_powerup_type', target: 3,  title: 'Use 3 🌈 power-ups', param: 'rainbow' },
       { id: 's5-discover',  type: 'discover_recipes', target: 15, title: 'Discover 15 recipes total' },
-      { id: 's5-wave',      type: 'wave_reach',       target: 4,  title: 'Reach wave 4' }
+      { id: 's5-wave',      type: 'wave_reach',       target: 4,  title: 'Reach Day 4' }
     ],
     rewards: [
       { type: 'unlock_section', value: 'BEST_TWO_OF_THREE' }
@@ -111,8 +111,8 @@ export const SETS = [
     name: 'Connoisseur',
     challenges: [
       { id: 's6-master',    type: 'master_recipes',   target: 3,  title: 'Master 3 recipes (10/10)' },
-      { id: 's6-pop-wave',  type: 'use_powerup_wave', target: 8,  title: 'Use 8 power-ups in one wave' },
-      { id: 's6-combo',     type: 'combo_reach',      target: 15, title: 'Reach a 15× combo' }
+      { id: 's6-pop-wave',  type: 'use_powerup_wave', target: 8,  title: 'Use 8 power-ups in one day' },
+      { id: 's6-combo',     type: 'combo_reach',      target: 7,  title: 'Reach a 7× combo (max!)' }
     ],
     rewards: [
       { type: 'unlock_section', value: 'TRIPLE_THREAT' }
@@ -127,7 +127,7 @@ export const SETS = [
     challenges: [
       { id: 's7-discover',  type: 'discover_recipes', target: 25, title: 'Discover 25 recipes total' },
       { id: 's7-pop-total', type: 'use_powerup_total',target: 30, title: 'Use 30 power-ups total' },
-      { id: 's7-wave',      type: 'wave_reach',       target: 6,  title: 'Reach wave 6' }
+      { id: 's7-wave',      type: 'wave_reach',       target: 6,  title: 'Reach Day 6' }
     ],
     rewards: []
   },
@@ -136,7 +136,7 @@ export const SETS = [
     name: 'Royal Treatment',
     challenges: [
       { id: 's8-section-js',type: 'complete_section', target: 5,  title: 'Master the Junior Scoop section', param: 'JUNIOR_SCOOP' },
-      { id: 's8-combo',     type: 'combo_reach',      target: 20, title: 'Reach a 20× combo' },
+      { id: 's8-combo',     type: 'serve_customers',  target: 75, title: 'Serve 75 customers total' },
       { id: 's8-master',    type: 'master_recipes',   target: 5,  title: 'Master 5 recipes total' }
     ],
     rewards: []
@@ -146,7 +146,7 @@ export const SETS = [
     name: 'Sugar Overload',
     challenges: [
       { id: 's9-discover',  type: 'discover_recipes', target: 35, title: 'Discover every recipe (35)' },
-      { id: 's9-wave',      type: 'wave_reach',       target: 8,  title: 'Reach wave 8' },
+      { id: 's9-wave',      type: 'wave_reach',       target: 8,  title: 'Reach Day 8' },
       { id: 's9-master',    type: 'master_recipes',   target: 10, title: 'Master 10 recipes total' }
     ],
     rewards: []
@@ -155,8 +155,8 @@ export const SETS = [
   {
     name: 'Apex',
     challenges: [
-      { id: 's10-combo',    type: 'combo_reach',      target: 25, title: 'Reach a 25× combo' },
-      { id: 's10-pop-wave', type: 'use_powerup_wave', target: 12, title: 'Use 12 power-ups in one wave' },
+      { id: 's10-combo',    type: 'master_recipes',   target: 15, title: 'Master 15 recipes total' },
+      { id: 's10-pop-wave', type: 'use_powerup_wave', target: 12, title: 'Use 12 power-ups in one day' },
       { id: 's10-section',  type: 'complete_section', target: 5,  title: 'Master the Three\'s Company section', param: 'THREES_COMPANY' }
     ],
     rewards: []

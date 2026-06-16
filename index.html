@@ -14,7 +14,7 @@
     <div class="stack-left">
       <div class="gauge-row">
         <div id="gauge-wrap">
-          <div id="gauge" aria-label="Wave progress">
+          <div id="gauge" aria-label="Day progress">
             <svg viewBox="0 0 120 120">
               <defs>
                 <linearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="1">
@@ -94,10 +94,6 @@
             <input type="checkbox" id="debugComboBreakerToggle" />
             <span>Combo breaker (chain serves → supercharged power-up)</span>
           </label>
-          <div class="debug-slider">
-            <label>Combo breaker threshold: <span id="debugComboBreakerLabel">8</span></label>
-            <input type="range" id="debugComboBreaker" min="3" max="15" step="1" value="8" />
-          </div>
         </div>
       </details>
 
@@ -206,13 +202,13 @@
 
   <div id="waveTransitionOverlay" class="hidden">
     <div class="wave-transition-modal">
-      <h2 class="wt-title">Wave Complete</h2>
+      <h2 class="wt-title">Day Complete</h2>
       <div class="wt-subtitle"></div>
       <div class="wt-challenges"></div>
       <div class="wt-rewards hidden"></div>
       <div class="wt-buttons">
         <button class="wt-recipes-btn secondary">📖 Recipes</button>
-        <button class="wt-play-btn"><span class="wt-play-label">Next Wave in 3…</span></button>
+        <button class="wt-play-btn"><span class="wt-play-label">Next Day in 3…</span></button>
         <button class="wt-challenges-btn secondary">🎯 Challenges</button>
       </div>
     </div>
@@ -245,8 +241,8 @@
       </div>
       <div class="settings-row">
         <label for="sensitivitySlider">Movement Sensitivity</label>
-        <input type="range" id="sensitivitySlider" min="0.5" max="5" step="0.1" value="2" />
-        <span id="sensitivityValue">2.0×</span>
+        <input type="range" id="sensitivitySlider" min="0.5" max="5" step="0.1" value="1.7" />
+        <span id="sensitivityValue">1.7×</span>
       </div>
       <div class="settings-row settings-row-check">
         <label for="hapticsToggle">Vibration</label>

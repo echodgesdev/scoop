@@ -67,8 +67,9 @@ export const COMBO_DECAY_S = 5;
 // (longer-running) power-up. It's the active, skill-expressive payoff (chain
 // serves → earn a power-up) with no new verb. The supercharged power-up runs at
 // DURATION_MULT × the normal timed duration so it clearly out-classes a passive
-// customer tip.
-export const COMBO_BREAKER_THRESHOLD = 8;
+// customer tip. The breaker fires AT this value, so it's also the effective max
+// combo (challenges' combo targets cap here). Fixed (no longer debug-tunable).
+export const COMBO_BREAKER_THRESHOLD = 7;
 export const COMBO_BREAKER_DURATION_MULT = 2;
 
 // === Health ===================================================================

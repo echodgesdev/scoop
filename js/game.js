@@ -205,8 +205,8 @@ export class Game {
         : this.world.waves.tuning().spawnInterval,
       onFallSpeed: m => this.world.field.setFallScale(m),
       getFallSpeed: () => this.world.field.fallScale,
-      onComboBreaker: n => { this.world.comboBreakerThreshold = Math.max(2, Math.round(n)); },
-      getComboBreaker: () => this.world.comboBreakerThreshold,
+      // Combo-breaker threshold is fixed (= max combo, COMBO_BREAKER_THRESHOLD);
+      // only the on/off toggle remains debug-tunable.
       onComboBreakerToggle: on => { this.world.comboBreakerEnabled = on; this._syncComboHud(); },
       getComboBreakerEnabled: () => this.world.comboBreakerEnabled
     });
@@ -473,8 +473,8 @@ export class Game {
   _loadTouchGain() {
     try {
       const v = parseFloat(localStorage.getItem('scoop.touchGain') || '');
-      return Number.isFinite(v) ? Math.max(0.5, Math.min(5, v)) : 2.0;
-    } catch { return 2.0; }
+      return Number.isFinite(v) ? Math.max(0.5, Math.min(5, v)) : 1.7;
+    } catch { return 1.7; }
   }
 
   /** @param {number} g */
@@ -539,7 +539,7 @@ export class Game {
     this.clock += frame;
 
     // Presentation timers decay on the variable step (they're game-owned, not
-    // part of the deterministic sim): the "WAVE N!" banner and the hurt flash.
+    // part of the deterministic sim): the "DAY N!" banner and the hurt flash.
     if (this.banner && (this.banner.t -= frame) <= 0) this.banner = null;
     if (this.hurt > 0) this.hurt = Math.max(0, this.hurt - frame);
 
@@ -553,7 +553,7 @@ export class Game {
         this.inNightCycle = false;
         // The recap modal + night sweep are done — announce the wave we're now
         // entering.
-        this.banner = { text: `WAVE ${this.world.waves.wave}!`, t: 1.6 };
+        this.banner = { text: `DAY ${this.world.waves.wave}!`, t: 1.6 };
       }
     }
     // Visual-only systems run variable-step — including during the cashout /

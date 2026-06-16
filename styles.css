@@ -214,7 +214,7 @@ html, body {
   justify-content: center;
   font-size: 36px;
   font-weight: bold;
-  color: #c1121f;
+  color: #8a4a2a;   /* dark brown — matches the "Paused" title, not red */
   text-shadow: 0 2px 0 #fff, 0 0 10px rgba(255, 183, 3, 0.55);
   line-height: 1;
   pointer-events: none;
@@ -773,7 +773,11 @@ body.menu-visible #hud {
   color: #222;
 }
 
-#closeRecipesBtn {
+/* Full-width modal close buttons — one shared base (the parlor candy gradient is
+   layered on later in the theme block). Settings' close is a variant below. */
+#closeRecipesBtn,
+#closeChallengesBtn,
+#closeRegularsBtn {
   font-family: inherit;
   font-size: 16px;
   font-weight: bold;
@@ -1100,19 +1104,6 @@ button.flash {
   line-height: 16px;
   font-weight: bold;
   color: #222;
-}
-
-#closeChallengesBtn {
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: bold;
-  padding: 8px;
-  width: 100%;
-  border: none;
-  border-radius: 10px;
-  background: #b85;
-  color: #fff;
-  cursor: pointer;
 }
 
 /* Inline challenges block on the game-over screen */

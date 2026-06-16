@@ -139,7 +139,7 @@ export function wireReactions(game) {
   });
 
   game.bus.on('waveUp', () => {
-    // The "WAVE N!" banner fires at the next-wave start (Game._frame, on
+    // The "DAY N!" banner fires at the next-wave start (Game._frame, on
     // night-cycle completion), not here.
     game.hud.setGauge(game.world.waves.wave, 1);
     game.hud.flashWaveUp();

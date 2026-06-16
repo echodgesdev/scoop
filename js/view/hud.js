@@ -746,7 +746,7 @@ export class Hud {
     const challengesEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-challenges'));
     const rewardsEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-rewards'));
 
-    if (titleEl) titleEl.textContent = `Wave ${completedWave} Complete`;
+    if (titleEl) titleEl.textContent = `Day ${completedWave} Complete`;
     if (subtitleEl) {
       subtitleEl.textContent = cur ? `Set ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
     }
@@ -909,7 +909,7 @@ export class Hud {
         this._wtResume();
         return;
       }
-      playLabel.textContent = `Next Wave in ${secondsLeft}…`;
+      playLabel.textContent = `Next Day in ${secondsLeft}…`;
       secondsLeft -= 1;
     };
     tick();
@@ -1053,7 +1053,7 @@ export class Hud {
             <div class="stat-value">${score}${isRecord ? ' <span class="record-pill">🏆 NEW BEST</span>' : ''}</div>
           </div>
           <div class="stat">
-            <div class="stat-label">Wave</div>
+            <div class="stat-label">Day</div>
             <div class="stat-value">${wave}</div>
           </div>
           <div class="stat">

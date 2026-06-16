@@ -31,15 +31,13 @@ export class DebugPanel {
    *   getMaxLive?: () => number,
    *   onSpawnInterval?: (sec: number) => void,
    *   getSpawnInterval?: () => number,
-   *   onComboBreaker?: (n: number) => void,
-   *   getComboBreaker?: () => number,
    *   onComboBreakerToggle?: (on: boolean) => void,
    *   getComboBreakerEnabled?: () => boolean,
    *   onFallSpeed?: (m: number) => void,
    *   getFallSpeed?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onTipGap, getTipGap, onPowerupWeights, getPowerupWeights, onTutorialFlag, getTutorialFlag, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreaker, getComboBreaker, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onTipGap, getTipGap, onPowerupWeights, getPowerupWeights, onTutorialFlag, getTutorialFlag, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -63,8 +61,6 @@ export class DebugPanel {
     this.getMaxLive = getMaxLive || (() => 7);
     this.onSpawnInterval = onSpawnInterval || (() => {});
     this.getSpawnInterval = getSpawnInterval || (() => 0.85);
-    this.onComboBreaker = onComboBreaker || (() => {});
-    this.getComboBreaker = getComboBreaker || (() => 8);
     this.onComboBreakerToggle = onComboBreakerToggle || (() => {});
     this.getComboBreakerEnabled = getComboBreakerEnabled || (() => false);
     this.onFallSpeed = onFallSpeed || (() => {});
@@ -123,7 +119,6 @@ export class DebugPanel {
     this._wireSlider('debugMaxLive', 'debugMaxLiveLabel', this.onMaxLive, this.getMaxLive, int);
     this._wireSlider('debugSpawnInterval', 'debugSpawnIntervalLabel', this.onSpawnInterval, this.getSpawnInterval, twoDp);
     this._wireSlider('debugFallSpeed', 'debugFallSpeedLabel', this.onFallSpeed, this.getFallSpeed, oneDp);
-    this._wireSlider('debugComboBreaker', 'debugComboBreakerLabel', this.onComboBreaker, this.getComboBreaker, int);
 
     const breakerCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugComboBreakerToggle'));
     if (breakerCb) {
