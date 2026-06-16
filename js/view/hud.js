@@ -425,19 +425,25 @@ export class Hud {
   /**
    * Reference grid: one coin-style card per tip token — the four power-ups plus
    * the coin ($) cash tip — each an icon in a colored coin + name + what it does.
-   * Static content sourced from powerupVisuals.js; re-rendering on open is cheap.
+   * Power-ups are gated by challenge unlocks, so locked ones render greyed with a
+   * "how to get it" hint; the coin is always available. Content from powerupVisuals.js.
    */
   _renderPowerups() {
     if (!this.powerupsOverlayEl) return;
     const listEl = this.powerupsOverlayEl.querySelector('.powerups-grid');
     if (!listEl) return;
     const tokens = [...PICKUP_TYPES, 'coin'];   // 4 power-ups + the coin cash tip
-    listEl.innerHTML = tokens.map(t => `
-      <div class="powerup-card">
+    listEl.innerHTML = tokens.map(t => {
+      // The coin tip is always available; power-ups unlock via the challenge sets.
+      const unlocked = t === 'coin' || !this.challenges || this.challenges.isPowerupUnlocked(t);
+      const cls = unlocked ? 'powerup-card' : 'powerup-card locked';
+      const desc = unlocked ? (PICKUP_DESC[t] || '') : '🔒 Unlock by clearing challenges';
+      return `<div class="${cls}">
         <div class="powerup-coin" style="--ring:${PICKUP_RING_COLOR[t]}">${PICKUP_ICONS[t]}</div>
         <div class="powerup-name">${PICKUP_NAME[t] || t}</div>
-        <div class="powerup-desc">${PICKUP_DESC[t] || ''}</div>
-      </div>`).join('');
+        <div class="powerup-desc">${desc}</div>
+      </div>`;
+    }).join('');
   }
 
   /**
