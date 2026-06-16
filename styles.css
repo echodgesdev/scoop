@@ -777,7 +777,8 @@ body.menu-visible #hud {
    layered on later in the theme block). Settings' close is a variant below. */
 #closeRecipesBtn,
 #closeChallengesBtn,
-#closeRegularsBtn {
+#closeRegularsBtn,
+#closePowerupsBtn {
   font-family: inherit;
   font-size: 16px;
   font-weight: bold;
@@ -928,7 +929,8 @@ button.flash {
 }
 
 /* --- Regulars collection -------------------------------------------------- */
-#regularsOverlay {
+#regularsOverlay,
+#powerupsOverlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 0, 0, 0.65);
@@ -937,9 +939,11 @@ button.flash {
   justify-content: center;
   z-index: 100;
 }
-#regularsOverlay.hidden { display: none; }
+#regularsOverlay.hidden,
+#powerupsOverlay.hidden { display: none; }
 
-.regulars-modal {
+.regulars-modal,
+.powerups-modal {
   background: #fff3c0;
   border: 4px solid #b85;
   border-radius: 14px;
@@ -951,7 +955,8 @@ button.flash {
   flex-direction: column;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
-.regulars-modal h2 { margin: 0 0 4px 0; text-align: center; }
+.regulars-modal h2,
+.powerups-modal h2 { margin: 0 0 4px 0; text-align: center; }
 .regulars-count {
   text-align: center;
   font-weight: bold;
@@ -1017,6 +1022,45 @@ button.flash {
   font-weight: bold;
   color: #b07a32;
 }
+
+/* Power-ups reference — coin-style cards (icon in a colored coin + description). */
+.powerups-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 4px 6px;
+  margin-bottom: 14px;
+}
+.powerup-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 14px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid #e8c9a0;
+}
+/* Coin: a cream disc with a thick colored ring (per power-up, via --ring) and the
+   icon centered — mirrors the in-game tip token. */
+.powerup-coin {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  line-height: 1;
+  background: radial-gradient(circle at 50% 38%, #fffefb, #ffe9b8);
+  border: 5px solid var(--ring, #ffd700);
+  box-shadow: 0 3px 8px rgba(40, 16, 4, 0.3), inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+.powerup-name { font-weight: bold; color: #6a4a2a; font-size: 15px; }
+.powerup-desc { font-size: 12px; color: #6a5238; line-height: 1.35; }
 
 .challenge-set {
   background: rgba(255, 255, 255, 0.55);
@@ -1242,6 +1286,7 @@ button.flash {
    buttons (Regulars, Settings) each center on their own full-width row instead
    of dangling alone in the grid's first column. */
 .menu-buttons.gameover-buttons #regularsBtn,
+.menu-buttons.gameover-buttons #powerupsBtn,
 .menu-buttons.gameover-buttons #settingsBtn {
   grid-column: 1 / -1;
   justify-self: center;
@@ -1780,10 +1825,11 @@ button.flash {
 .pause-modal .wt-title {
   color: #6a4a2a;
 }
-/* Pause menu has a 4th button (Regulars); center it on its own full-width row
-   so it doesn't dangle in the 3-column grid. Scoped to the pause button, so the
-   wave-transition overlay (3 buttons) is untouched. */
-.wt-buttons #pauseRegularsBtn {
+/* Pause menu has extra buttons (Regulars, Power-ups) beyond the 3-column grid;
+   center each on its own full-width row so they don't dangle. Scoped to the
+   pause buttons, so the wave-transition overlay (3 buttons) is untouched. */
+.wt-buttons #pauseRegularsBtn,
+.wt-buttons #pausePowerupsBtn {
   grid-column: 1 / -1;
   justify-self: center;
 }
@@ -1878,6 +1924,7 @@ body.menu-visible #pauseBtn {
 .recipes-modal,
 .challenges-modal,
 .regulars-modal,
+.powerups-modal,
 .settings-modal,
 .wave-transition-modal,
 .gameover-card {
@@ -1898,6 +1945,7 @@ body.menu-visible #pauseBtn {
 .recipes-modal::before,
 .challenges-modal::before,
 .regulars-modal::before,
+.powerups-modal::before,
 .settings-modal::before,
 .wave-transition-modal::before,
 .gameover-card::before {
@@ -1918,6 +1966,7 @@ body.menu-visible #pauseBtn {
 .recipes-modal h2,
 .challenges-modal h2,
 .regulars-modal h2,
+.powerups-modal h2,
 .settings-modal h2,
 .wt-title {
   color: #8a4a2a;
@@ -1985,6 +2034,7 @@ body.menu-visible #pauseBtn {
 #closeRecipesBtn,
 #closeChallengesBtn,
 #closeRegularsBtn,
+#closePowerupsBtn,
 #closeSettingsBtn {
   border-radius: 999px;
   background: linear-gradient(180deg, #d9a263, #bb7f47 60%, #a96e39);
@@ -1995,10 +2045,12 @@ body.menu-visible #pauseBtn {
 #closeRecipesBtn:hover,
 #closeChallengesBtn:hover,
 #closeRegularsBtn:hover,
+#closePowerupsBtn:hover,
 #closeSettingsBtn:hover { filter: brightness(1.06); }
 #closeRecipesBtn:active,
 #closeChallengesBtn:active,
 #closeRegularsBtn:active,
+#closePowerupsBtn:active,
 #closeSettingsBtn:active {
   transform: translateY(3px);
   box-shadow: 0 1px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.25);
@@ -2014,6 +2066,7 @@ body.menu-visible #pauseBtn {
 #recipesOverlay,
 #challengesOverlay,
 #regularsOverlay,
+#powerupsOverlay,
 #settingsOverlay { background: rgba(32, 17, 8, 0.62); }
 #waveTransitionOverlay,
 #pauseOverlay { background: rgba(32, 17, 8, 0.55); }

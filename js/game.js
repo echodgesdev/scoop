@@ -115,6 +115,7 @@ export class Game {
       recipesOverlayEl: document.getElementById('recipesOverlay'),
       challengesOverlayEl: document.getElementById('challengesOverlay'),
       regularsOverlayEl: document.getElementById('regularsOverlay'),
+      powerupsOverlayEl: document.getElementById('powerupsOverlay'),
       settingsOverlayEl: document.getElementById('settingsOverlay'),
       waveTransitionOverlayEl: document.getElementById('waveTransitionOverlay'),
       pauseOverlayEl: document.getElementById('pauseOverlay'),

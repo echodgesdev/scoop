@@ -23,3 +23,20 @@ export const PICKUP_RING_COLOR = {
   rainbow: '#ffd166',
   coin:    '#ffd700'
 };
+
+// Display name + one-line description per token — for the Power-ups reference
+// modal (view/hud.js). Names match the challenge reward labels.
+export const PICKUP_NAME = {
+  heart:   'Heart',
+  feather: 'Speed',
+  pause:   'Freeze',
+  rainbow: 'Rainbow',
+  coin:    'Coin Tip'
+};
+export const PICKUP_DESC = {
+  heart:   'Patches you up — restores some health instantly.',
+  feather: 'Your cone zips around faster for a few seconds.',
+  pause:   "Freezes every customer's patience — serve with no clock ticking.",
+  rainbow: 'Every scoop counts as any color — serve any order for a few seconds.',
+  coin:    'A cash tip: bonus points, no power-up effect.'
+};

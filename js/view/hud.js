@@ -1,8 +1,9 @@
 // @ts-check
-import { COLORS } from '../game/config.js';
+import { COLORS, PICKUP_TYPES } from '../game/config.js';
 import { RECIPE_TARGET, GROUPS } from '../game/recipes.js';
 import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
+import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from './powerupVisuals.js';
 
 const GROUP_BY_ID = Object.fromEntries(GROUPS.map(g => [g.id, g]));
 
@@ -35,7 +36,7 @@ function loadBest() {
 export class Hud {
   constructor({
     scoreEl, comboEl, healthFillEl, overlayEl, gaugeEl, flashEl,
-    recipesOverlayEl, challengesOverlayEl, regularsOverlayEl, settingsOverlayEl,
+    recipesOverlayEl, challengesOverlayEl, regularsOverlayEl, powerupsOverlayEl, settingsOverlayEl,
     waveTransitionOverlayEl, pauseOverlayEl, challengeToastEl,
     recipes, challenges, regulars, sound, onStart, onHowToPlay, getInGame,
     getVolume, onSetVolume, getSensitivity, onSetSensitivity,
@@ -50,6 +51,7 @@ export class Hud {
     this.recipesOverlayEl = recipesOverlayEl;
     this.challengesOverlayEl = challengesOverlayEl;
     this.regularsOverlayEl = regularsOverlayEl;
+    this.powerupsOverlayEl = powerupsOverlayEl;
     this.settingsOverlayEl = settingsOverlayEl;
     this.waveTransitionOverlayEl = waveTransitionOverlayEl;
     this.pauseOverlayEl = pauseOverlayEl;
@@ -177,6 +179,15 @@ export class Hud {
       closeRegularsBtn.dataset.wired = '1';
     }
 
+    const powerupsBtn = document.getElementById('powerupsBtn');
+    if (powerupsBtn) powerupsBtn.addEventListener('click', () => this.showPowerups());
+
+    const closePowerupsBtn = document.getElementById('closePowerupsBtn');
+    if (closePowerupsBtn && !closePowerupsBtn.dataset.wired) {
+      closePowerupsBtn.addEventListener('click', () => this.hidePowerups());
+      closePowerupsBtn.dataset.wired = '1';
+    }
+
     // Settings is a menu item on three overlays (home, game-over card, pause).
     // Each wires once via the dataset guard; #settingsBtn is recreated on every
     // overlay rewrite, so it re-wires itself then.
@@ -254,6 +265,11 @@ export class Hud {
     if (pauseRegularsBtn && !pauseRegularsBtn.dataset.wired) {
       pauseRegularsBtn.addEventListener('click', () => this.showRegulars());
       pauseRegularsBtn.dataset.wired = '1';
+    }
+    const pausePowerupsBtn = document.getElementById('pausePowerupsBtn');
+    if (pausePowerupsBtn && !pausePowerupsBtn.dataset.wired) {
+      pausePowerupsBtn.addEventListener('click', () => this.showPowerups());
+      pausePowerupsBtn.dataset.wired = '1';
     }
 
     const resetBtn = document.getElementById('resetProgressBtn');
@@ -396,6 +412,34 @@ export class Hud {
 
   hideRegulars() {
     if (this.regularsOverlayEl) this.regularsOverlayEl.classList.add('hidden');
+  }
+
+  /** Render the power-up reference and reveal the modal. */
+  showPowerups() {
+    this._renderPowerups();
+    if (this.powerupsOverlayEl) this.powerupsOverlayEl.classList.remove('hidden');
+  }
+
+  hidePowerups() {
+    if (this.powerupsOverlayEl) this.powerupsOverlayEl.classList.add('hidden');
+  }
+
+  /**
+   * Reference grid: one coin-style card per power-up (icon in a colored coin +
+   * name + what it does). Static content sourced from powerupVisuals.js, so it
+   * only needs rendering once — but re-rendering on open is cheap and keeps it
+   * in sync if those tables change.
+   */
+  _renderPowerups() {
+    if (!this.powerupsOverlayEl) return;
+    const listEl = this.powerupsOverlayEl.querySelector('.powerups-grid');
+    if (!listEl) return;
+    listEl.innerHTML = PICKUP_TYPES.map(t => `
+      <div class="powerup-card">
+        <div class="powerup-coin" style="--ring:${PICKUP_RING_COLOR[t]}">${PICKUP_ICONS[t]}</div>
+        <div class="powerup-name">${PICKUP_NAME[t] || t}</div>
+        <div class="powerup-desc">${PICKUP_DESC[t] || ''}</div>
+      </div>`).join('');
   }
 
   /**
@@ -1069,6 +1113,7 @@ export class Hud {
         <button id="startBtn">▶ Play Again</button>
         <button id="challengesBtn" class="secondary">🎯 Challenges</button>
         <button id="regularsBtn" class="secondary">😀 Regulars</button>
+        <button id="powerupsBtn" class="secondary">⚡ Power-ups</button>
         <button id="settingsBtn" class="secondary">⚙️ Settings</button>
       </div>
     `;
