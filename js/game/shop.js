@@ -60,6 +60,9 @@ export class Shop {
     this.combo = 0;
     this.comboTimer = 0;
     this.bestCombo = 0;
+    // Combo scoring on/off — World drives it from `tutorialActive` so the
+    // tutorial scores every serve flat (combo stays 0, no multiplier, HUD hidden).
+    this.comboEnabled = true;
     this.orderTime = PATTERN_TIME_START;
     this.width = 0;
     this.respawnTimer = 0;
@@ -120,14 +123,17 @@ export class Shop {
   }
 
   /**
-   * Inject a customer with an explicit order at a chosen slot (tutorial use).
+   * Inject a customer with an explicit order at a chosen slot (scripted tutorial).
    * @param {number} slot
    * @param {ScoopColor[]} colors
-   * @param {number} [value]
-   * @param {number} [weight]
+   * @param {{ value?: number, weight?: number, character?: string|null, tip?: (import('../types.js').PickupTypeName|'coin'|null) }} [opts]
+   *   `character` pins a specific regular (e.g. resurrecting the same one in the
+   *   death demo); `tip` attaches a tip token (the step-9 coin). Defaults match a
+   *   plain mid-size single order with no tip and a random regular.
    * @returns {Customer}
    */
-  spawnScripted(slot, colors, value = 180, weight = 1) {
+  spawnScripted(slot, colors, opts = {}) {
+    const { value = 180, weight = 1, character = null, tip = null } = opts;
     const x = this.slotX(slot);
     /** @type {Order} */
     const order = {
@@ -145,7 +151,8 @@ export class Shop {
       id: this._id++, slot, x, prevX: x, targetX: x,
       yOff: ARRIVE_OFFSET, prevYOff: ARRIVE_OFFSET,
       state: STATE.ARRIVING, timer: 0, waitT: 0, mood: null, order,
-      character: this._pickCharacter()
+      character: character || this._pickCharacter(),
+      tip
     };
     this.customers.push(c);
     return c;
@@ -503,10 +510,14 @@ export class Shop {
    * @param {Customer} c
    */
   _completeOrder(c) {
-    this.combo += c.order.weight || 1;
-    this.comboTimer = COMBO_DECAY_S;
-    this.bestCombo = Math.max(this.bestCombo, this.combo);
-    const gained = c.order.value * this.combo;
+    // Tutorial disables combos (no chain, no multiplier) so it can't be used to
+    // cheese a score — combo stays 0 and the combo HUD stays hidden.
+    if (this.comboEnabled) {
+      this.combo += c.order.weight || 1;
+      this.comboTimer = COMBO_DECAY_S;
+      this.bestCombo = Math.max(this.bestCombo, this.combo);
+    }
+    const gained = c.order.value * (this.comboEnabled ? this.combo : 1);
     this.score += gained;
     const colors = c.order.originalColors.slice();
     const tip = c.tip || null;

@@ -48,7 +48,16 @@ export class ScoopField {
     // scoops arrive" knob (debug slider). 1 = the tuned base. Persists across
     // reset().
     this.fallScale = 1;
+    // Hard stop on the RANDOM sky spawner (scripted drops still work). The
+    // tutorial pauses it for its guided beats so only scripted scoops fall.
+    // Cleared by reset() so normal play always spawns.
+    this.spawnPaused = false;
     this._refill();
+  }
+
+  /** @param {boolean} b pause/resume the random sky spawner (scripted drops unaffected) */
+  setSpawnPaused(b) {
+    this.spawnPaused = b;
   }
 
   /** @param {() => ScoopColor[]} fn */
@@ -75,7 +84,29 @@ export class ScoopField {
     this.scoops = [];
     this.spawnTimer = 0;
     this.upcoming = [];
+    this.spawnPaused = false;
     this._refill();
+  }
+
+  /**
+   * Drop ONE scripted scoop of a chosen color at a chosen x — the tutorial's
+   * "catch this" beat. Same shape as a normal spawn so it falls and is catchable.
+   * Bypasses the spawn timer / maxLive cap. @param {number} x @param {ScoopColor} color
+   * @returns {Scoop} the pushed scoop (so the caller can watch its y)
+   */
+  spawnScripted(x, color) {
+    const speedMult = this.fallScale;
+    /** @type {Scoop} */
+    const s = {
+      x,
+      y: -SCOOP_RADIUS,
+      prevY: -SCOOP_RADIUS,
+      vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * speedMult,
+      speedMult,
+      color
+    };
+    this.scoops.push(s);
+    return s;
   }
 
   /** @returns {ScoopColor} */
@@ -103,12 +134,16 @@ export class ScoopField {
    * @param {(scoop: Scoop) => boolean} onCatch return true to consume the scoop
    */
   update(dt, bounds, tuning, missY, onCatch) {
-    this.spawnTimer += dt;
-    if (this.spawnTimer >= tuning.spawnInterval) {
-      this.spawnTimer = 0;
-      // Idle at the cap — the spawner just retries next interval once a slot
-      // frees up. Dissolving scoops don't count against the cap.
-      if (this._liveCount() < this.maxLive) this._spawn(bounds, tuning.fallMult);
+    // Random sky spawner (paused during the scripted tutorial; scripted drops in
+    // spawnScripted bypass this entirely).
+    if (!this.spawnPaused) {
+      this.spawnTimer += dt;
+      if (this.spawnTimer >= tuning.spawnInterval) {
+        this.spawnTimer = 0;
+        // Idle at the cap — the spawner just retries next interval once a slot
+        // frees up. Dissolving scoops don't count against the cap.
+        if (this._liveCount() < this.maxLive) this._spawn(bounds, tuning.fallMult);
+      }
     }
 
     for (let i = this.scoops.length - 1; i >= 0; i--) {

@@ -17,11 +17,12 @@ import {
 } from './config.js';
 import { recipesForWave } from './recipes.js';
 
-// Wave 0 (the tutorial wave) clears after serving just THREE customers — a
-// short, count-based onboarding (the no-repeat-color spawn filter means those
-// three are three distinct junior flavors). Kept ≤ COLOR_KEYS.length so the
-// distinct-flavor filter always has something to hand out.
-const WAVE0_GOAL = 3;
+// Wave 0 (the scripted tutorial day) clears after a fixed number of SERVES. The
+// scripted tutorial stages 6 of them (steps 1–9) then hands off to 5 "regular"
+// customers (step 10), so the day-meter fills ~one slice per serve and lands on
+// a complete day right as the tutorial ends. Count-based (not the phase
+// arithmetic the campaign waves use).
+const WAVE0_GOAL = 11;
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').WaveEventName} WaveEventName */
@@ -62,8 +63,9 @@ export class Waves {
     this.servedInPhase = 0;
     this.completedPhases = 0; // 0..PHASES_PER_WAVE — phases cleared this wave
     this.celebrating = 0;     // seconds left in the wave-up freeze
-    /** @type {Set<ScoopColor>} Colors served in Wave 0 (completion + no-repeat). */
+    /** @type {Set<ScoopColor>} Colors served in Wave 0 (no-repeat spawn filter). */
     this.servedColors = new Set();
+    this.servedCount = 0;     // Wave 0 only: total serves toward WAVE0_GOAL.
     this.reset();
   }
 
@@ -74,8 +76,9 @@ export class Waves {
     this.servedInPhase = 0;
     this.completedPhases = 0;    // 0..PHASES_PER_WAVE — phases cleared this wave
     this.celebrating = 0;        // seconds left in the wave-up freeze
-    // Colors served so far in Wave 0 — drives completion (one of each) and the
-    // no-repeat-served-color spawn filter. Unused in waves 1+.
+    // Wave 0 only: total serves toward WAVE0_GOAL (drives the day meter + day
+    // end), and the set of colors served so far (the no-repeat spawn filter).
+    this.servedCount = 0;
     this.servedColors = new Set();
   }
 
@@ -105,7 +108,7 @@ export class Waves {
    */
   get waveFraction() {
     if (this.celebrating > 0) return 1;
-    if (this.wave === 0) return Math.min(1, this.servedColors.size / WAVE0_GOAL);
+    if (this.wave === 0) return Math.min(1, this.servedCount / WAVE0_GOAL);
     return Math.min(1, (this.completedPhases + this.phaseFraction) / PHASES_PER_WAVE);
   }
 
@@ -118,11 +121,12 @@ export class Waves {
   onServed(colors = []) {
     if (this.celebrating > 0) return null;
 
-    // Wave 0 (tutorial): no phase arithmetic — clear once one of each color has
-    // been served, then advance into Wave 1.
+    // Wave 0 (scripted tutorial): no phase arithmetic — count serves until
+    // WAVE0_GOAL, then advance into Wave 1.
     if (this.wave === 0) {
+      this.servedCount += 1;
       for (const c of colors) this.servedColors.add(c);
-      if (this.servedColors.size < WAVE0_GOAL) return null;
+      if (this.servedCount < WAVE0_GOAL) return null;
       this.wave = 1;
       this.phase = 1;
       this.servedInPhase = 0;

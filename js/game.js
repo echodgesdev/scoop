@@ -169,9 +169,15 @@ export class Game {
     this.hurt = 0;
     this.running = false;
     this.paused = false;
-    // Whether the tutorial "day meter" callout is currently shown (so we only
-    // toggle the DOM on transitions, not every frame).
+    // Whether the tutorial "day meter" callout is currently shown + its current
+    // text (so we only touch the DOM when the shown-state or text changes).
     this._dayHintShown = false;
+    /** @type {string | null} */
+    this._dayHintText = null;
+    // This run's tutorial mode, set in start(): whether the tutorial played, and
+    // whether it's a Settings REPLAY (sandbox). Read by the day-end transition.
+    this._playedTutorial = false;
+    this._replaySandbox = false;
     // Fixed-timestep loop (engine). Started in start(), stopped on game over.
     // Renders every animation frame; movers interpolate by the render alpha.
     this.loop = new Loop(FIXED_DT, MAX_FRAME);
@@ -424,9 +430,14 @@ export class Game {
     this.hud.hideOverlay();
     this.effects.reset();
     this.stations.layout(this.bounds);
+    // A tutorial REPLAY from Settings (How to Play after the tutorial's already
+    // been cleared) is a SANDBOX: freeze challenge progress and restrict tips to
+    // coins. A genuine first play (Set 1 not cleared yet) is the real thing.
+    const replaySandbox = forceTutorial && this.world.challenges.firstSetCleared();
+    this.world.challenges.setFrozen(replaySandbox);
     // Reveal the next challenge set if last run completed the current one — the
-    // "next set appears only after the game ends" pacing. Must run BEFORE the
-    // tutorial-skip check below reads currentSet.
+    // "next set appears only after the game ends" pacing (no-op when frozen).
+    // Must run BEFORE the tutorial-skip check below reads currentSet.
     this.world.challenges.advanceSet();
     // Day 0 (the tutorial) only plays until the first challenge set is cleared —
     // after that we jump straight to Day 1. "How to Play" and the debug "force
@@ -435,6 +446,12 @@ export class Game {
     // Reset the simulation (models + progression-session counters). The mode is
     // rebuilt inside, so re-derive the presentation tutorial from it afterward.
     this.world.reset(playWave0);
+    // Sandbox flag lives on World (the tip roller reads it); set after reset so a
+    // prior run's value never leaks. Remember the run's tutorial mode for the
+    // day-end transition (first play → auto-advance to Set 2; replay → no change).
+    this.world.tutorialSandbox = replaySandbox;
+    this._replaySandbox = replaySandbox;
+    this._playedTutorial = playWave0;
     this.tutorial = this.world.mode.makeTutorial();
 
     this.banner = null;
@@ -515,10 +532,14 @@ export class Game {
    * Guarded so the DOM only changes on transitions, not every frame.
    */
   _syncDayHint() {
-    const want = this.tutorial.active;
-    if (want === this._dayHintShown) return;
+    // The scripted tutorial drives the gauge callout text (null = hidden). Only
+    // touch the DOM when the shown-state or the text actually changes.
+    const text = (this.tutorial && this.tutorial.dayHintText) || null;
+    const want = !!text;
+    if (want === this._dayHintShown && text === this._dayHintText) return;
     this._dayHintShown = want;
-    this.hud.setDayHint(want);
+    this._dayHintText = text;
+    this.hud.setDayHint(want, text);
   }
 
   /**
@@ -727,6 +748,12 @@ export class Game {
     // so flush any in-flight pop-text / bursts now — otherwise they'd hang
     // motionless behind the overlay until the next wave resumes.
     this.effects.reset();
+    // The Day-0 → Day-1 transition is the tutorial end: 'first' (real play) auto-
+    // advances to Set 2; 'replay' (sandbox) leaves challenges untouched. Any later
+    // day is a normal transition (null).
+    const tutMode = (this.world.waves.wave === 1 && this._playedTutorial)
+      ? (this._replaySandbox ? 'replay' : 'first')
+      : null;
     this.hud.showWaveTransition({
       completedWave,
       // Regulars to flip-reveal this day: the Day-0 tutorial's first starters,
@@ -736,6 +763,7 @@ export class Game {
         ...this.world.drainTutorialReveals(),
         ...this.world.regulars.drainPendingReveals()
       ],
+      tutorialMode: tutMode,
       onResume: () => this._endWaveTransition()
     });
   }

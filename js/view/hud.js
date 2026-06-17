@@ -89,6 +89,8 @@ export class Hud {
     this._unlockQueueTimer = null;
     /** @type {string[]} regular names to flip-reveal this transition (set in showWaveTransition) */
     this._pendingRegularReveals = [];
+    /** @type {'first'|'replay'|null} tutorial-end transition mode (set in showWaveTransition) */
+    this._wtTutorialMode = null;
     this._wtInterrupted = false;
     /** @type {() => void} */
     this._wtResume = () => {};
@@ -680,13 +682,21 @@ export class Hud {
   }
 
   /**
-   * Tutorial-only: show/hide the "fill the meter to finish the day" callout by
-   * the wave gauge, and pulse the gauge to draw the eye (body.day-hint).
+   * Tutorial-only: show/hide the day-meter callout by the wave gauge, and pulse
+   * the gauge to draw the eye (body.day-hint). The scripted tutorial passes the
+   * callout text per beat ("Complete orders…", "Finish the day!").
    * @param {boolean} show
+   * @param {string|null} [text] optional override for the callout body text
    */
-  setDayHint(show) {
+  setDayHint(show, text = null) {
     const el = document.getElementById('dayHint');
-    if (el) el.classList.toggle('hidden', !show);
+    if (el) {
+      el.classList.toggle('hidden', !show);
+      if (text) {
+        const body = el.querySelector('.day-hint-body');
+        if (body) body.textContent = text;
+      }
+    }
     document.body.classList.toggle('day-hint', show);
   }
 
@@ -878,14 +888,15 @@ export class Hud {
    * starts a 3-second countdown to Resume. Any button click cancels the
    * countdown and converts the centre button to "Play".
    *
-   * @param {{ completedWave: number, reveals?: string[], onResume: () => void }} opts
+   * @param {{ completedWave: number, reveals?: string[], onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
    */
-  showWaveTransition({ completedWave, reveals = [], onResume }) {
+  showWaveTransition({ completedWave, reveals = [], onResume, tutorialMode = null }) {
     if (!this.waveTransitionOverlayEl || !this.challenges) {
       // No overlay markup — resume immediately so the player isn't stuck.
       onResume();
       return;
     }
+    this._wtTutorialMode = tutorialMode;
     // The reveals (regulars met today) flip AFTER the cross-offs, together with
     // any rewards the commit grants — built into one queue in _afterCrossOffs.
     this._pendingRegularReveals = reveals || [];
@@ -1048,6 +1059,33 @@ export class Hud {
    * @param {HTMLElement | null} challengesEl
    */
   _afterUnlocks(challengesEl) {
+    const mode = this._wtTutorialMode;
+
+    // Tutorial end (first play): the "finish your run to unlock the next set" gate
+    // does NOT apply — advance to Set 2 now and transition the panel to it.
+    if (mode === 'first' && this.challenges) {
+      this.challenges.advanceSet();
+      if (challengesEl) {
+        challengesEl.classList.add('fading-out');
+        setTimeout(() => {
+          const cur = this.challenges.getCurrentSet();
+          const rows = cur ? cur.challenges.map(ch => this._renderChallengeRow(ch)).join('') : '';
+          const label = cur ? `Next up — Set ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
+          challengesEl.innerHTML = `<div class="wt-new-label">${label}</div>${rows}`;
+          challengesEl.classList.remove('fading-out');
+          challengesEl.classList.add('fading-in');
+          this._startWtCountdown();
+        }, 300);
+      } else {
+        this._startWtCountdown();
+      }
+      return;
+    }
+
+    // Tutorial replay (sandbox): challenges are frozen — no advance, no nudge.
+    if (mode === 'replay') { this._startWtCountdown(); return; }
+
+    // Normal day: nudge to finish the run if this set just completed.
     if (this.challenges && this.challenges.isCurrentSetComplete() && challengesEl) {
       challengesEl.classList.add('fading-out');
       setTimeout(() => {

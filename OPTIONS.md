@@ -362,12 +362,12 @@ grows, keeping strict→loose order so it degrades gracefully:
 - **Favorite flavor → favorite recipe.** Each regular now stores a `favoriteRecipe`
   (canonical recipe id, e.g. `pink+pink`); the collection card shows its color dots
   + recipe name, resolved via `RECIPE_BY_ID` ([game/recipes.js](js/game/recipes.js)).
-- **Tutorial-end "meet your first regulars".** The Day-0 tutorial is now just **3
-  customers** (`WAVE0_GOAL = 3` in [game/waves.js](js/game/waves.js)). While the
-  tutorial overlay is active, `world._onOrderComplete` records the served starters
-  (`world.drainTutorialReveals()`, capped at 3) so the day-end queue can flip them in
-  alongside Set 1's rewards (🪙 Coin + the first two recipe sections) — the only time
-  a STARTER gets a reveal coin (they're never actually locked).
+- **Tutorial-end "meet your first regulars".** The scripted Day-0 tutorial (see the
+  **Scripted Tutorial** section) stages its customers; while it's active,
+  `world._onOrderComplete` records the served starters (`world.drainTutorialReveals()`,
+  capped at 3) so the day-end queue can flip them in alongside Set 1's rewards
+  (🪙 Coin + the first two recipe sections) — the only time a STARTER gets a reveal
+  coin (they're never actually locked).
 
 ### Open ideas (not built)
 
@@ -478,6 +478,75 @@ unlock coin + the challenge reward label.
   art on the unlock coin + reward label, same as the customer-face placeholders.
 - **Reward variety.** Sets 6–10 are single-reward; once there are more reward types
   (cosmetics, etc.) the later sets could grant small bundles like Sets 1–5 do.
+
+---
+
+## Scripted Tutorial
+
+**Status:** SHIPPED 2026-06-17. Day 0 is no longer a passive hint overlay on a real
+wave — it's a fully SCRIPTED, one-beat-at-a-time onboarding driven by a step machine
+in `TippingTutorial` ([game/modes/tipping.js](js/game/modes/tipping.js)). The class
+holds `step` / `_phase` / per-beat scratch, sets `this.bubbles` (canvas speech pills
+drawn by `draw`) + `this.dayHintText` (the `#dayHint` gauge callout), and advances by
+POLLING world state each `update` (no bus listeners → nothing leaks across runs).
+
+### The control hooks it borrows
+
+- **Freeze = pause.** `player.frozen` stops movement AND — because `game._deliver` /
+  `game._pop` also bail on `frozen` — serving and swiping. So a "frozen" beat is a full
+  pause the player can't act through. Used for the intro plop, the death demo (so they
+  can't serve mid-lesson), and the tip note. (The swipe lesson does NOT freeze — it
+  needs the swipe verb — it just instructs.)
+- **Stage customers.** `shop.scripted = true` suspends auto-spawn/reconcile;
+  `shop.spawnScripted(slot, colors, { value, character, tip })` injects exact customers
+  (and pins the same `character` when the death-demo customer resurrects, and attaches
+  the step-9 coin `tip`).
+- **Control the sky.** `field.setMaxLive(0)` empties it; `field.spawnScripted(x, color)`
+  drops one catchable scoop on cue (re-dropped until caught).
+- **Patience demo.** `world.freezePatience` (separate from `tutorialActive`) freezes the
+  countdown for the guided beats; the death demo drains one customer's `order.timeLeft`
+  by hand, then sets them angry + calls `world.onExpire(1)` (real health drop + shake),
+  and `world.health` is snapshotted/restored so steps 1–9 can't actually game-over.
+
+### The 11 beats
+
+1 plop a scoop on the frozen cone → "move" · 2 "tap to deliver" #1 (no tip) · 3 "+50"
+points pill · 4 drop a scoop, "catch" at mid-screen · 5 DEMO: patience drains → angry →
+leaves → health drops · 6 resurrect same regular, deliver · 7 gauge callout + serve 2
+more · 8 two scoops on the cone, "swipe up to toss the top" then serve the bottom · 9 a
+coin-tipped customer + "some tips are power-ups you unlock later" · 10 hand off to **5
+regular customers with REAL patience/health** (a careless player can die here) → the day
+meter fills and the day ends. Day 0 completes on the **11th serve** (`WAVE0_GOAL = 11`,
+serve-count based — see waves.js); the meter fills ~one slice per serve.
+
+### Scoring is neutered for the whole tutorial
+
+Combos and perfect catches are OFF while `world.tutorialActive` is true, so the tutorial
+can't be used to cheese a score (they're discovered through real play): `world._onCatch`
+zeroes `perfect`; `shop.comboEnabled` (driven each step from `!tutorialActive`) keeps
+combo at 0 / multiplier 1 / the combo HUD hidden; and the combo breaker is gated off.
+
+### Settings replay = SANDBOX
+
+Triggering the tutorial from Settings AFTER it's been cleared (`forceTutorial &&
+challenges.firstSetCleared()`) is a no-progress sandbox: `challenges.setFrozen(true)`
+makes every recorder / `commitEarned` / `advanceSet` a no-op, and `world.tutorialSandbox`
+makes `rollTip` pay **coins only**. A first play is the real thing.
+
+### Tutorial end → Set 2 (no "finish your run")
+
+The Day-0→Day-1 transition is special. `game._beginWaveTransition` tags it `'first'`
+(real play) or `'replay'` (sandbox). In `hud._afterUnlocks`, `'first'` calls
+`challenges.advanceSet()` and fades the day-complete panel to **Set 2's** rows (Day-1's
+challenges) instead of the "finish this run to unlock the next set" nudge; `'replay'`
+leaves challenges untouched. Normal mid-game day-ends are unchanged.
+
+### Open ideas (not built)
+
+- **Skip control during the unlock queue / beats.** Hitting Play already resumes; an
+  explicit "skip tutorial" affordance could help repeat testers.
+- **Richer faces during the patience demo.** Today it relies on the patience ring + the
+  final angry face; intermediate "worried" expressions would sell the lesson harder.
 
 ---
 

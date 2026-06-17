@@ -180,6 +180,10 @@ export class Challenges {
     this.recipes = recipes;
     this.regulars = regulars;
     this.state = this._load();
+    // When true (a tutorial REPLAY from Settings), every progress recorder,
+    // commitEarned, and advanceSet is a no-op — so re-watching the tutorial can't
+    // touch saved progress, grant rewards, or advance sets. Set by game.start().
+    this.frozen = false;
     // Per-wave runtime counter for "use X power-ups in one wave" — not
     // persisted; resets on each wave-up event.
     this.powerupsUsedThisWave = 0;
@@ -254,6 +258,9 @@ export class Challenges {
     } catch {}
   }
 
+  /** Tutorial-replay sandbox toggle: freeze ALL progress mutation. @param {boolean} b */
+  setFrozen(b) { this.frozen = b; }
+
   /** Wipe all challenge progress, unlocks, and counters back to a fresh save. */
   reset() {
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
@@ -309,6 +316,7 @@ export class Challenges {
 
   /** @param {string} _id */
   recordDiscover(_id) {
+    if (this.frozen) return;
     this.state.stats.discoveredCount = this._countDiscovered();
     this._checkCompletions();
     this._save();
@@ -316,12 +324,14 @@ export class Challenges {
 
   /** @param {string} _id */
   recordMaster(_id) {
+    if (this.frozen) return;
     this.state.stats.masteredCount = this._countMastered();
     this._checkCompletions();
     this._save();
   }
 
   recordCustomerServed() {
+    if (this.frozen) return;
     this.state.stats.customersServed += 1;
     this._checkCompletions();
     this._save();
@@ -334,6 +344,7 @@ export class Challenges {
    * @param {PickupTypeName} type
    */
   recordPowerupUsed(type) {
+    if (this.frozen) return;
     this.state.stats.powerupsUsedByType[type] = (this.state.stats.powerupsUsedByType[type] || 0) + 1;
     this.state.stats.powerupsUsedTotal += 1;
     this.powerupsUsedThisWave += 1;
@@ -343,6 +354,7 @@ export class Challenges {
 
   /** @param {number} combo */
   recordCombo(combo) {
+    if (this.frozen) return;
     if (combo > this.state.stats.maxCombo) this.state.stats.maxCombo = combo;
     this._checkCompletions();
     this._save();
@@ -350,6 +362,7 @@ export class Challenges {
 
   /** @param {number} wave */
   recordWaveReached(wave) {
+    if (this.frozen) return;
     if (wave > this.state.stats.maxWave) this.state.stats.maxWave = wave;
     this._checkCompletions();
     this._save();
@@ -421,6 +434,7 @@ export class Challenges {
    * off and by the game-over flow to commit just-met requirements.
    */
   getEarnedNotCommitted() {
+    if (this.frozen) return [];
     const set = SETS[this.state.currentSet];
     if (!set) return [];
     return set.challenges.filter(ch => !this.state.completed[ch.id] && this._getProgress(ch) >= ch.target);
@@ -440,6 +454,7 @@ export class Challenges {
    * @returns {{ committed: string[], rewards: Reward[], setComplete: boolean }}
    */
   commitEarned() {
+    if (this.frozen) return { committed: [], rewards: [], setComplete: false };
     const idx = this.state.currentSet;
     const set = SETS[idx];
     /** @type {string[]} */
@@ -472,6 +487,7 @@ export class Challenges {
    * mid-run doesn't surface the next set until this life ends. @returns {boolean} advanced
    */
   advanceSet() {
+    if (this.frozen) return false;
     const idx = this.state.currentSet;
     if (this.isCurrentSetComplete() && idx < SETS.length - 1) {
       this.state.currentSet = idx + 1;

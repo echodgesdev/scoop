@@ -155,10 +155,16 @@ export class World {
     /** @type {{ unlocked: string[], mastered: string[] }} */
     this.sessionRecipeEvents = { unlocked: [], mastered: [] };
 
-    // Set by the coordinator each frame: patience is frozen while the tutorial is
-    // on (so the staged customer never bails). The tutorial is presentation and
-    // lives in game.js; World only reads this boolean.
+    // Set by the coordinator each frame: `tutorialActive` = the tutorial is
+    // running (disables combos + perfect catches + the combo breaker so it can't
+    // cheese a score, and gates the served-starter capture). `freezePatience` is
+    // SEPARATE — the scripted tutorial freezes patience for its guided steps (1–9)
+    // but lets it run for real in the final stretch (step 10). `tutorialSandbox`
+    // (a Settings replay) makes tips coin-only. All three are presentation/flow
+    // signals; World only reads them. Set by game.js.
     this.tutorialActive = false;
+    this.freezePatience = false;
+    this.tutorialSandbox = false;
   }
 
   /** Y of the sand-floor top edge — the customer ground line (no view dependency). */
@@ -223,6 +229,9 @@ export class World {
     this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
     this.sessionRecipeEvents = { unlocked: [], mastered: [] };
     this.challenges.resetSession();
+    // Tutorial flags clear on every reset; game.start re-applies tutorialSandbox
+    // for a Settings replay, and the scripted tutorial sets freezePatience itself.
+    this.freezePatience = false;
   }
 
   /**
@@ -243,6 +252,9 @@ export class World {
   step(dt) {
     this.waves.update(dt);
     this.powerups.update(dt);
+    // Tutorial scoring rules: no combo chain/multiplier while the tutorial runs
+    // (the coordinator keeps tutorialActive true until the day ends).
+    this.shop.comboEnabled = !this.tutorialActive;
 
     const tuning = this.waves.tuning();
     // Debug overrides win over the wave ramp; only affect spawns from here on
@@ -260,15 +272,18 @@ export class World {
     // playable wave; the tutorial only overlays hints on top of it.
     this.field.update(dt, this.bounds, tuning, missY, scoop => {
       if (!isCaught(scoop, hitbox)) return false;
-      const perfect = Math.abs(scoop.x - hitbox.x) <= PERFECT_CATCH_BAND;
+      // No "perfect" catches in the tutorial — kills the bonus, the combo refresh,
+      // and the perfect FX so it can't be used to cheese a score.
+      const perfect = !this.tutorialActive && Math.abs(scoop.x - hitbox.x) <= PERFECT_CATCH_BAND;
       this._onCatch(scoop, perfect);
       return true;
     });
 
     this._stepActive(dt);
 
-    // Patience is frozen during the tutorial so the staged customer never bails.
-    const patienceOn = this.flags.patternTimer && !this.powerups.pauseActive && !this.tutorialActive;
+    // Patience is frozen only while the scripted tutorial asks for it (its guided
+    // steps); it runs for real otherwise — including the tutorial's final stretch.
+    const patienceOn = this.flags.patternTimer && !this.powerups.pauseActive && !this.freezePatience;
     const { expired, comboLost } = this.shop.update(dt, { patienceOn });
     if (expired > 0) this.onExpire(expired);
     if (comboLost) this.bus.emit('comboLost', /** @type {any} */ ({}));
@@ -429,7 +444,7 @@ export class World {
     // power-up (resets the meter). Enabled per mode (default Tipping-only).
     // Skipped on the wave-completing serve: the wave cashes the combo out anyway,
     // and firing here would freeze its pop-text behind the between-wave overlay.
-    if (this.comboBreakerEnabled && event !== WAVE_EVENT.WAVE_UP &&
+    if (this.comboBreakerEnabled && !this.tutorialActive && event !== WAVE_EVENT.WAVE_UP &&
         this.shop.combo >= this.comboBreakerThreshold) {
       this._fireComboBreaker(cx, cy);
     }
