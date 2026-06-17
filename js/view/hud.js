@@ -657,6 +657,15 @@ export class Hud {
     }
   }
 
+  /** Flash + shake the health bar to telegraph taking damage (fired on 'expire'). */
+  flashHealthDamage() {
+    const el = document.getElementById('health-track');
+    if (!el) return;
+    el.classList.remove('hit');
+    void el.offsetWidth;   // restart the CSS animation
+    el.classList.add('hit');
+  }
+
   /** Center of the gauge element in viewport coords (for particle bursts). */
   gaugeCenter() {
     if (!this.gaugeEl) return null;

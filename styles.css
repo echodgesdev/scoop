@@ -375,6 +375,17 @@ body.day-hint #gauge::before {
   transition: width 0.15s ease, background 0.15s ease;
 }
 
+/* Damage highlight — a red flash + shake on the health bar when you take a hit
+   (fired on every 'expire'; the tutorial leans on it to teach the consequence). */
+#health-track.hit { animation: health-hit 0.55s ease; }
+@keyframes health-hit {
+  0%   { box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.4); transform: translateX(0); }
+  15%  { box-shadow: 0 0 0 3px #ff3b3b, 0 0 18px 5px rgba(255, 59, 59, 0.95); transform: translateX(-3px); }
+  45%  { transform: translateX(3px); }
+  70%  { transform: translateX(-2px); }
+  100% { box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.4); transform: translateX(0); }
+}
+
 .swatch {
   width: 28px;
   height: 28px;

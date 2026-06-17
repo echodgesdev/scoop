@@ -126,6 +126,7 @@ export function wireReactions(game) {
     game.sound.expire();
     game.haptics.expire();
     game.effects.addShake(12);
+    game.hud.flashHealthDamage();
     game.hurt = 0.35;
   });
 
