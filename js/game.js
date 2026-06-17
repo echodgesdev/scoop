@@ -729,8 +729,13 @@ export class Game {
     this.effects.reset();
     this.hud.showWaveTransition({
       completedWave,
-      // Regulars unlocked this day (the mystery, served) get a coin-flip reveal.
-      reveals: this.world.regulars.drainPendingReveals(),
+      // Regulars to flip-reveal this day: the Day-0 tutorial's first starters,
+      // then any mystery regular unlocked (served) today. The HUD plays them — and
+      // the challenge rewards — as a one-at-a-time coin-flip queue after cross-offs.
+      reveals: [
+        ...this.world.drainTutorialReveals(),
+        ...this.world.regulars.drainPendingReveals()
+      ],
       onResume: () => this._endWaveTransition()
     });
   }

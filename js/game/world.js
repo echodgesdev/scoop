@@ -86,6 +86,13 @@ export class World {
     this._mysteryName = null;
     this._mysteryRevealDay = 0;
 
+    // Names of the (starter) regulars served during the Day-0 tutorial, in order.
+    // Drained for the end-of-tutorial "meet your first regulars" flip-reveal — the
+    // one place a starter gets a reveal coin (they're never "locked"). Captured
+    // only while the tutorial overlay is active; empty on tutorial-skipped runs.
+    /** @type {string[]} */
+    this._tutorialServed = [];
+
     // Sim config (debug-tunable). Delivery method: how a tray serves an order
     // ('any' | 'sequential' | 'whole'). Typed as string since the debug dropdown
     // sets it from a plain string.
@@ -103,9 +110,10 @@ export class World {
     this.patienceOverride = null;
 
     this.waves    = new Waves(
-      // Recipe sections now unlock purely by DAY (recipes.js WAVE_GROUPS), not by
-      // challenges — so no section gating here.
-      () => null,
+      // Recipe sections are challenge-gated again: a section spawns only once it's
+      // been unlocked by a cleared set AND the day pool (WAVE_GROUPS) has reached
+      // it. Challenges derives the unlocked set from cleared-set rewards.
+      () => this.challenges.unlockedSections(),
       id => this.recipes.isDiscovered(id)
     );
     this.powerups = new PowerUps();
@@ -172,6 +180,17 @@ export class World {
   }
 
   /**
+   * Take and clear the starters served during the Day-0 tutorial (≤ 3) — the
+   * end-of-tutorial "meet your first regulars" reveal. Empty after a non-tutorial
+   * run, so it's safe to call at every day-end. @returns {string[]}
+   */
+  drainTutorialReveals() {
+    const out = this._tutorialServed.slice(0, 3);
+    this._tutorialServed = [];
+    return out;
+  }
+
+  /**
    * Reset every model + progression-session counter for a fresh run. Flow,
    * presentation, and the loop are the coordinator's to reset.
    * @param {boolean} playWave0 whether the run opens on the tutorial wave
@@ -191,6 +210,7 @@ export class World {
     // life — you must start a fresh run (die) to roll the next candidate.
     this._mysteryName = this.regulars.pickMysteryCandidate();
     this._mysteryRevealDay = 3 + Math.floor(Math.random() * 5);
+    this._tutorialServed = [];
     this.health = MAX_HEALTH;
     this.activeBubble = null;
     this.puLeaving.length = 0;
@@ -384,6 +404,12 @@ export class World {
     // so a "serve a regular N times" challenge sees the up-to-date count. The
     // day-end reveal reads regulars.drainPendingReveals().
     this.regulars.recordServed(customer.character);
+    // Tutorial only: remember which starters you served, so the day-end reveal
+    // can introduce them. `tutorialActive` is set by the coordinator before each
+    // step and is still true on the serve that clears Day 0.
+    if (this.tutorialActive && customer.character && !this._tutorialServed.includes(customer.character)) {
+      this._tutorialServed.push(customer.character);
+    }
     this.challenges.recordCustomerServed();
     this.challenges.recordCombo(this.shop.combo);
 

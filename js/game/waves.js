@@ -10,7 +10,6 @@ import {
   FALL_SPEED_MULT_END,
   PATTERN_TIME_START,
   PATTERN_TIME_END,
-  COLOR_KEYS,
   ORDER_SIZE_WEIGHTS,
   DISCOVERY_BIAS_START,
   DISCOVERY_BIAS_END,
@@ -18,10 +17,11 @@ import {
 } from './config.js';
 import { recipesForWave } from './recipes.js';
 
-// Wave 0 (the tutorial wave) clears once the player has served one of each of
-// the base colors — a fixed, count-based goal rather than the phase arithmetic
-// the campaign waves use.
-const WAVE0_GOAL = COLOR_KEYS.length;
+// Wave 0 (the tutorial wave) clears after serving just THREE customers — a
+// short, count-based onboarding (the no-repeat-color spawn filter means those
+// three are three distinct junior flavors). Kept ≤ COLOR_KEYS.length so the
+// distinct-flavor filter always has something to hand out.
+const WAVE0_GOAL = 3;
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').WaveEventName} WaveEventName */

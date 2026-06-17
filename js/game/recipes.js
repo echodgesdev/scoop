@@ -24,11 +24,11 @@ const PINK = 'pink', MINT = 'mint', CHOCO = 'choco', VANILLA = 'vanilla', BLUEBE
  * and `weight` is the combo bump. Each recipe is { name, colors } with the
  * display name BAKED at seed time. Regenerate the block with seed/gen-recipes.mjs.
  * @typedef {{ name: string, colors: ScoopColor[] }} Recipe
- * @typedef {{ id: string, name: string, size: number, value: number, weight: number, recipes: Recipe[] }} RecipeGroup
+ * @typedef {{ id: string, name: string, emoji: string, size: number, value: number, weight: number, recipes: Recipe[] }} RecipeGroup
  */
 /** @type {RecipeGroup[]} */
 export const GROUPS = [
-  { id: 'JUNIOR_SCOOP', name: "Junior Scoop", size: 1, value: 50, weight: 1,
+  { id: 'JUNIOR_SCOOP', name: "Junior Scoop", emoji: "🍦", size: 1, value: 50, weight: 1,
     recipes: [
       { name: "Strawberry", colors: [PINK] },
       { name: "Mint", colors: [MINT] },
@@ -36,7 +36,7 @@ export const GROUPS = [
       { name: "Vanilla", colors: [VANILLA] },
       { name: "Blueberry", colors: [BLUEBERRY] },
     ] },
-  { id: 'DAILY_DOUBLE', name: "Daily Double", size: 2, value: 100, weight: 1,
+  { id: 'DAILY_DOUBLE', name: "Daily Double", emoji: "🍨", size: 2, value: 100, weight: 1,
     recipes: [
       { name: "Double Strawberry", colors: [PINK, PINK] },
       { name: "Double Mint", colors: [MINT, MINT] },
@@ -44,7 +44,7 @@ export const GROUPS = [
       { name: "Double Vanilla", colors: [VANILLA, VANILLA] },
       { name: "Double Blueberry", colors: [BLUEBERRY, BLUEBERRY] },
     ] },
-  { id: 'YIN_YANG', name: "Yin & Yang", size: 2, value: 100, weight: 1,
+  { id: 'YIN_YANG', name: "Yin & Yang", emoji: "☯️", size: 2, value: 100, weight: 1,
     recipes: [
       { name: "Blueberry + Chocolate", colors: [CHOCO, BLUEBERRY] },
       { name: "Blueberry + Mint", colors: [MINT, BLUEBERRY] },
@@ -52,7 +52,7 @@ export const GROUPS = [
       { name: "Blueberry + Vanilla", colors: [VANILLA, BLUEBERRY] },
       { name: "Chocolate + Mint", colors: [MINT, CHOCO] },
     ] },
-  { id: 'ODD_COUPLE', name: "Odd Couple", size: 2, value: 100, weight: 1,
+  { id: 'ODD_COUPLE', name: "Odd Couple", emoji: "🎭", size: 2, value: 100, weight: 1,
     recipes: [
       { name: "Chocolate + Strawberry", colors: [PINK, CHOCO] },
       { name: "Chocolate + Vanilla", colors: [CHOCO, VANILLA] },
@@ -60,7 +60,7 @@ export const GROUPS = [
       { name: "Mint + Vanilla", colors: [MINT, VANILLA] },
       { name: "Strawberry + Vanilla", colors: [PINK, VANILLA] },
     ] },
-  { id: 'THREES_COMPANY', name: "Three's Company", size: 3, value: 150, weight: 2,
+  { id: 'THREES_COMPANY', name: "Three's Company", emoji: "🎪", size: 3, value: 150, weight: 2,
     recipes: [
       { name: "Triple Strawberry", colors: [PINK, PINK, PINK] },
       { name: "Triple Mint", colors: [MINT, MINT, MINT] },
@@ -68,7 +68,7 @@ export const GROUPS = [
       { name: "Triple Vanilla", colors: [VANILLA, VANILLA, VANILLA] },
       { name: "Triple Blueberry", colors: [BLUEBERRY, BLUEBERRY, BLUEBERRY] },
     ] },
-  { id: 'BEST_TWO_OF_THREE', name: "Best Two of Three", size: 3, value: 150, weight: 2,
+  { id: 'BEST_TWO_OF_THREE', name: "Best Two of Three", emoji: "🥈", size: 3, value: 150, weight: 2,
     recipes: [
       { name: "Double Blueberry + Chocolate", colors: [BLUEBERRY, BLUEBERRY, CHOCO] },
       { name: "Double Blueberry + Mint", colors: [BLUEBERRY, BLUEBERRY, MINT] },
@@ -76,7 +76,7 @@ export const GROUPS = [
       { name: "Double Blueberry + Vanilla", colors: [BLUEBERRY, BLUEBERRY, VANILLA] },
       { name: "Double Chocolate + Blueberry", colors: [CHOCO, CHOCO, BLUEBERRY] },
     ] },
-  { id: 'TRIPLE_THREAT', name: "Triple Threat", size: 3, value: 150, weight: 2,
+  { id: 'TRIPLE_THREAT', name: "Triple Threat", emoji: "🎨", size: 3, value: 150, weight: 2,
     recipes: [
       { name: "Blueberry + Strawberry + Vanilla", colors: [PINK, VANILLA, BLUEBERRY] },
       { name: "Chocolate + Mint + Strawberry", colors: [PINK, MINT, CHOCO] },
@@ -118,6 +118,10 @@ export const ALL_RECIPES = generateActiveRecipes();
 /** Lookup a recipe by its canonical id (recipeIdFor). Used to resolve a
  *  regular's favoriteRecipe to its name + colors for the collection card. */
 export const RECIPE_BY_ID = new Map(ALL_RECIPES.map(r => [r.id, r]));
+
+/** Lookup a recipe SECTION (group) by its id — for the challenge reward label
+ *  and the section-unlock reveal coin (name + placeholder emoji). */
+export const GROUP_BY_ID = new Map(GROUPS.map(g => [g.id, g]));
 
 // Wave -> accessible group ids. The pool grows by one group per wave (in GROUPS
 // order — singles → 2-scoop → the 3-scoop families), clamping at the full set.

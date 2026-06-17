@@ -343,11 +343,17 @@ grows, keeping strict→loose order so it degrades gracefully:
   unlocks when first served. So a single life can unlock **at most one** mystery
   regular — you must die to roll the next candidate. (Starters keep the roster from
   being burned in one run; the other four regulars unlock from challenge sets.)
-- **Day-end flip reveal (phase 4).** `game._beginWaveTransition` drains
-  `regulars.drainPendingReveals()` into `hud.showWaveTransition({ reveals })`, which
-  populates `.wt-reveal` with a CSS 3D **coin flip**: holds the grey `Empty`
-  silhouette (col 0), then flips to the full `Default` face (col 1). Same
-  customer-sheet crop as the collection faces.
+- **Day-end unlock-reveal QUEUE (phase 4, generalized).** The CSS 3D **coin flip**
+  is now the shared "you unlocked something" animation for **all** unlock kinds:
+  regulars (silhouette → face crop), power-ups, the coin tip, and recipe sections
+  (an emoji `?` coin → the token/section emoji). `game._beginWaveTransition` passes
+  the day's regular reveals (`world.drainTutorialReveals()` + `regulars.drainPendingReveals()`)
+  into `hud.showWaveTransition({ reveals })`; the HUD holds them until AFTER the
+  challenge cross-offs, then `_afterCrossOffs` commits the set, builds ONE queue of
+  `[…regulars, …rewards]`, and `_runUnlockQueue` flips them **one at a time** (one
+  spins, cuts to the next, until all are shown) before the resume countdown. Card
+  markup: `_unlockCardHtml`; reward→card mapping: `_rewardToCard`. The old static
+  `.wt-rewards` text box is retired (kept hidden). Hitting Play skips the queue.
 - **"Serve a regular N times" challenge family (phase 5).** New `serve_regular`
   challenge type ([game/challenges.js](js/game/challenges.js), reads
   `regulars.servedCount(param)`); `Challenges` now takes the `regulars` store.
@@ -356,6 +362,12 @@ grows, keeping strict→loose order so it degrades gracefully:
 - **Favorite flavor → favorite recipe.** Each regular now stores a `favoriteRecipe`
   (canonical recipe id, e.g. `pink+pink`); the collection card shows its color dots
   + recipe name, resolved via `RECIPE_BY_ID` ([game/recipes.js](js/game/recipes.js)).
+- **Tutorial-end "meet your first regulars".** The Day-0 tutorial is now just **3
+  customers** (`WAVE0_GOAL = 3` in [game/waves.js](js/game/waves.js)). While the
+  tutorial overlay is active, `world._onOrderComplete` records the served starters
+  (`world.drainTutorialReveals()`, capped at 3) so the day-end queue can flip them in
+  alongside Set 1's rewards (🪙 Coin + the first two recipe sections) — the only time
+  a STARTER gets a reveal coin (they're never actually locked).
 
 ### Open ideas (not built)
 
@@ -373,22 +385,26 @@ grows, keeping strict→loose order so it degrades gracefully:
 
 ## Challenge Reward Ladder
 
-**Status:** SHIPPED 2026-06-16. The 10 challenge sets ([game/challenges.js](js/game/challenges.js))
-are now the spine of progression: each set is the *only* source of its feature, and
-clearing one is the gate for the next. This replaced the old model where challenge
-rewards were recipe-book sections.
+**Status:** SHIPPED 2026-06-16 (sections re-coupled 2026-06-16). The 10 challenge
+sets ([game/challenges.js](js/game/challenges.js)) are the spine of progression:
+each set is the *only* source of its feature(s), and clearing one is the gate for
+the next. Rewards are coin/power-ups, regulars, AND recipe sections (sections were
+briefly day-gated, then brought back here).
 
 ### The ladder
 
 Each set is 3 goals; clearing all 3 grants the set's reward. The unlock order:
 
-| Set | Name | Reward |
-|----:|------|--------|
-| 1 | Getting Started | 🪙 **Coin** tips (the tutorial set) |
-| 2 | Taste the Rainbow | 🌈 Rainbow power-up |
-| 3 | Making Regulars | 😀 **Freddie** (regular) |
-| 4 | Heart on the Line | ❤️ Heart power-up |
-| 5 | Local Legend | 😀 **Harvey Green** (regular) |
+A set may grant MULTIPLE rewards (`rewards: Reward[]`). Sets 1–5 also dole out the
+six non-tutorial recipe sections (Junior Scoop is always unlocked):
+
+| Set | Name | Reward(s) |
+|----:|------|-----------|
+| 1 | Getting Started | 🪙 **Coin** tips + 🍨 Daily Double + ☯️ Yin & Yang (tutorial set) |
+| 2 | Taste the Rainbow | 🌈 Rainbow power-up + 🎭 Odd Couple |
+| 3 | Making Regulars | 😀 **Freddie** (regular) + 🎪 Three's Company |
+| 4 | Heart on the Line | ❤️ Heart power-up + 🥈 Best Two of Three |
+| 5 | Local Legend | 😀 **Harvey Green** (regular) + 🎨 Triple Threat (last section) |
 | 6 | Brain Freeze | ❄️ Freeze power-up |
 | 7 | Speak to the Manager | 😀 **Karen** (regular) |
 | 8 | Quickstep | ⚡ Speed power-up |
@@ -396,8 +412,11 @@ Each set is 3 goals; clearing all 3 grants the set's reward. The unlock order:
 | 10 | Top Scooper | — (bragging rights; final cutscene TBD) |
 
 Reward types (`Reward.type` in challenges.js): `unlock_coin`, `unlock_powerup`,
-`unlock_regular`. Applied once via `_applyReward` (coin sets `unlocks.coin`,
-power-ups set `unlocks.powerups[x]`, regulars call `regulars.unlock(name)`).
+`unlock_regular`, `unlock_section`. Applied once via `_applyReward` (coin sets
+`unlocks.coin`, power-ups set `unlocks.powerups[x]`, regulars call
+`regulars.unlock(name)`). Sections are **derived** — `unlockedSections()` reads
+which sets' rewards have been claimed (`rewardsClaimed`) rather than a stored map,
+so old saves get their sections retroactively without a migration step.
 
 ### Two hard rules
 
@@ -405,6 +424,10 @@ power-ups set `unlocks.powerups[x]`, regulars call `regulars.unlock(name)`).
    asks you to *use* the power-up it itself unlocks — so the power-up-use goal for
    Rainbow lives in Set 3 (after Set 2 grants it), Heart's in Set 5, etc. The
    power-up-granting sets (2/4/6/8) gate on combo / serve / master goals instead.
+   The rule now also covers **sections**: a set's `discover_recipes` target is
+   always ≤ the recipes reachable from sections unlocked by EARLIER sets (Set 2
+   "discover 8" vs the 15 from Set 1's 3 sections; Set 5 "discover 18" vs 30 from
+   Sets 1–4; Set 9 "discover 35" needs all sections, all unlocked by Set 5).
 2. **The next set won't appear until the current run ENDS.** Clearing a set's goals
    unlocks its reward *immediately* (mid-run, via `commitEarned()` — so you can use
    that Rainbow right away), but the *next* set's challenges stay hidden until you
@@ -415,29 +438,46 @@ power-ups set `unlocks.powerups[x]`, regulars call `regulars.unlock(name)`).
    the *following* run ([game.js](js/game.js) `start()`), so a player clears at most
    one set per life.
 
-### Coin / power-up gating
+### Tip gating + PACING
 
-Tips can only pay out tokens the player has unlocked. [modes/tipping.js](js/game/modes/tipping.js)
-`rollTip()` builds its weighted pool from `challenges.unlockedPowerupTypes()` and
-appends the coin only when `challenges.isCoinUnlocked()` — so during the Day-0
-tutorial (Set 1 not yet cleared) **nothing tips**, coins begin once Set 1 clears,
-and each power-up joins the tip mix as its set is cleared. The power-ups modal
-([view/hud.js](js/view/hud.js) `_renderPowerups`) shows the same lock state (coin
-via `isCoinUnlocked`, power-ups via `isPowerupUnlocked`).
+Tips can only pay out tokens the player has unlocked (so the Day-0 tutorial tips
+nothing; coins begin once Set 1 clears; power-ups join as their sets clear). On top
+of that, [modes/tipping.js](js/game/modes/tipping.js) `rollTip()` now **paces** the
+mix so a player can't string a chain of big power-ups and blitz the day:
 
-### Recipe sections decoupled
+- **Minor tips** — the ❤️ heart heal and the 🪙 coin cash — are eligible anytime
+  they're unlocked (they don't break pacing).
+- **Major tips** — the timed power-ups 🌈 / ⚡ / ❄️ — are rationed three ways:
+  1. **held back early** — only once `waves.waveFraction ≥ MAJOR_TIP_DAY_FRACTION`
+     (0.3), so the start of each day is minor-only;
+  2. **capped per day** — at most `MAX_MAJOR_TIPS_PER_DAY` (5), tracked in the mode
+     and reset when `waves.wave` rolls over;
+  3. **de-duplicated** — `_majorBusy()` excludes a major that's already the running
+     power-up (`powerups.active` / `activeBubble`) OR already waiting as another
+     on-screen customer's `tip`, so two of the same never overlap.
 
-Recipe-book sections are **no longer challenge rewards** — they unlock purely by
-**day** (`WAVE_GROUPS` in [game/recipes.js](js/game/recipes.js)); `Waves` is
-constructed with a `() => null` section-gate. This freed all 10 challenge sets to
-hand out the coin / power-ups / regulars ladder above.
+The power-ups modal ([view/hud.js](js/view/hud.js) `_renderPowerups`) still shows the
+unlock lock state (coin via `isCoinUnlocked`, power-ups via `isPowerupUnlocked`).
+
+### Recipe sections re-coupled to challenges
+
+Recipe-book sections are challenge rewards **again** (the earlier day-only decoupling
+is reverted — players liked the challenge unlock). `Waves` is constructed with
+`() => challenges.unlockedSections()`; `recipesForWave` intersects that with the
+day pool (`WAVE_GROUPS`), so a section spawns once it's **both** unlocked AND
+wave-reached. Junior Scoop is always unlocked (the tutorial singles); Sets 1–5 hand
+out the other six (see the ladder table). Each section carries a placeholder `emoji`
+([game/recipes.js](js/game/recipes.js) `GROUPS`, looked up via `GROUP_BY_ID`) for the
+unlock coin + the challenge reward label.
 
 ### Open ideas (not built)
 
 - **Set 10 cutscene.** Set 10 currently rewards nothing (`rewards: []`) — the
   intended payoff is a short "you beat the game" cutscene, TBD.
-- **Reward variety.** The ladder is one-reward-per-set; a set could grant a small
-  bundle (e.g. a regular *and* a cosmetic) once there are more reward types.
+- **Section emojis are placeholders.** 🍨/☯️/🎭/🎪/🥈/🎨 stand in for real section
+  art on the unlock coin + reward label, same as the customer-face placeholders.
+- **Reward variety.** Sets 6–10 are single-reward; once there are more reward types
+  (cosmetics, etc.) the later sets could grant small bundles like Sets 1–5 do.
 
 ---
 

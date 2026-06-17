@@ -1,9 +1,14 @@
 // @ts-check
 import { COLORS, PICKUP_TYPES } from '../game/config.js';
-import { RECIPE_TARGET, GROUPS, RECIPE_BY_ID } from '../game/recipes.js';
+import { RECIPE_TARGET, GROUPS, RECIPE_BY_ID, GROUP_BY_ID } from '../game/recipes.js';
 import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from './powerupVisuals.js';
+
+// Unlock-reveal queue timing (one coin flips at a time). Tuned to match the
+// .wt-coin-flip CSS animation (0.4s hold + 0.9s flip) plus a short read beat
+// before the next card cuts in.
+const UNLOCK_ITEM_MS = 1650;
 
 // Regulars collection screen. Faces are cropped out of the shared sprite sheet
 // via CSS background-position: each regular's sheet ROW comes from the sprite
@@ -79,6 +84,11 @@ export class Hud {
     // Wave-transition timers & state. Created fresh in showWaveTransition.
     /** @type {number | null} */
     this._wtCountdownTimer = null;
+    // Unlock-reveal queue (regulars/power-ups/sections flipping one at a time).
+    /** @type {number | null} */
+    this._unlockQueueTimer = null;
+    /** @type {string[]} regular names to flip-reveal this transition (set in showWaveTransition) */
+    this._pendingRegularReveals = [];
     this._wtInterrupted = false;
     /** @type {() => void} */
     this._wtResume = () => {};
@@ -342,6 +352,10 @@ export class Hud {
     }
     if (r.type === 'unlock_coin') return '🪙 Coin tips';
     if (r.type === 'unlock_regular') return `😀 ${r.value}`;
+    if (r.type === 'unlock_section') {
+      const g = GROUP_BY_ID.get(r.value);
+      return g ? `${g.emoji} ${g.name}` : r.value;
+    }
     return r.value;
   }
 
@@ -763,19 +777,43 @@ export class Hud {
   // === Wave transition (between-wave overlay with cross-offs + countdown) ===
 
   /**
-   * Day-end "New Regular!" reveal: a coin that flips from the grey silhouette to
-   * the regular's full face, one per regular newly unlocked this day (the
-   * mystery, once served). Fresh markup each call so the CSS flip replays; hidden
-   * when there's nothing to reveal.
-   * @param {string[]} names
+   * Map a committed challenge Reward to an unlock-reveal card descriptor, or null
+   * for reward types that don't get a coin (none today). Power-ups / coin /
+   * sections flip an emoji coin; a regular flips their silhouette → face.
+   * @param {{ type: string, value: string }} r
+   * @returns {{ kind: string, name?: string, emoji?: string, ring?: string, label?: string } | null}
    */
-  _renderReveal(names) {
-    const el = this.waveTransitionOverlayEl && this.waveTransitionOverlayEl.querySelector('.wt-reveal');
-    if (!el) return;
-    if (!names || names.length === 0) { el.classList.add('hidden'); el.innerHTML = ''; return; }
-    const T = REGULAR_FACE_TILE;
-    el.innerHTML = names.map(name => {
-      const row = REGULAR_ROW_BY_NAME.get(name) || 0;
+  _rewardToCard(r) {
+    if (r.type === 'unlock_regular') return { kind: 'regular', name: r.value };
+    if (r.type === 'unlock_coin') {
+      return { kind: 'coin', emoji: PICKUP_ICONS.coin, ring: PICKUP_RING_COLOR.coin, label: 'Coin Tips Unlocked!' };
+    }
+    if (r.type === 'unlock_powerup') {
+      return {
+        kind: 'powerup',
+        emoji: PICKUP_ICONS[r.value] || '⚡',
+        ring: PICKUP_RING_COLOR[r.value] || '#ffd166',
+        label: `New Power-up — ${PICKUP_NAME[r.value] || r.value}!`
+      };
+    }
+    if (r.type === 'unlock_section') {
+      const g = GROUP_BY_ID.get(r.value);
+      return { kind: 'section', emoji: g ? g.emoji : '🍨', ring: '#ffd166', label: `New Recipes — ${g ? g.name : r.value}!` };
+    }
+    return null;
+  }
+
+  /**
+   * Markup for one unlock coin. A 'regular' card crops silhouette/face from the
+   * customer sheet (back → front); the emoji kinds (coin/power-up/section) show a
+   * "?" coin that flips to the unlocked thing's emoji. Fresh markup each call so
+   * the CSS flip replays.
+   * @param {{ kind: string, name?: string, emoji?: string, ring?: string, label?: string }} item
+   */
+  _unlockCardHtml(item) {
+    if (item.kind === 'regular') {
+      const T = REGULAR_FACE_TILE;
+      const row = REGULAR_ROW_BY_NAME.get(item.name || '') || 0;
       const back  = `background-position:-${REGULAR_EMPTY_COL * T}px -${row * T}px`;  // silhouette
       const front = `background-position:-${REGULAR_FACE_COL * T}px -${row * T}px`;   // full face
       return `<div class="wt-reveal-item">
@@ -783,10 +821,55 @@ export class Hud {
           <div class="wt-reveal-face wt-reveal-back" style="${back}"></div>
           <div class="wt-reveal-face wt-reveal-front" style="${front}"></div>
         </div></div>
-        <div class="wt-reveal-label">New Regular — <b>${name}</b>!</div>
+        <div class="wt-reveal-label">New Regular — <b>${item.name}</b>!</div>
       </div>`;
-    }).join('');
+    }
+    const ring = item.ring || '#ffd166';
+    return `<div class="wt-reveal-item">
+      <div class="wt-reveal-coin"><div class="wt-reveal-inner">
+        <div class="wt-reveal-face wt-reveal-back wt-reveal-emoji" style="--ring:${ring}">?</div>
+        <div class="wt-reveal-face wt-reveal-front wt-reveal-emoji" style="--ring:${ring}">${item.emoji || ''}</div>
+      </div></div>
+      <div class="wt-reveal-label">${item.label || ''}</div>
+    </div>`;
+  }
+
+  /**
+   * Play an unlock-reveal QUEUE: show one coin, let it flip, then cut to the next
+   * until all have spun. Calls `done` when the queue empties (or immediately if
+   * there's nothing to reveal). One timer at a time so hideWaveTransition can stop it.
+   * @param {Array<{ kind: string, name?: string, emoji?: string, ring?: string, label?: string }>} items
+   * @param {() => void} done
+   */
+  _runUnlockQueue(items, done) {
+    const el = this.waveTransitionOverlayEl && this.waveTransitionOverlayEl.querySelector('.wt-reveal');
+    this._clearUnlockQueue();
+    if (!el || !items || items.length === 0) {
+      if (el) { el.classList.add('hidden'); el.innerHTML = ''; }
+      done();
+      return;
+    }
     el.classList.remove('hidden');
+    let i = 0;
+    const showNext = () => {
+      if (i >= items.length) {
+        this._unlockQueueTimer = null;
+        done();
+        return;
+      }
+      el.innerHTML = this._unlockCardHtml(items[i]);
+      if (this.sound) this.sound.perfect();   // a little "ding" on each flip
+      i += 1;
+      this._unlockQueueTimer = /** @type {any} */ (setTimeout(showNext, UNLOCK_ITEM_MS));
+    };
+    showNext();
+  }
+
+  _clearUnlockQueue() {
+    if (this._unlockQueueTimer !== null) {
+      clearTimeout(this._unlockQueueTimer);
+      this._unlockQueueTimer = null;
+    }
   }
 
   /**
@@ -803,7 +886,12 @@ export class Hud {
       onResume();
       return;
     }
-    this._renderReveal(reveals);
+    // The reveals (regulars met today) flip AFTER the cross-offs, together with
+    // any rewards the commit grants — built into one queue in _afterCrossOffs.
+    this._pendingRegularReveals = reveals || [];
+    this._clearUnlockQueue();
+    const revealEl = this.waveTransitionOverlayEl.querySelector('.wt-reveal');
+    if (revealEl) { revealEl.classList.add('hidden'); revealEl.innerHTML = ''; }
     this._wtResume = onResume;
     this._wtInterrupted = false;
     this._wtClearCountdown();
@@ -927,46 +1015,52 @@ export class Hud {
   }
 
   /**
-   * After cross-offs: commit the day's earned challenges, show any rewards they
-   * granted, and — if the set is now fully cleared — nudge the player to finish
-   * the run (the NEXT set stays hidden until the game ends). Either way, start
-   * the countdown to resume.
+   * After cross-offs: commit the day's earned challenges (which APPLIES any newly-
+   * earned rewards once), then play ONE coin-flip queue for everything unlocked
+   * today — the regulars you met, then the rewards (coin / power-up / recipe
+   * section / challenge regular). When the queue finishes, _afterUnlocks handles
+   * the set-complete nudge + the resume countdown.
    * @param {HTMLElement | null} rewardsEl
    * @param {HTMLElement | null} challengesEl
    */
   _afterCrossOffs(rewardsEl, challengesEl) {
     if (!this.challenges) return;
-    // Commit now so the saved state matches what the player is seeing. This
-    // also APPLIES any newly-earned rewards (unlock coin/regular/power-up) once.
+    // Commit now so the saved state matches what the player is seeing.
     const result = this.challenges.commitEarned();
-    // Unlocked-rewards box — only when this commit actually granted rewards.
-    const hasRewards = rewardsEl && result.rewards.length > 0;
-    if (hasRewards) {
-      const rewards = result.rewards.map(r => `<span class="wt-reward">${this._rewardLabel(r)}</span>`).join('');
-      rewardsEl.innerHTML = `<div class="wt-rewards-title">🎁 Unlocked</div><div class="wt-reward-list">${rewards}</div>`;
-      rewardsEl.classList.remove('hidden');
-    }
-    // Once the set is complete, the next set won't appear until this run ends —
-    // swap the challenge list for a "finish your run" nudge (after a beat so the
-    // reward box, if any, lands first).
-    if (this.challenges.isCurrentSetComplete() && challengesEl) {
-      setTimeout(() => {
-        challengesEl.classList.add('fading-out');
-        setTimeout(() => {
-          challengesEl.innerHTML =
-            `<div class="wt-new-label">Challenge set complete!</div>` +
-            `<div class="wt-finish-note">Finish this run to unlock the next set of challenges.</div>`;
-          challengesEl.classList.remove('fading-out');
-          challengesEl.classList.add('fading-in');
-          this._startWtCountdown();
-        }, 300);
-      }, hasRewards ? 700 : 0);
-    } else {
-      this._startWtCountdown();
-    }
+    // The flip queue replaces the old static "🎁 Unlocked" text box — keep it hidden.
+    if (rewardsEl) { rewardsEl.classList.add('hidden'); rewardsEl.innerHTML = ''; }
+
+    const queue = [
+      ...this._pendingRegularReveals.map(name => ({ kind: 'regular', name })),
+      ...result.rewards.map(r => this._rewardToCard(r)).filter(Boolean)
+    ];
+    this._pendingRegularReveals = [];
+    this._runUnlockQueue(/** @type {any[]} */ (queue), () => this._afterUnlocks(challengesEl));
     // NOTE: commitEarned is idempotent (rewardsClaimed guard), so _endGame's
     // later commit is a no-op. The next set is only revealed by advanceSet(),
     // which runs at the start of the FOLLOWING run — never mid-life.
+  }
+
+  /**
+   * Queue done. If the set is now fully cleared, the next set won't appear until
+   * this run ends — swap the challenge list for a "finish your run" nudge. Either
+   * way, start the countdown to resume.
+   * @param {HTMLElement | null} challengesEl
+   */
+  _afterUnlocks(challengesEl) {
+    if (this.challenges && this.challenges.isCurrentSetComplete() && challengesEl) {
+      challengesEl.classList.add('fading-out');
+      setTimeout(() => {
+        challengesEl.innerHTML =
+          `<div class="wt-new-label">Challenge set complete!</div>` +
+          `<div class="wt-finish-note">Finish this run to unlock the next set of challenges.</div>`;
+        challengesEl.classList.remove('fading-out');
+        challengesEl.classList.add('fading-in');
+        this._startWtCountdown();
+      }, 300);
+    } else {
+      this._startWtCountdown();
+    }
   }
 
   _startWtCountdown() {
@@ -1060,6 +1154,7 @@ export class Hud {
 
   hideWaveTransition() {
     this._wtClearCountdown();
+    this._clearUnlockQueue();
     if (this.waveTransitionOverlayEl) this.waveTransitionOverlayEl.classList.add('hidden');
   }
 

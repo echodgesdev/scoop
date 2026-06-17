@@ -5,16 +5,21 @@
 const STORAGE_KEY = 'scoop.challenges';
 
 // === Master challenge sets ===================================================
-// Each set is 3 challenges. Completing all 3 unlocks the set's reward IMMEDIATELY
-// (mid-run) — a tip token or a "regular" customer — but the NEXT set's challenges
-// stay hidden until the current run ends (see commitEarned / advanceSet), so the
-// player can clear at most one set per life. Crucially, a set's goals only ever
-// require features unlocked by EARLIER sets (a set never asks you to use the
-// power-up it itself unlocks). Unlock ladder:
-//   1 Coin · 2 Rainbow · 3 Freddie · 4 Heart · 5 Harvey Green · 6 Freeze ·
-//   7 Karen · 8 Speed · 9 Poop · 10 — (bragging rights; final cutscene TBD).
-// Recipe sections are NOT challenge rewards anymore — they unlock by day (see
-// recipes.js WAVE_GROUPS); the random regulars unlock via in-game encounters.
+// Each set is 3 challenges. Completing all 3 unlocks the set's reward(s)
+// IMMEDIATELY (mid-run) — tip tokens, a "regular" customer, and/or recipe
+// SECTIONS — but the NEXT set's challenges stay hidden until the current run ends
+// (see commitEarned / advanceSet), so the player can clear at most one set per
+// life. Crucially, a set's goals only ever require features unlocked by EARLIER
+// sets (a set never asks you to use a power-up — or discover recipes from a
+// section — that it itself unlocks). Unlock ladder:
+//   1 Coin + Daily Double + Yin&Yang · 2 Rainbow + Odd Couple ·
+//   3 Freddie + Three's Company · 4 Heart + Best Two of Three ·
+//   5 Harvey Green + Triple Threat · 6 Freeze · 7 Karen · 8 Speed · 9 Poop ·
+//   10 — (bragging rights; final cutscene TBD).
+// Recipe SECTIONS are challenge rewards again (Sets 1–5 dole out the six non-
+// tutorial sections; Junior Scoop is always unlocked). recipesForWave still
+// intersects with the day-pool, so a section appears once it's BOTH unlocked
+// AND wave-reached. The random regulars unlock via in-game encounters.
 
 /**
  * @typedef {object} Challenge
@@ -27,8 +32,8 @@ const STORAGE_KEY = 'scoop.challenges';
 
 /**
  * @typedef {object} Reward
- * @property {'unlock_powerup'|'unlock_coin'|'unlock_regular'} type
- * @property {string} value         powerup type name, 'coin', or a regular's name
+ * @property {'unlock_powerup'|'unlock_coin'|'unlock_regular'|'unlock_section'} type
+ * @property {string} value  powerup type name, 'coin', a regular's name, or a recipe-section (group) id
  */
 
 /**
@@ -40,18 +45,24 @@ const STORAGE_KEY = 'scoop.challenges';
 
 /** @type {ChallengeSet[]} */
 export const SETS = [
-  // Set 1 — the tutorial set: its three goals are guaranteed by finishing Day 0
-  // (serve one of each junior flavor). Clearing it unlocks Coin tips.
+  // Set 1 — the tutorial set: its three goals are guaranteed by finishing the
+  // 3-customer Day-0 tutorial. Clearing it unlocks Coin tips PLUS the first two
+  // recipe sections (Daily Double + Yin & Yang) — the tutorial-end celebration.
   {
     name: 'Getting Started',
     challenges: [
-      { id: 's1-1', type: 'discover_recipes', target: 5, title: 'Discover 5 flavors' },
-      { id: 's1-2', type: 'serve_customers',  target: 5, title: 'Serve 5 customers' },
+      { id: 's1-1', type: 'discover_recipes', target: 3, title: 'Discover 3 flavors' },
+      { id: 's1-2', type: 'serve_customers',  target: 3, title: 'Serve 3 customers' },
       { id: 's1-3', type: 'wave_reach',       target: 1, title: 'Reach Day 1' }
     ],
-    rewards: [{ type: 'unlock_coin', value: 'coin' }]
+    rewards: [
+      { type: 'unlock_coin',    value: 'coin' },
+      { type: 'unlock_section', value: 'DAILY_DOUBLE' },
+      { type: 'unlock_section', value: 'YIN_YANG' }
+    ]
   },
-  // Set 2 → Rainbow. (Goals: only Coin available, so no power-up-use goal yet.)
+  // Set 2 → Rainbow + Odd Couple. (Goals: only Coin available, so no power-up-use
+  // goal yet; discover-8 is reachable from the 3 sections Set 1 unlocked = 15.)
   {
     name: 'Taste the Rainbow',
     challenges: [
@@ -59,9 +70,12 @@ export const SETS = [
       { id: 's2-2', type: 'combo_reach',      target: 4,  title: 'Reach a 4× combo' },
       { id: 's2-3', type: 'discover_recipes', target: 8,  title: 'Discover 8 recipes total' }
     ],
-    rewards: [{ type: 'unlock_powerup', value: 'rainbow' }]
+    rewards: [
+      { type: 'unlock_powerup', value: 'rainbow' },
+      { type: 'unlock_section', value: 'ODD_COUPLE' }
+    ]
   },
-  // Set 3 → Freddie (character). Rainbow is now available to use.
+  // Set 3 → Freddie (character) + Three's Company. Rainbow is now available.
   {
     name: 'Making Regulars',
     challenges: [
@@ -69,9 +83,12 @@ export const SETS = [
       { id: 's3-2', type: 'discover_recipes', target: 12, title: 'Discover 12 recipes total' },
       { id: 's3-3', type: 'wave_reach',       target: 3,  title: 'Reach Day 3' }
     ],
-    rewards: [{ type: 'unlock_regular', value: 'Freddie' }]
+    rewards: [
+      { type: 'unlock_regular', value: 'Freddie' },
+      { type: 'unlock_section', value: 'THREES_COMPANY' }
+    ]
   },
-  // Set 4 → Heart.
+  // Set 4 → Heart + Best Two of Three.
   {
     name: 'Heart on the Line',
     challenges: [
@@ -79,9 +96,14 @@ export const SETS = [
       { id: 's4-2', type: 'serve_customers',  target: 30, title: 'Serve 30 customers total' },
       { id: 's4-3', type: 'master_recipes',   target: 2,  title: 'Master 2 recipes (10/10)' }
     ],
-    rewards: [{ type: 'unlock_powerup', value: 'heart' }]
+    rewards: [
+      { type: 'unlock_powerup', value: 'heart' },
+      { type: 'unlock_section', value: 'BEST_TWO_OF_THREE' }
+    ]
   },
-  // Set 5 → Harvey Green (character). Heart now available to use.
+  // Set 5 → Harvey Green (character) + Triple Threat (the last section). Heart
+  // now available to use; discover-18 is reachable from the 6 sections unlocked
+  // by Sets 1–4 (= 30 recipes).
   {
     name: 'Local Legend',
     challenges: [
@@ -89,7 +111,10 @@ export const SETS = [
       { id: 's5-2', type: 'discover_recipes', target: 18, title: 'Discover 18 recipes total' },
       { id: 's5-3', type: 'wave_reach',       target: 4,  title: 'Reach Day 4' }
     ],
-    rewards: [{ type: 'unlock_regular', value: 'Harvey Green' }]
+    rewards: [
+      { type: 'unlock_regular', value: 'Harvey Green' },
+      { type: 'unlock_section', value: 'TRIPLE_THREAT' }
+    ]
   },
   // Set 6 → Freeze (Ice).
   {
@@ -251,6 +276,25 @@ export class Challenges {
 
   /** Coin tips unlock from Set 1 (the tutorial); gated like the power-ups. */
   isCoinUnlocked() { return this.state.unlocks.coin === true; }
+
+  /**
+   * Recipe sections (group ids) the player has unlocked. Junior Scoop is always
+   * available (the tutorial singles); the other six are challenge rewards. DERIVED
+   * from which sets' rewards have been claimed, so it stays correct for old saves
+   * (where the section reward field didn't exist yet) without a migration step.
+   * Fed to Waves so a section only spawns once it's BOTH unlocked AND wave-reached.
+   * @returns {Set<string>}
+   */
+  unlockedSections() {
+    const out = new Set(['JUNIOR_SCOOP']);
+    for (let i = 0; i < SETS.length; i++) {
+      if (!this.state.rewardsClaimed[i]) continue;
+      for (const r of SETS[i].rewards) {
+        if (r.type === 'unlock_section') out.add(r.value);
+      }
+    }
+    return out;
+  }
 
   /**
    * True once the first challenge set (the Wave 0 tutorial goals) has been
