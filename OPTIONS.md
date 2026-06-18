@@ -539,9 +539,10 @@ OFF until it's explicitly taught, then ON for good.
 4. **A tip** (step 9): a coin-tipped customer, paused to read "tips can be power-ups",
    delivered with a ghost scoop and patience on.
 5. **Catching, hands-off** (step 10): hand off to real play — sky scoops resume (gentle cap),
-   patience on, no more ghosts. The "complete orders until the day is done" gauge callout
-   appears **after the first real delivery**; the remaining customers run unguided with
-   REAL patience/health (a careless player can die). Day 0 completes on the **11th serve**
+   patience on, no more ghosts. The "catch the falling scoops" hint and the "complete orders
+   until the day is done" gauge callout both show **until the first real delivery**, then
+   clear (the goal callout doesn't linger all round); the remaining customers run unguided
+   with REAL patience/health (a careless player can die). Day 0 completes on the **11th serve**
    (`WAVE0_GOAL = 11`, serve-count based — see waves.js): 7 guided + 4 free-play.
 
 ### Scoring is neutered for the whole tutorial

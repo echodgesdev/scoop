@@ -492,13 +492,14 @@ class TippingTutorial extends TutorialBase {
         break;
 
       case 10:
-        // PHASE 5 — free play. Telegraph catching; once the first real order lands,
-        // swap to the "finish the day" gauge callout and go fully hands-off.
+        // PHASE 5 — free play. Until the first real order lands, telegraph the new
+        // catching mechanic AND the day goal; the moment a customer is served, clear
+        // BOTH and go fully hands-off (the goal callout shouldn't linger all round).
         if (w.waves.servedCount > this._freePlayBase) {
-          this.dayHintText = '☀️ Complete orders until the day is done!';
+          this.dayHintText = null;
           this.bubbles = [];
         } else {
-          this.dayHintText = null;
+          this.dayHintText = 'Complete orders until the day is done!';
           this.bubbles = [{ x: game.bounds.width / 2, y: game.bounds.height * 0.34, text: 'Now catch the falling scoops!', point: null, accent: '#5cd8ff' }];
         }
         break;
