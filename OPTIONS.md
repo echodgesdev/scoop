@@ -531,16 +531,18 @@ OFF until it's explicitly taught, then ON for good.
 2. **Patience demo, must move to the customer** (steps 4–5): ghost a scoop, carry it to #2,
    then a scripted drain → angry → leaves → health drops; resurrect #2 and deliver for real
    (still no-fail).
-3. **Patience ON, escalating pop lessons** (steps 6–7): a plain 1-scoop delivery, then a
-   2-scoop and a 3-scoop cone where the customer wants the BOTTOM scoop — "swipe up to toss
-   the top scoop" to dig down to it (one pop, then two to master).
-4. **A tip** (step 8): a coin-tipped customer, paused to read "tips can be power-ups",
+3. **Patience ON, pop + multi-serve** (steps 6–8): a 1-scoop delivery; a 2-scoop pop lesson
+   (customer wants the BOTTOM scoop — "swipe up to toss the top scoop" to dig down to it);
+   then a 3-scoop **two-customer** beat — the TOP scoop goes to one customer, the BOTTOM to
+   another, and the MIDDLE matches nobody (toss it), so one stack serves two people. (The
+   top-first delivery rule forces the order: serve A → toss the junk → serve B.)
+4. **A tip** (step 9): a coin-tipped customer, paused to read "tips can be power-ups",
    delivered with a ghost scoop and patience on.
-5. **Catching, hands-off** (step 9): hand off to real play — sky scoops resume (gentle cap),
+5. **Catching, hands-off** (step 10): hand off to real play — sky scoops resume (gentle cap),
    patience on, no more ghosts. The "complete orders until the day is done" gauge callout
    appears **after the first real delivery**; the remaining customers run unguided with
    REAL patience/health (a careless player can die). Day 0 completes on the **11th serve**
-   (`WAVE0_GOAL = 11`, serve-count based — see waves.js): 6 guided + 5 free-play.
+   (`WAVE0_GOAL = 11`, serve-count based — see waves.js): 7 guided + 4 free-play.
 
 ### Scoring is neutered for the whole tutorial
 

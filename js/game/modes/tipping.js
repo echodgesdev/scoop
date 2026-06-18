@@ -41,15 +41,24 @@ const T_C2 = /** @type {ScoopColor} */ ('pink');      // #2 — patience demo + 
 const T_C3 = /** @type {ScoopColor} */ ('mint');      // #3 — first delivery with patience ON
 const T_TIP = /** @type {ScoopColor} */ ('vanilla');  // #6 — the tip beat
 /**
- * Pop lessons (#4, #5): the customer wants `wanted` (the BOTTOM scoop); `plop`
- * lists the ghost scoops bottom→top, so everything stacked above `wanted` is junk
- * to swipe off. Two scoops = one pop (teach); three = two pops (master).
- * @type {{ slot: number, wanted: ScoopColor, plop: ScoopColor[] }[]}
+ * Pop lesson (#4): the customer wants `wanted` (the BOTTOM scoop); `plop` lists the
+ * ghost scoops bottom→top, so the junk stacked on top is swiped off. One pop.
  */
-const POP_LESSONS = [
-  { slot: 2, wanted: /** @type {ScoopColor} */ ('pink'), plop: /** @type {ScoopColor[]} */ (['pink', 'blueberry']) },
-  { slot: 0, wanted: /** @type {ScoopColor} */ ('mint'), plop: /** @type {ScoopColor[]} */ (['mint', 'choco', 'blueberry']) }
-];
+const POP1 = { slot: 2, wanted: /** @type {ScoopColor} */ ('pink'), plop: /** @type {ScoopColor[]} */ (['pink', 'blueberry']) };
+/**
+ * Two-customer lesson (#5 + #6): three scoops, two customers. The TOP scoop goes to
+ * the customer at `slotA`, the BOTTOM to the one at `slotB`, and the MIDDLE matches
+ * nobody (toss it) — so a single stack serves two people. Serving the top scoop only
+ * succeeds at the customer who wants it, so the order is forced: A → toss → B. `plop`
+ * is built bottom→top from these colors.
+ */
+const TWO = {
+  topColor:    /** @type {ScoopColor} */ ('pink'),       // on top → served FIRST, goes to slotA
+  midColor:    /** @type {ScoopColor} */ ('blueberry'),  // matches nobody → swiped off
+  bottomColor: /** @type {ScoopColor} */ ('mint'),       // at the bottom → served LAST, goes to slotB
+  slotA: 4,    // wants the TOP scoop
+  slotB: 0     // wants the BOTTOM scoop
+};
 // Staging slots (0..4). Each guided customer sits away from where the cone ends up
 // after the previous delivery, so every beat also rehearses moving the cone (slot
 // spacing always exceeds the serve REACH, so even one slot over needs a walk).
@@ -78,8 +87,9 @@ const easeIn = (/** @type {number} */ t) => t * t;
  *   1. GHOST scoop, learn to move + deliver (patience OFF).
  *   2. GHOST scoop, carry it to the customer, a patience→anger→death DEMO (lose
  *      health), then deliver for real (still no-fail).
- *   3. Patience ON: a plain 1-scoop delivery, then 2- and 3-scoop pop lessons —
- *      the customer wants the bottom scoop, so swipe the junk off the top.
+ *   3. Patience ON: a 1-scoop delivery; a 2-scoop pop lesson (customer wants the
+ *      bottom scoop, swipe the junk off); then a 3-scoop, TWO-customer beat — top
+ *      scoop → one customer, bottom → another, middle → nobody (toss it).
  *   4. A tip (paused to read it), still ghost scoops, patience on.
  *   5. Hand off to real play: catching from the sky (no more ghosts), a gentle
  *      sky cap, patience on; the "finish the day" callout shows after the first
@@ -97,9 +107,10 @@ class TippingTutorial extends TutorialBase {
     this.step = 0;
     this.t = 0;             // seconds in the current step
     this._phase = 0;        // sub-phase within a step
-    this._sub = 0;          // which pop lesson (#4 = 0, #5 = 1)
     /** @type {Customer | null} the customer the current beat is about */
     this._c = null;
+    /** @type {Customer | null} the second customer (the two-customer pop lesson) */
+    this._c2 = null;
     /** @type {string | null} captured name so the death-demo customer resurrects as themself */
     this._cName = null;
     /** @type {{ color: ScoopColor, t: number } | null} the plop ghost currently falling (drawn, not a field scoop) */
@@ -190,10 +201,23 @@ class TippingTutorial extends TutorialBase {
     return c;
   }
 
-  /** Stage the current pop lesson (POP_LESSONS[_sub]). @param {Game} game */
-  _stagePop(game) {
-    const L = POP_LESSONS[this._sub];
-    this._c = this._stageGhost(game, L.slot, [L.wanted], L.plop);
+  /** Stage (or restage) the two-customer lesson: A at slotA wants the top scoop, B at
+   *  slotB wants the bottom, junk in the middle. @param {Game} game */
+  _stageTwo(game) {
+    const sh = game.world.shop, pl = game.world.player;
+    this._c  = sh.spawnScripted(TWO.slotA, [TWO.topColor],    { value: GUIDE_VALUE });
+    this._c2 = sh.spawnScripted(TWO.slotB, [TWO.bottomColor], { value: GUIDE_VALUE });
+    pl.frozen = true; pl.clearStack();
+    this._startPlops([TWO.bottomColor, TWO.midColor, TWO.topColor]);
+  }
+
+  /** Pull a scripted customer off the board immediately (no slide-off) so a restage
+   *  never spawns a fresh customer on top of the old one — and never exhausts the
+   *  regular roster (which would leave the new one character-less). @param {Game} game @param {Customer | null} c */
+  _remove(game, c) {
+    const list = game.world.shop.customers;
+    const i = c ? list.indexOf(c) : -1;
+    if (i >= 0) list.splice(i, 1);
   }
 
   /** Begin plopping `colors` (bottom→top) onto the cone via the ghost animation. @param {ScoopColor[]} colors */
@@ -260,17 +284,22 @@ class TippingTutorial extends TutorialBase {
         this._c = this._stageGhost(game, SLOT_3A, [T_C3], [T_C3]);
         break;
       case 7:
-        // PHASE 3b/3c — pop lessons (#4 two scoops, #5 three). _sub picks which.
-        this._stagePop(game);
+        // PHASE 3b — pop lesson (#4): customer wants the BOTTOM scoop; swipe the junk off.
+        this._c = this._stageGhost(game, POP1.slot, [POP1.wanted], POP1.plop);
         break;
       case 8:
+        // PHASE 3c — two-customer lesson (#5 + #6): top scoop → A, bottom → B, middle
+        // → nobody (toss it). One stack serves two people.
+        this._stageTwo(game);
+        break;
+      case 9:
         // PHASE 4 — a tip, paused so it can be read (patience frozen for the beat);
         // the scoop is still ghosted (no catching yet) and delivered with patience on.
         w.freezePatience = true;
         this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: TIP_COIN });
         pl.frozen = true; pl.clearStack();
         break;
-      case 9:
+      case 10:
         // PHASE 5 — hand off to real play: catching from the sky (no more ghosts),
         // patience on, a GENTLE sky cap. The "finish the day" callout waits for the
         // first real delivery (set in _tick, keyed off servedCount).
@@ -280,7 +309,7 @@ class TippingTutorial extends TutorialBase {
         w.freezePatience = false;
         pl.frozen = false;
         this._freePlayBase = w.waves.servedCount;
-        this._c = null;
+        this._c = null; this._c2 = null;
         break;
     }
   }
@@ -378,6 +407,7 @@ class TippingTutorial extends TutorialBase {
         } else if (this._served(this._c)) {
           this._setStep(7, game);
         } else if (this._expired(this._c)) {
+          this._remove(game, this._c);                          // clear the angry one before resurrecting
           this._c = this._stageGhost(game, SLOT_3A, [T_C3], [T_C3]); this._phase = 0;
         } else if (pl.stack.length === 0) {
           pl.frozen = true; this._startPlops([T_C3]); this._phase = 0;
@@ -387,32 +417,60 @@ class TippingTutorial extends TutorialBase {
         break;
 
       case 7: {
-        // PHASE 3b/3c — pop lessons. Customer wants the BOTTOM scoop; swipe the junk
-        // off the top to reach it. _sub 0 = two scoops (one pop), 1 = three (master).
-        const L = POP_LESSONS[this._sub];
+        // PHASE 3b — pop lesson (#4). Customer wants the BOTTOM scoop; swipe the junk
+        // off the top to reach it (one pop).
         if (this._phase === 0) {
           if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 1; }
         } else if (this._expired(this._c)) {
-          this._stagePop(game); this._phase = 0;                  // timed out → restage fresh
+          this._remove(game, this._c);                          // clear the angry one before restaging
+          this._c = this._stageGhost(game, POP1.slot, [POP1.wanted], POP1.plop); this._phase = 0;   // timed out → restage
         } else if (this._phase === 1) {
           const cols = pl.colors();
-          if (cols.length === 0) { pl.frozen = true; this._startPlops(L.plop); this._phase = 0; break; }   // over-popped
-          if (cols.length === 1 && cols[0] === L.wanted) { this._phase = 2; break; }                       // junk cleared
+          if (cols.length === 0) { pl.frozen = true; this._startPlops(POP1.plop); this._phase = 0; break; }   // over-popped
+          if (cols.length === 1 && cols[0] === POP1.wanted) { this._phase = 2; break; }                       // junk cleared
           this.bubbles = [this._scoopBubble(game, 'Swipe up to toss the top scoop', '#ffd166')];
         } else {
           if (pl.stack.length === 0 && !this._served(this._c)) {  // over-popped after revealing → restage
-            pl.frozen = true; this._startPlops(L.plop); this._phase = 0; break;
+            pl.frozen = true; this._startPlops(POP1.plop); this._phase = 0; break;
           }
           if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Tap to deliver', false)];
-          if (this._served(this._c)) {
-            if (this._sub === 0) { this._sub = 1; this.bubbles = []; this._stagePop(game); this._phase = 0; }
-            else { this._setStep(8, game); }
-          }
+          if (this._served(this._c)) this._setStep(8, game);
         }
         break;
       }
 
-      case 8:
+      case 8: {
+        // PHASE 3c — TWO customers, three scoops: top → A, bottom → B, middle → nobody.
+        // Serve A (top), toss the junk, serve B (bottom): one stack feeds two people.
+        // The delivery rule forces that order — the top scoop only takes at A.
+        const A = this._c, B = this._c2;
+        if (this._phase === 0) {
+          if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 1; }
+          break;
+        }
+        if (this._served(A) && this._served(B)) { this._setStep(9, game); break; }
+        const cols = pl.colors();
+        // Broken — a needed customer timed out, or their flavor got tossed before
+        // their turn (the junk middle being tossed is fine; it isn't anyone's color).
+        const brokenA = !this._served(A) && (this._expired(A) || !cols.includes(TWO.topColor));
+        const brokenB = !this._served(B) && (this._expired(B) || !cols.includes(TWO.bottomColor));
+        if (brokenA || brokenB) {
+          // Clear BOTH old customers first — otherwise the fresh pair spawns on top of
+          // them and the duplicates exhaust the roster (leaving one character-less).
+          this._remove(game, A); this._remove(game, B);
+          this._stageTwo(game); this._phase = 0; break;
+        }
+        if (!this._served(A)) {
+          if (A) this.bubbles = [this._customerBubble(game, A, 'Serve your top scoop here', false)];
+        } else if (cols.length > 1) {
+          this.bubbles = [this._scoopBubble(game, 'Nobody wants this — swipe it off', '#ffd166')];
+        } else if (B) {
+          this.bubbles = [this._customerBubble(game, B, 'Now serve this customer', false)];
+        }
+        break;
+      }
+
+      case 9:
         // PHASE 4 — tip. Read beat (paused), then ghost the scoop and deliver (patience on).
         if (this._phase === 0) {
           if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'A tip! Tips can be power-ups.', true, '#ffd166')];
@@ -421,6 +479,7 @@ class TippingTutorial extends TutorialBase {
           if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 2; }
         } else {
           if (this._expired(this._c)) {                           // timed out → restage with the tip again
+            this._remove(game, this._c);                          // clear the angry one before resurrecting
             this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: TIP_COIN });
             pl.frozen = true; pl.clearStack(); this._startPlops([T_TIP]); this._phase = 1; break;
           }
@@ -428,11 +487,11 @@ class TippingTutorial extends TutorialBase {
             pl.frozen = true; this._startPlops([T_TIP]); this._phase = 1; break;
           }
           if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Tap to deliver for the tip!', false)];
-          if (this._served(this._c)) this._setStep(9, game);
+          if (this._served(this._c)) this._setStep(10, game);
         }
         break;
 
-      case 9:
+      case 10:
         // PHASE 5 — free play. Telegraph catching; once the first real order lands,
         // swap to the "finish the day" gauge callout and go fully hands-off.
         if (w.waves.servedCount > this._freePlayBase) {

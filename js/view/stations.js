@@ -88,8 +88,6 @@ function rainbowSwatch() {
 // reserved for the unlock animation; the 6 moods follow, shifted one right of
 // the old single-row layout). A customer's row is their character.
 const FACE = Object.freeze({ EMPTY: 0, DEFAULT: 1, HUNGRY: 2, UPSET: 3, ANGRY: 4, DROOL: 5, FROZEN: 6 });
-// Emoji fallback by column, used until the sheet image loads (column 0 unused).
-const FACE_EMOJI = ['❔', '🙂', '😋', '😟', '😠', '🤤', '🥶'];
 // The def's `image` is the runtime path (sprite-editor export) — used verbatim.
 const faceSheet = new SpriteSheet(CUSTOMER_SPRITE);
 
@@ -148,17 +146,13 @@ export class Stations {
       return { c, cx, faceY, waiting, servable, active, patience };
     });
 
-    // Layer 1 — faces. The character picks the row, the mood picks the column;
-    // the cell is drawn at FACE_SCALE. Falls back to the mood emoji until the
-    // sheet image loads (or if the character is unknown).
+    // Layer 1 — faces. The character picks the sprite row, the mood picks the
+    // column; the cell is drawn at FACE_SCALE. Customers always carry a valid
+    // character (the selection waterfall + roster guarantee it), so there's no
+    // emoji-placeholder fallback — that was the old pre-sprite stand-in.
     for (const it of items) {
       const faceIdx = faceFor(it.c, it.patience, it.servable, pausePatience);
-      if (!faceSheet.draw(ctx, it.c.character || '', faceIdx, it.cx, it.faceY, FACE_SCALE)) {
-        ctx.font = `${FACE_SIZE}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(FACE_EMOJI[faceIdx] || '🙂', it.cx, it.faceY);
-      }
+      faceSheet.draw(ctx, it.c.character || '', faceIdx, it.cx, it.faceY, FACE_SCALE);
     }
 
     // Layer 2 — held mini-cones + flying / settled served scoops (above faces so
