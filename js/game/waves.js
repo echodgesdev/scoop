@@ -18,10 +18,10 @@ import {
 import { recipesForWave } from './recipes.js';
 
 // Wave 0 (the scripted tutorial day) clears after a fixed number of SERVES. The
-// scripted tutorial stages 6 of them (steps 1–9) then hands off to 5 "regular"
-// customers (step 10), so the day-meter fills ~one slice per serve and lands on
-// a complete day right as the tutorial ends. Count-based (not the phase
-// arithmetic the campaign waves use).
+// scripted tutorial guides 6 of them (move, patience demo, three pop lessons, a
+// tip) then hands off to 5 free-play customers, so the day-meter fills ~one slice
+// per serve and lands on a complete day right as the tutorial ends. Count-based
+// (not the phase arithmetic the campaign waves use).
 const WAVE0_GOAL = 11;
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */

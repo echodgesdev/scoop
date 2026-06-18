@@ -483,41 +483,64 @@ unlock coin + the challenge reward label.
 
 ## Scripted Tutorial
 
-**Status:** SHIPPED 2026-06-17. Day 0 is no longer a passive hint overlay on a real
-wave — it's a fully SCRIPTED, one-beat-at-a-time onboarding driven by a step machine
+**Status:** SHIPPED 2026-06-17, restructured 2026-06-18 into the five-phase
+"introduce-then-rely-on-it" flow below. Day 0 is no longer a passive hint overlay on a
+real wave — it's a fully SCRIPTED, one-beat-at-a-time onboarding driven by a step machine
 in `TippingTutorial` ([game/modes/tipping.js](js/game/modes/tipping.js)). The class
 holds `step` / `_phase` / per-beat scratch, sets `this.bubbles` (canvas speech pills
 drawn by `draw`) + `this.dayHintText` (the `#dayHint` gauge callout), and advances by
 POLLING world state each `update` (no bus listeners → nothing leaks across runs).
 
+### Design principle: introduce a mechanic, then rely on it
+
+Each phase teaches ONE verb and the next phase assumes it. Scoops are **ghost-plopped**
+onto the cone for the whole guided run — catching from the sky isn't introduced until the
+final stretch, so the player never juggles two new skills at once. Likewise patience is
+OFF until it's explicitly taught, then ON for good.
+
 ### The control hooks it borrows
 
 - **Freeze = pause.** `player.frozen` stops movement AND — because `game._deliver` /
   `game._pop` also bail on `frozen` — serving and swiping. So a "frozen" beat is a full
-  pause the player can't act through. Used for the intro plop, the death demo (so they
-  can't serve mid-lesson), and the tip note. (The swipe lesson does NOT freeze — it
-  needs the swipe verb — it just instructs.)
+  pause the player can't act through. Used for every plop, the death demo (frozen ~1.3×
+  REACH out so they can't serve mid-lesson), and the tip note. The pop + deliver beats
+  UNFREEZE — they need the swipe/serve verbs — and just instruct.
+- **Ghost plop, not catch.** Guided scoops are plopped onto the cone via an eased ghost
+  animation (`_startPlops` / `_advancePlops` → `pl.push`), never caught from the sky. The
+  pop lessons plop "junk" colors on top of the wanted (bottom) scoop so there's something
+  to swipe off.
 - **Stage customers.** `shop.scripted = true` suspends auto-spawn/reconcile;
   `shop.spawnScripted(slot, colors, { value, character, tip })` injects exact customers
-  (and pins the same `character` when the death-demo customer resurrects, and attaches
-  the step-9 coin `tip`).
-- **Control the sky.** `field.setMaxLive(0)` empties it; `field.spawnScripted(x, color)`
-  drops one catchable scoop on cue (re-dropped until caught).
+  (pins the same `character` when the demo customer resurrects; attaches the tip coin).
+  Every guided customer sits ≥1 slot from where the cone ends up (slot spacing > serve
+  REACH), so each beat also rehearses moving.
+- **Control the sky.** `field.setSpawnPaused(true)` stops the random spawner for the
+  guided beats (only ghost plops appear); the final stretch resumes it at a GENTLE cap
+  (`field.setMaxLive(2)`, vs the mode's 7) so the first real catching isn't a firehose.
+  `_cleanup` restores the mode cap for Day 1.
 - **Patience demo.** `world.freezePatience` (separate from `tutorialActive`) freezes the
-  countdown for the guided beats; the death demo drains one customer's `order.timeLeft`
-  by hand, then sets them angry + calls `world.onExpire(1)` (real health drop + shake),
-  and `world.health` is snapshotted/restored so steps 1–9 can't actually game-over.
+  countdown for phases 1–2; the death demo drains one customer's `order.timeLeft` by hand,
+  sets them angry + calls `world.onExpire(1)` (real health drop + shake — the damage
+  STANDS). From phase 3 on patience runs for REAL; guided customers that time out simply
+  resurrect (you keep the damage) so the script can't soft-lock.
 
-### The 11 beats
+### The five phases (9-step machine)
 
-1 plop a scoop on the frozen cone → "move" · 2 "tap to deliver" #1 (no tip) · 3 "+50"
-points pill · 4 drop a scoop, "catch" at mid-screen · 5 DEMO: patience drains → angry →
-leaves → health drops · 6 resurrect same regular, deliver · 7 gauge callout + serve 2
-more · 8 two scoops on the cone, "swipe up to toss the top" then serve the bottom · 9 a
-coin-tipped customer + "some tips are power-ups you unlock later" · 10 hand off to **5
-regular customers with REAL patience/health** (a careless player can die here) → the day
-meter fills and the day ends. Day 0 completes on the **11th serve** (`WAVE0_GOAL = 11`,
-serve-count based — see waves.js); the meter fills ~one slice per serve.
+1. **Move + deliver, patience OFF** (steps 1–3): plop a scoop on the frozen cone → "move
+   left and right" → "tap to deliver" #1 → "+50" pill.
+2. **Patience demo, must move to the customer** (steps 4–5): ghost a scoop, carry it to #2,
+   then a scripted drain → angry → leaves → health drops; resurrect #2 and deliver for real
+   (still no-fail).
+3. **Patience ON, escalating pop lessons** (steps 6–7): a plain 1-scoop delivery, then a
+   2-scoop and a 3-scoop cone where the customer wants the BOTTOM scoop — "swipe up to toss
+   the top scoop" to dig down to it (one pop, then two to master).
+4. **A tip** (step 8): a coin-tipped customer, paused to read "tips can be power-ups",
+   delivered with a ghost scoop and patience on.
+5. **Catching, hands-off** (step 9): hand off to real play — sky scoops resume (gentle cap),
+   patience on, no more ghosts. The "complete orders until the day is done" gauge callout
+   appears **after the first real delivery**; the remaining customers run unguided with
+   REAL patience/health (a careless player can die). Day 0 completes on the **11th serve**
+   (`WAVE0_GOAL = 11`, serve-count based — see waves.js): 6 guided + 5 free-play.
 
 ### Scoring is neutered for the whole tutorial
 

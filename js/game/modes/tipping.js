@@ -1,6 +1,6 @@
 // @ts-check
 import { PICKUP_TYPE, TIP_COIN, PICKUP_TO_POWER, CUSTOMER_FACE_OFFSET_PX } from '../config.js';
-import { STATE } from '../shop.js';
+import { STATE, REACH } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
 import { drawScoop } from '../../view/playerView.js';
 
@@ -30,18 +30,39 @@ const MAX_MAJOR_TIPS_PER_DAY = 5;
 /** The timed (major) power-up tips, paced by the rules above. Heart is minor. */
 const MAJOR_TIP_TYPES = [PICKUP_TYPE.FEATHER, PICKUP_TYPE.PAUSE, PICKUP_TYPE.RAINBOW];
 
-// Scripted tutorial day — flavors used per beat (all junior singles, ≥3 distinct
-// so Set 1's "discover 3" clears), the throwaway top scoop for the swipe lesson,
-// the staging slots, and the beat durations.
-const T_C1 = 'vanilla', T_C2 = 'pink', T_C3 = 'mint', T_C4 = 'choco', T_C5 = 'blueberry', T_C6 = 'pink';
-const T_TOP = 'mint';            // the scoop tossed in the swipe lesson (≠ T_C5)
-const FIRST_SLOT = 0;            // #1 is far from center so step 1 teaches movement
-const GUIDE_SLOT = 2;            // every other guided customer waits center
+// Scripted tutorial day. Every guided beat hands the player GHOST scoops (plopped
+// straight onto the cone); catching from the sky isn't introduced until the final
+// free-play stretch. Flavors are junior singles. In the pop lessons the customer
+// wants the BOTTOM scoop and the colors above it are "junk" the player tosses to
+// reach it — junk is only ever popped, never served, so the served set stays a
+// clean 3+ distinct (vanilla/pink/mint) for Set 1's "discover 3".
+const T_C1 = /** @type {ScoopColor} */ ('vanilla');   // #1 — move + deliver (patience off)
+const T_C2 = /** @type {ScoopColor} */ ('pink');      // #2 — patience demo + recovery
+const T_C3 = /** @type {ScoopColor} */ ('mint');      // #3 — first delivery with patience ON
+const T_TIP = /** @type {ScoopColor} */ ('vanilla');  // #6 — the tip beat
+/**
+ * Pop lessons (#4, #5): the customer wants `wanted` (the BOTTOM scoop); `plop`
+ * lists the ghost scoops bottom→top, so everything stacked above `wanted` is junk
+ * to swipe off. Two scoops = one pop (teach); three = two pops (master).
+ * @type {{ slot: number, wanted: ScoopColor, plop: ScoopColor[] }[]}
+ */
+const POP_LESSONS = [
+  { slot: 2, wanted: /** @type {ScoopColor} */ ('pink'), plop: /** @type {ScoopColor[]} */ (['pink', 'blueberry']) },
+  { slot: 0, wanted: /** @type {ScoopColor} */ ('mint'), plop: /** @type {ScoopColor[]} */ (['mint', 'choco', 'blueberry']) }
+];
+// Staging slots (0..4). Each guided customer sits away from where the cone ends up
+// after the previous delivery, so every beat also rehearses moving the cone (slot
+// spacing always exceeds the serve REACH, so even one slot over needs a walk).
+const SLOT_1ST = 0;   // #1 — far left of the centered start
+const SLOT_2ND = 3;   // #2 — patience demo (kept off the edge so its long bubble reads)
+const SLOT_3A  = 1;   // #3 — first patience-on delivery
+const SLOT_TIP = 3;   // #6 — the tip
 const GUIDE_VALUE = 50;          // a junior-single's points (so the "+50" pill is honest)
 const FACE_BUBBLE_GAP = 125;     // px from a customer's FACE CENTER to a bubble hugging it (head ≈168 tall)
 const POINTS_BEAT = 1.2;         // how long the "+50" pill lingers
 const TIP_BEAT = 2.8;            // read beat for the tip explanation
 const DRAIN_S = 1.4;             // how fast the demo customer's patience drains
+const FINAL_MAX_LIVE = 2;        // gentle sky during the final free-play stretch (vs the mode's 7)
 // First-scoop "plop": a tutorial-owned ghost scoop eases down from PLOP_RISE px
 // above the landing slot over PLOP_FALL_S, then commits to the tray (land-squash).
 // Restored from the original tutorial (git 8962db3) — accelerating drop feels best.
@@ -52,14 +73,23 @@ const ORDER_BEAT = 0.5;          // beat after the first customer's order bubble
 const easeIn = (/** @type {number} */ t) => t * t;
 
 /**
- * Tipping tutorial — a fully SCRIPTED, heavily-telegraphed onboarding day. It
- * drives World directly (freeze cone, stage customers via `shop.spawnScripted`,
- * stop/inject sky scoops, run a patience→anger→death DEMO) and shows one beat at
- * a time. Combos + perfect catches are disabled for the whole day (see World), so
- * it can't be used to cheese a score. `start()` is the only entry; `update()` is a
- * step machine; `draw()` renders the current beat's speech bubbles. The cone's
- * `frozen` flag doubles as a full PAUSE (game._deliver/_pop also bail on frozen),
- * which is how the guided beats stop the player from acting ahead of the prompt.
+ * Tipping tutorial — a fully SCRIPTED, heavily-telegraphed onboarding day that
+ * introduces one mechanic at a time and then relies on it. The five phases:
+ *   1. GHOST scoop, learn to move + deliver (patience OFF).
+ *   2. GHOST scoop, carry it to the customer, a patience→anger→death DEMO (lose
+ *      health), then deliver for real (still no-fail).
+ *   3. Patience ON: a plain 1-scoop delivery, then 2- and 3-scoop pop lessons —
+ *      the customer wants the bottom scoop, so swipe the junk off the top.
+ *   4. A tip (paused to read it), still ghost scoops, patience on.
+ *   5. Hand off to real play: catching from the sky (no more ghosts), a gentle
+ *      sky cap, patience on; the "finish the day" callout shows after the first
+ *      real delivery and the remaining customers run unguided.
+ * It drives World directly (freeze cone, stage customers via `shop.spawnScripted`,
+ * pause/cap the sky, run the demo). Combos + perfect catches are disabled for the
+ * whole day (see World) so it can't cheese a score. `start()` is the only entry;
+ * `update()` is the step machine; `draw()` renders the beat's speech bubbles. The
+ * cone's `frozen` flag doubles as a full PAUSE (game._deliver/_pop bail on frozen),
+ * which is how guided beats stop the player from acting ahead of the prompt.
  */
 class TippingTutorial extends TutorialBase {
   constructor() {
@@ -67,18 +97,17 @@ class TippingTutorial extends TutorialBase {
     this.step = 0;
     this.t = 0;             // seconds in the current step
     this._phase = 0;        // sub-phase within a step
-    this._sub = 0;          // which of step 7's two customers
+    this._sub = 0;          // which pop lesson (#4 = 0, #5 = 1)
     /** @type {Customer | null} the customer the current beat is about */
     this._c = null;
     /** @type {string | null} captured name so the death-demo customer resurrects as themself */
     this._cName = null;
-    /** @type {import('../../types.js').Scoop | null} the scripted falling scoop */
-    this._scoop = null;
     /** @type {{ color: ScoopColor, t: number } | null} the plop ghost currently falling (drawn, not a field scoop) */
     this._ghost = null;
     /** @type {ScoopColor[]} colors still queued to plop onto the cone (bottom→top) */
     this._plopQueue = [];
     this._plopGap = 0;      // beat before the next queued ghost starts falling
+    this._freePlayBase = 0; // waves.servedCount when the final free-play stretch began
     /** @type {Array<{ x: number, y: number, text: string, point?: ('up'|'down'|null), accent?: string }>} */
     this.bubbles = [];
     /** @type {string | null} text for the #dayHint gauge callout (game._syncDayHint reads it) */
@@ -103,7 +132,7 @@ class TippingTutorial extends TutorialBase {
   /** @param {number} dt @param {Game} game */
   update(dt, game) {
     if (!this.active) return;
-    // The scripted day ends when step 10's regular customers fill the day meter
+    // The scripted day ends when the final free-play customers fill the day meter
     // (wave advances). Release any control we still hold and finish.
     if (game.world.waves.wave !== 0) { this._cleanup(game); this._finish(); return; }
     this.t += dt;
@@ -117,6 +146,7 @@ class TippingTutorial extends TutorialBase {
     w.freezePatience = false;
     w.player.frozen = false;
     w.field.setSpawnPaused(false);
+    w.field.setMaxLive(w.mode.maxLive);   // restore the mode's sky cap (the final stretch lowered it)
     this._ghost = null;
     this._plopQueue = [];
     this.dayHintText = null;
@@ -127,6 +157,8 @@ class TippingTutorial extends TutorialBase {
   _served(c) { return !!c && c.state === STATE.LEAVING && c.mood === 'happy'; }
   /** @param {Customer | null} c */
   _waiting(c) { return !!c && c.state === STATE.WAITING; }
+  /** Customer left ANGRY (patience ran out) — the patience-on recovery trigger. @param {Customer | null} c */
+  _expired(c) { return !!c && c.state === STATE.LEAVING && c.mood === 'angry'; }
 
   /** A hint pinned just above the cone's top scoop — snapped to it, pointing down. @param {Game} game @param {string} text @param {string} [accent] */
   _scoopBubble(game, text, accent) {
@@ -143,12 +175,25 @@ class TippingTutorial extends TutorialBase {
       ? { x: c.x, y: faceY - FACE_BUBBLE_GAP, text, point: /** @type {'down'} */ ('down'), accent }
       : { x: c.x, y: faceY + FACE_BUBBLE_GAP, text, point: /** @type {'up'} */ ('up'), accent };
   }
-  /** Keep one scripted scoop of `color` falling until caught (at `dropX`, default center). @param {Game} game @param {ScoopColor} color @param {number} [dropX] */
-  _ensureScoop(game, color, dropX) {
-    const w = game.world;
-    if (w.player.colors().includes(color)) return;          // already caught it
-    if (this._scoop && w.field.scoops.includes(this._scoop)) return;  // still falling
-    this._scoop = w.field.spawnScripted(dropX != null ? dropX : game.bounds.width / 2, /** @type {any} */ (color));
+  /**
+   * Stage a fresh scripted customer at `slot` (order = `order`) and start plopping
+   * `plop` (bottom→top) onto a frozen, emptied cone — the shared opening of every
+   * ghost beat. @param {Game} game @param {number} slot @param {ScoopColor[]} order
+   * @param {ScoopColor[]} plop @param {{ character?: string|null, tip?: (PickupTypeName|'coin'|null) }} [opts]
+   * @returns {Customer}
+   */
+  _stageGhost(game, slot, order, plop, opts = {}) {
+    const pl = game.world.player;
+    const c = game.world.shop.spawnScripted(slot, order, { value: GUIDE_VALUE, ...opts });
+    pl.frozen = true; pl.clearStack();
+    this._startPlops(plop);
+    return c;
+  }
+
+  /** Stage the current pop lesson (POP_LESSONS[_sub]). @param {Game} game */
+  _stagePop(game) {
+    const L = POP_LESSONS[this._sub];
+    this._c = this._stageGhost(game, L.slot, [L.wanted], L.plop);
   }
 
   /** Begin plopping `colors` (bottom→top) onto the cone via the ghost animation. @param {ScoopColor[]} colors */
@@ -188,57 +233,54 @@ class TippingTutorial extends TutorialBase {
     const w = game.world, sh = w.shop, fld = w.field, pl = w.player;
     switch (this.step) {
       case 1:
+        // PHASE 1 — move + deliver, patience OFF. Freeze the world (no sky scoops,
+        // no patience), stage #1 far from the centered start; the plop is deferred
+        // to _tick so it lands AFTER #1's order bubble pops.
         sh.scripted = true; w.freezePatience = true;
-        fld.setSpawnPaused(true); fld.scoops.length = 0;   // no sky scoops until step 4
-        this._c = sh.spawnScripted(FIRST_SLOT, [T_C1], { value: GUIDE_VALUE });
+        fld.setSpawnPaused(true); fld.scoops.length = 0;
+        this._c = sh.spawnScripted(SLOT_1ST, [T_C1], { value: GUIDE_VALUE });
         pl.frozen = true; pl.clearStack();
-        // Sequence runs in _tick: customer slides in → order bubble pops → a beat →
-        // the first scoop plops onto the cone → "move" tooltip. The plop is deferred
-        // so it lands AFTER the order bubble shows.
         break;
-      case 4:
-        this._c = sh.spawnScripted(GUIDE_SLOT, [T_C2], { value: GUIDE_VALUE });
-        this._scoop = null;
+      case 4: {
+        // PHASE 2 — patience DEMO. Ghost a scoop, make the player carry it to #2
+        // (far side); on arrival the demo runs (patience drains → anger → damage).
+        const c2 = this._stageGhost(game, SLOT_2ND, [T_C2], [T_C2]);
+        this._c = c2;
+        this._cName = c2.character;
         break;
+      }
       case 5:
-        // Carry the scoop they just caught over to the customer — no teleport, no
-        // re-plop (both felt busted). cName lets step 6 resurrect them.
-        this._cName = this._c ? this._c.character : null;
+        // PHASE 2 recovery — resurrect #2 (no-fail; patience still frozen) so the
+        // player actually delivers the ghost scoop this time.
+        this._c = this._stageGhost(game, SLOT_2ND, [T_C2], [T_C2], { character: this._cName });
         break;
       case 6:
-        // No health regen — the damage stands. Resurrect the same customer, plop a
-        // fresh scoop, and let patience run for REAL so they deliver it this time.
-        this._c = sh.spawnScripted(GUIDE_SLOT, [T_C2], { value: GUIDE_VALUE, character: this._cName });
-        pl.frozen = true; pl.clearStack();
-        this._startPlops([/** @type {any} */ (T_C2)]);
+        // PHASE 3a — patience ON from here. A plain 1-scoop delivery to rehearse it.
         w.freezePatience = false;
+        this._c = this._stageGhost(game, SLOT_3A, [T_C3], [T_C3]);
         break;
       case 7:
-        w.freezePatience = true;                           // guided again — pause patience
-        this.dayHintText = '☀️ Complete orders until the day is done!';
-        this._sub = 0; this._scoop = null;
-        this._c = sh.spawnScripted(GUIDE_SLOT, [T_C3], { value: GUIDE_VALUE });
+        // PHASE 3b/3c — pop lessons (#4 two scoops, #5 three). _sub picks which.
+        this._stagePop(game);
         break;
       case 8:
-        // Two scoops plop onto the (frozen) cone — bottom wanted (T_C5), junk on
-        // top (T_TOP) — for the swipe-to-toss lesson.
+        // PHASE 4 — a tip, paused so it can be read (patience frozen for the beat);
+        // the scoop is still ghosted (no catching yet) and delivered with patience on.
+        w.freezePatience = true;
+        this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: TIP_COIN });
         pl.frozen = true; pl.clearStack();
-        this._startPlops([/** @type {any} */ (T_C5), /** @type {any} */ (T_TOP)]);
-        this._c = sh.spawnScripted(GUIDE_SLOT, [T_C5], { value: GUIDE_VALUE });
         break;
       case 9:
-        pl.frozen = true;                                  // PAUSE to read the tip note
-        this._scoop = null;
-        this._c = sh.spawnScripted(GUIDE_SLOT, [T_C6], { value: GUIDE_VALUE, tip: TIP_COIN });
-        break;
-      case 10:
-        // Hand off to real play: sky + auto-spawn resume, patience runs for real.
+        // PHASE 5 — hand off to real play: catching from the sky (no more ghosts),
+        // patience on, a GENTLE sky cap. The "finish the day" callout waits for the
+        // first real delivery (set in _tick, keyed off servedCount).
         sh.scripted = false;
         fld.setSpawnPaused(false);
+        fld.setMaxLive(FINAL_MAX_LIVE);
         w.freezePatience = false;
         pl.frozen = false;
-        this.dayHintText = '☀️ Finish the day!';
-        this._c = null; this._scoop = null;
+        this._freePlayBase = w.waves.servedCount;
+        this._c = null;
         break;
     }
   }
@@ -248,21 +290,20 @@ class TippingTutorial extends TutorialBase {
   _tick(dt, game) {
     const w = game.world, sh = w.shop, pl = w.player;
     switch (this.step) {
+
       case 1: {
+        // PHASE 1a — customer slides in, order bubble pops (WAITING + beat), THEN the
+        // scoop plops onto the frozen cone, THEN the "move" tooltip: beats in sequence.
         const c = this._c;
-        // Phase 0: let the customer slide in and their order bubble pop (WAITING),
-        // hold a beat, THEN drop the scoop in — so the beats read in sequence.
         if (this._phase === 0) {
           if (c && c.state === STATE.WAITING && c.waitT >= ORDER_BEAT) {
-            this._startPlops([/** @type {any} */ (T_C1)]);
+            this._startPlops([T_C1]);
             this._phase = 1;
           }
         }
-        // Phase 1: the scoop eases down and plops onto the frozen cone.
         if (this._phase === 1) {
           if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 2; }
         }
-        // Phase 2: hand movement over with the "move" tooltip.
         if (this._phase === 2) {
           this.bubbles = [this._scoopBubble(game, '◀  Move left and right  ▶')];
           if (sh.customerAt(pl.x) >= 0) this._setStep(2, game);
@@ -271,122 +312,136 @@ class TippingTutorial extends TutorialBase {
       }
 
       case 2:
-        // Re-plop ONLY if they tossed it while the customer is still owed — never
-        // after a successful delivery (that left a scoop stuck on the cone).
-        if (pl.stack.length === 0 && this._waiting(this._c)) pl.push(/** @type {any} */ (T_C1));
+        // PHASE 1b — deliver. Re-plop ONLY if tossed while still owed (never after a
+        // serve, which would leave a scoop stuck on the cone).
+        if (pl.stack.length === 0 && this._waiting(this._c)) pl.push(T_C1);
         if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Tap to deliver', false)];
         if (this._served(this._c)) this._setStep(3, game);
         break;
 
       case 3:
+        // PHASE 1c — the points reward reads.
         if (this._c) this.bubbles = [this._customerBubble(game, this._c, '+50 points!', true, '#ffd166')];
         if (this.t >= POINTS_BEAT) this._setStep(4, game);
         break;
 
-      case 4:
-        // Scoop falls off to the LEFT — away from the centered customer — so the
-        // player catches it there and then carries it over in step 5.
-        this._ensureScoop(game, T_C2, game.bounds.width * 0.22);
-        if (this._scoop && this._scoop.y > game.bounds.height * 0.5) {
-          // Short text so the pill fits at the off-center drop x (no edge clip).
-          this.bubbles = [{ x: this._scoop.x, y: this._scoop.y - 56, text: 'Catch it!', point: 'down' }];
-        }
-        if (pl.colors().includes(T_C2)) this._setStep(5, game);
-        break;
-
-      case 5: {
+      case 4: {
+        // PHASE 2 — carry the ghost scoop to #2, then the scripted patience demo.
         const c = this._c;
-        if (!c) { this._setStep(6, game); break; }
-        if (this._served(c)) { this._setStep(7, game); break; }   // delivered in time → no demo
+        if (!c) { this._setStep(5, game); break; }
+        if (this._served(c)) { this._setStep(6, game); break; }   // frame-perfect early serve → skip the demo
         if (this._phase === 0) {
-          // Carry the caught scoop over; the (paused) demo begins on reaching them.
-          if (pl.stack.length === 0) pl.push(/** @type {any} */ (T_C2));   // tossed → give it back
-          else if (sh.customerAt(pl.x) >= 0) { pl.frozen = true; this._phase = 1; }
+          if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 1; }
         } else if (this._phase === 1) {
+          if (pl.stack.length === 0) pl.push(T_C2);               // tossed → give it back
+          this.bubbles = [this._scoopBubble(game, 'Bring it to the customer')];
+          // Freeze just outside serve range so the demo always runs before a tap could land.
+          if (Math.abs(pl.x - c.x) < REACH * 1.3) { pl.frozen = true; this.bubbles = []; this._phase = 2; }
+        } else if (this._phase === 2) {
           // Telegraphed FAIL: warn, drain their patience to zero, then take damage.
           this.bubbles = [this._customerBubble(game, c, 'Deliver before their patience runs out!', false, '#ff6fa3')];
           if (this._waiting(c)) {
-            c.order.timeLeft -= (c.order.duration / DRAIN_S) * dt;     // drain for show
+            c.order.timeLeft -= (c.order.duration / DRAIN_S) * dt;
             if (c.order.timeLeft <= 0) {
               c.order.timeLeft = 0;
               c.state = STATE.LEAVING; c.mood = 'angry';
-              w.onExpire(1);                                            // health drop + shake + sound + bar flash
-              this._phase = 2;
+              w.onExpire(1);                                       // health drop + shake + sound + bar flash
+              this._phase = 3;
             }
           }
-        } else if (this._phase === 2) {
-          // Damage tooltip while the angry customer slides off, then recover.
+        } else if (this._phase === 3) {
           this.bubbles = [this._customerBubble(game, c, 'Too slow — you lost health!', true, '#ff6fa3')];
-          if (!sh.list.includes(c)) this._setStep(6, game);
+          if (!sh.list.includes(c)) this._setStep(5, game);
         }
         break;
       }
 
+      case 5:
+        // PHASE 2 recovery — deliver for real (no-fail; patience still frozen). Plop
+        // → unfreeze → deliver; re-plop if tossed.
+        if (this._phase === 0) {
+          if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 1; }
+        } else if (this._served(this._c)) {
+          this._setStep(6, game);
+        } else if (pl.stack.length === 0) {
+          pl.frozen = true; this._startPlops([T_C2]); this._phase = 0;
+        } else if (this._c) {
+          this.bubbles = [this._customerBubble(game, this._c, 'Tap to deliver', false)];
+        }
+        break;
+
       case 6:
-        // Recovery: deliver for real, no tooltips. Patience runs normally; if they
-        // toss it or the customer expires again, re-stage and keep going.
+        // PHASE 3a — patience ON. A plain 1-scoop delivery under the clock; resurrect
+        // on a timeout (the damage stands) and re-plop if tossed, so the script holds.
         if (this._phase === 0) {
           if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 1; }
         } else if (this._served(this._c)) {
           this._setStep(7, game);
+        } else if (this._expired(this._c)) {
+          this._c = this._stageGhost(game, SLOT_3A, [T_C3], [T_C3]); this._phase = 0;
         } else if (pl.stack.length === 0) {
-          // Tossed it → re-plop the scoop back onto the cone.
-          pl.frozen = true; this._startPlops([/** @type {any} */ (T_C2)]); this._phase = 0;
-        } else if (!sh.list.includes(this._c)) {
-          // Their patience ran out → resurrect + re-plop until it's delivered.
-          this._c = sh.spawnScripted(GUIDE_SLOT, [T_C2], { value: GUIDE_VALUE, character: this._cName });
-          pl.frozen = true; pl.clearStack(); this._startPlops([/** @type {any} */ (T_C2)]); this._phase = 0;
+          pl.frozen = true; this._startPlops([T_C3]); this._phase = 0;
+        } else if (this._c) {
+          this.bubbles = [this._customerBubble(game, this._c, 'Tap to deliver', false)];
         }
         break;
 
       case 7: {
-        const color = this._sub === 0 ? T_C3 : T_C4;
-        this._ensureScoop(game, color);
-        if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Catch & serve!', false)];
-        if (this._served(this._c)) {
-          if (this._sub === 0) {
-            this._sub = 1; this._scoop = null;
-            this._c = sh.spawnScripted(GUIDE_SLOT, [T_C4], { value: GUIDE_VALUE });
-          } else {
-            this._setStep(8, game);
+        // PHASE 3b/3c — pop lessons. Customer wants the BOTTOM scoop; swipe the junk
+        // off the top to reach it. _sub 0 = two scoops (one pop), 1 = three (master).
+        const L = POP_LESSONS[this._sub];
+        if (this._phase === 0) {
+          if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 1; }
+        } else if (this._expired(this._c)) {
+          this._stagePop(game); this._phase = 0;                  // timed out → restage fresh
+        } else if (this._phase === 1) {
+          const cols = pl.colors();
+          if (cols.length === 0) { pl.frozen = true; this._startPlops(L.plop); this._phase = 0; break; }   // over-popped
+          if (cols.length === 1 && cols[0] === L.wanted) { this._phase = 2; break; }                       // junk cleared
+          this.bubbles = [this._scoopBubble(game, 'Swipe up to toss the top scoop', '#ffd166')];
+        } else {
+          if (pl.stack.length === 0 && !this._served(this._c)) {  // over-popped after revealing → restage
+            pl.frozen = true; this._startPlops(L.plop); this._phase = 0; break;
+          }
+          if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Tap to deliver', false)];
+          if (this._served(this._c)) {
+            if (this._sub === 0) { this._sub = 1; this.bubbles = []; this._stagePop(game); this._phase = 0; }
+            else { this._setStep(8, game); }
           }
         }
         break;
       }
 
       case 8:
+        // PHASE 4 — tip. Read beat (paused), then ghost the scoop and deliver (patience on).
         if (this._phase === 0) {
-          // Plop the two scoops in; unfreeze for the swipe lesson once they land.
-          if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 1; }
-        } else if (pl.stack.length === 0 && !this._served(this._c)) {
-          // Over-tossed the cone empty BEFORE serving → soft-lock recovery: re-stage
-          // both scoops and replay the swipe beat. (A successful serve also empties
-          // the cone, but _served guards that so we still advance to step 9 below.)
-          pl.frozen = true; this.bubbles = [];
-          this._startPlops([/** @type {any} */ (T_C5), /** @type {any} */ (T_TOP)]);
-          this._phase = 0;
+          if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'A tip! Tips can be power-ups.', true, '#ffd166')];
+          if (this.t >= TIP_BEAT) { w.freezePatience = false; this._startPlops([T_TIP]); this._phase = 1; }
         } else if (this._phase === 1) {
-          this.bubbles = [this._scoopBubble(game, 'Swipe up to toss the top scoop', '#ffd166')];
-          if (pl.stack.length === 1 && pl.colors()[0] === T_C5) this._phase = 2;
+          if (this._advancePlops(dt, game)) { pl.frozen = false; this._phase = 2; }
         } else {
-          if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Now serve the bottom flavor — tap to deliver', false)];
+          if (this._expired(this._c)) {                           // timed out → restage with the tip again
+            this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: TIP_COIN });
+            pl.frozen = true; pl.clearStack(); this._startPlops([T_TIP]); this._phase = 1; break;
+          }
+          if (pl.stack.length === 0 && !this._served(this._c)) {
+            pl.frozen = true; this._startPlops([T_TIP]); this._phase = 1; break;
+          }
+          if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Tap to deliver for the tip!', false)];
           if (this._served(this._c)) this._setStep(9, game);
         }
         break;
 
       case 9:
-        if (this._phase === 0) {
-          if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'A tip! Some tips are power-ups you unlock later.', true, '#ffd166')];
-          if (this.t >= TIP_BEAT) { pl.frozen = false; this._scoop = null; this._phase = 1; }
+        // PHASE 5 — free play. Telegraph catching; once the first real order lands,
+        // swap to the "finish the day" gauge callout and go fully hands-off.
+        if (w.waves.servedCount > this._freePlayBase) {
+          this.dayHintText = '☀️ Complete orders until the day is done!';
+          this.bubbles = [];
         } else {
-          this._ensureScoop(game, T_C6);
-          if (this._c) this.bubbles = [this._customerBubble(game, this._c, 'Catch & deliver for the tip!', false)];
-          if (this._served(this._c)) this._setStep(10, game);
+          this.dayHintText = null;
+          this.bubbles = [{ x: game.bounds.width / 2, y: game.bounds.height * 0.34, text: 'Now catch the falling scoops!', point: null, accent: '#5cd8ff' }];
         }
-        break;
-
-      case 10:
-        this.bubbles = [];   // no tooltips — just the gauge callout until the day ends
         break;
     }
   }
@@ -407,7 +462,14 @@ class TippingTutorial extends TutorialBase {
       ctx.restore();
     }
     for (const b of this.bubbles) {
-      this._hint(ctx, b.x, b.y, b.text, { t, accent: b.accent || '#5cd8ff', point: b.point || null });
+      // Keep the pill on-screen: measure it and clamp its center so an edge-slot
+      // customer's bubble doesn't run off the canvas (the caret follows the clamp).
+      ctx.save();
+      ctx.font = "bold 27px 'Comic Sans MS', sans-serif";
+      const halfW = (ctx.measureText(b.text).width + 42) / 2 + 8;
+      ctx.restore();
+      const x = Math.max(halfW, Math.min(game.bounds.width - halfW, b.x));
+      this._hint(ctx, x, b.y, b.text, { t, accent: b.accent || '#5cd8ff', point: b.point || null });
     }
   }
 }
