@@ -35,7 +35,7 @@ import { ScoopField, isCaught } from './scoops.js';
 import { Shop } from './shop.js';
 import { Waves, WAVE_EVENT } from './waves.js';
 import { PowerUps } from './powerups.js';
-import { Recipes } from './recipes.js';
+import { Recipes, RECIPE_BY_ID } from './recipes.js';
 import { Challenges } from './challenges.js';
 import { Regulars } from './regulars.js';
 import { CHARACTERS, CHARACTER_BY_NAME } from './customers.js';
@@ -408,6 +408,8 @@ export class World {
       if (ev.wasNew) {
         this.sessionRecipeEvents.unlocked.push(ev.id);
         this.challenges.recordDiscover(ev.id);
+        const rec = RECIPE_BY_ID.get(ev.id);
+        this.bus.emit('discover', { id: ev.id, name: rec ? rec.name : '' });
       }
       if (ev.justMastered) {
         this.sessionRecipeEvents.mastered.push(ev.id);
@@ -455,9 +457,10 @@ export class World {
       // The sim only announces the wave-up; the coordinator's 'waveUp' handler
       // schedules the cashout flow. Progression bookkeeping stays here.
       this.bus.emit('waveUp', { wave: this.waves.wave });
-      // Challenge tracking: new wave reached, and per-wave counters reset.
+      // Challenge tracking: new wave reached. (The per-day power-up counter is NOT
+      // reset here — it must survive until the wave-transition COMMITS the day's
+      // challenges; the coordinator resets it when the night cycle lands.)
       this.challenges.recordWaveReached(this.waves.wave);
-      this.challenges.recordWaveEnded();
       // Leaving Wave 0 → restore the normal demand bias for the campaign proper.
       if (this.waves.wave === 1) this.field.setDemandBias(SPAWN_DEMAND_BIAS);
     }

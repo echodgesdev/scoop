@@ -161,7 +161,7 @@ export const SETS = [
     name: 'Top Scooper',
     challenges: [
       { id: 's10-1', type: 'master_recipes',   target: 12, title: 'Master 12 recipes total' },
-      { id: 's10-2', type: 'use_powerup_wave', target: 10, title: 'Use 10 power-ups in one day' },
+      { id: 's10-2', type: 'use_powerup_wave', target: 5, title: 'Use 5 power-ups in one day' },
       { id: 's10-3', type: 'serve_regular',    target: 25, title: 'Serve Annie 25 times', param: 'Annie' }
     ],
     rewards: []

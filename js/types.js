@@ -85,6 +85,7 @@
  * @property {{ x: number, y: number, color: ScoopColor }} discard       toss-top (the upward gesture)
  * @property {{ x: number, y: number, points: number }} coin            a coin tip granted
  * @property {{ title: string }} challengeEarned                        a challenge requirement was newly met (HUD toast)
+ * @property {{ id: string, name: string }} discover                    a recipe completed for the first time (discovery toast)
  * @property {{}} phaseUp
  * @property {{ wave: number }} waveUp
  * @property {{}} gameOver

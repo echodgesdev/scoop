@@ -17,7 +17,6 @@
 import {
   MAX_HEALTH,
   COMBO_CASHOUT_PER,
-  STACK_CASHOUT_PER_SCOOP,
   SPAWN_DEMAND_BIAS,
   coneYFor
 } from './game/config.js';
@@ -610,8 +609,10 @@ export class Game {
         this.nightT = 1;
         this.inNightCycle = false;
         // Night sweep done — NOW roll the HUD day number over to the new day, and
-        // announce it.
+        // announce it. The per-day power-up counter resets here too (after the
+        // transition has committed the finished day's challenges).
         this._shownWave = this.world.waves.wave;
+        this.world.challenges.recordWaveEnded();
         this.banner = { text: `DAY ${this.world.waves.wave}!`, t: 1.6 };
       }
     }
@@ -711,9 +712,9 @@ export class Game {
     const pos = this.world.player.scoopPosition(idx);
     const color = this.world.player.stack[idx].color;
     this.world.player.popTop();
-    this.world.shop.addScore(STACK_CASHOUT_PER_SCOOP);
+    // Leftover tray scoops at wave-end just pop for show now — no points, no "+N"
+    // text (that was a vestigial reward; the score never meaningfully moved).
     this.effects.burst(pos.x, pos.y, [this.world.shop.hex(color), '#fff'], 14);
-    this.effects.popText(pos.x, pos.y - 10, `+${STACK_CASHOUT_PER_SCOOP}`, { color: '#ffec5c', size: 20, life: 0.6 });
     this.sound.catch_();
     setTimeout(() => this._cashoutStack(completedWave), 120);
   }

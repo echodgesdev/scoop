@@ -76,7 +76,7 @@ export class Hud {
 
     // Toast queue: challenges that just hit their requirement during play.
     // Shown one at a time at the bottom of the screen, each fades in/out.
-    /** @type {Array<{ title: string }>} */
+    /** @type {Array<{ title: string, icon: string }>} */
     this._toastQueue = [];
     this._toastShowing = false;
 
@@ -785,12 +785,19 @@ export class Hud {
     if (this.pauseOverlayEl) this.pauseOverlayEl.classList.add('hidden');
   }
 
-  // === Challenge toast (mid-play "✓ <title>" notification) ==================
+  // === Mid-play toasts (challenge met / flavor discovered) ==================
 
   /** @param {{ title: string }} challenge */
   showChallengeToast(challenge) {
     if (!this.challengeToastEl) return;
-    this._toastQueue.push({ title: challenge.title });
+    this._toastQueue.push({ title: challenge.title, icon: '✓' });
+    if (!this._toastShowing) this._processToastQueue();
+  }
+
+  /** First-time flavor discovery — a quick named toast. @param {string} name */
+  showDiscoveryToast(name) {
+    if (!this.challengeToastEl) return;
+    this._toastQueue.push({ title: `New flavor — ${name}`, icon: '🍦' });
     if (!this._toastShowing) this._processToastQueue();
   }
 
@@ -801,9 +808,9 @@ export class Hud {
       return;
     }
     this._toastShowing = true;
-    const next = /** @type {{ title: string }} */ (this._toastQueue.shift());
+    const next = /** @type {{ title: string, icon: string }} */ (this._toastQueue.shift());
     this.challengeToastEl.innerHTML =
-      `<span class="toast-check">✓</span><span class="toast-title">${next.title}</span>`;
+      `<span class="toast-check">${next.icon}</span><span class="toast-title">${next.title}</span>`;
     // Trigger reflow so the class transition fires every time.
     void this.challengeToastEl.offsetWidth;
     this.challengeToastEl.classList.add('show');

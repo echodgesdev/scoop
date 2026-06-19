@@ -1,6 +1,5 @@
 // @ts-check
 import { PICKUP_TYPE } from './game/config.js';
-import { recipeIdFor, RECIPE_BY_ID } from './game/recipes.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
@@ -33,20 +32,20 @@ export function wireReactions(game) {
     game.hurt = 0.2;
   });
 
-  // Order completed: confetti burst at the customer, but the one floating label is
-  // the RECIPE NAME, popped at the cone (the player's locus). Points ride the HUD
-  // score; the combo rides the HUD combo meter — no extra floating text.
+  // Order completed: confetti burst at the customer. No floating text — points
+  // ride the HUD score, combo rides the HUD combo meter, and flavor names surface
+  // via the discovery toast (below) + the end-of-day reveal coins.
   game.bus.on('serve', ({ colors, x, y }) => {
     game.effects.burst(x, y, colors.map(c => game.world.shop.hex(c)));
-    const recipe = RECIPE_BY_ID.get(recipeIdFor(colors));
-    if (recipe) {
-      const cx = game.world.player.x, cy = game.world.player.stackTopY();
-      game.effects.popText(cx, cy - 30, recipe.name, { color: '#fff3c0', size: 24, life: 1.0 });
-    }
     game.world.player.triggerFlash();
     game.effects.addShake(6);
     game.sound.match();
     game.haptics.serve();
+  });
+
+  // First time a recipe is completed: a quick toast naming the new flavor.
+  game.bus.on('discover', ({ name }) => {
+    if (name) game.hud.showDiscoveryToast(name);
   });
 
   game.bus.on('serveFail', () => {
