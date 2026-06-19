@@ -59,7 +59,8 @@ export class Shop {
     this.score = 0;
     this.combo = 0;
     this.comboTimer = 0;
-    this.bestCombo = 0;
+    this.bestCombo = 0;       // run peak (longest combo)
+    this.dayBestCombo = 0;    // peak this day (reset each day via resetDayCombo)
     // Combo scoring on/off — World drives it from `tutorialActive` so the
     // tutorial scores every serve flat (combo stays 0, no multiplier, HUD hidden).
     this.comboEnabled = true;
@@ -101,10 +102,14 @@ export class Shop {
     this.combo = 0;
     this.comboTimer = 0;
     this.bestCombo = 0;
+    this.dayBestCombo = 0;
     this.respawnTimer = 0;
     this.scripted = false;
     this.lastDeparted = null;
   }
+
+  /** Reset the per-day combo peak (called at each new day's start). */
+  resetDayCombo() { this.dayBestCombo = 0; }
 
   /**
    * Pick the regular for a new spawn via the selection waterfall: never a
@@ -516,6 +521,7 @@ export class Shop {
       this.combo += c.order.weight || 1;
       this.comboTimer = COMBO_DECAY_S;
       this.bestCombo = Math.max(this.bestCombo, this.combo);
+      this.dayBestCombo = Math.max(this.dayBestCombo, this.combo);
     }
     const gained = c.order.value * (this.comboEnabled ? this.combo : 1);
     this.score += gained;

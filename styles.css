@@ -1,3 +1,25 @@
+/* Packaged playful font. The UI + canvas text all reference 'Comic Sans MS',
+   which only exists on some OSes — hosted, most visitors fell back to plain
+   sans-serif. Comic Neue (SIL OFL, self-hosted in assets/fonts) is a Comic-Sans
+   alike; declaring it UNDER the 'Comic Sans MS' family name makes every existing
+   reference resolve to the bundled file, so it renders identically everywhere.
+   No local() src on purpose — even machines with real Comic Sans use the bundled
+   font, keeping the look consistent across devices. */
+@font-face {
+  font-family: 'Comic Sans MS';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('assets/fonts/comic-neue-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Comic Sans MS';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('assets/fonts/comic-neue-700.woff2') format('woff2');
+}
+
 :root {
   /* The shared "parlor card" look — a cream waffle surface (45°/-45° crosshatch
      over a warm gradient) with a brown rim. Used by the modals AND the in-game
@@ -1159,12 +1181,17 @@ button.flash {
 /* The collection containers are just scrollers now; .jcoin-grid does the layout. */
 .regulars-grid, .powerups-grid { display: block; }
 .jcoin-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  /* Flex (not grid) so a partial last row CENTERS: 5 tokens wrapping to 3 + 2
+     leaves the trailing 2 centered — reading as intentional, not "1 missing".
+     Applies to every journal page (recipes, power-ups, regulars). */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 12px 6px;
   padding: 6px 2px 2px;
 }
 .jcoin {
+  flex: 0 0 96px;   /* fixed cell so rows wrap predictably and center cleanly */
   display: flex; flex-direction: column; align-items: center; gap: 5px;
   background: none; border: none; padding: 4px 2px; cursor: pointer; font-family: inherit;
 }
@@ -1219,23 +1246,44 @@ button.flash {
 }
 #journalDetail.hidden { display: none; }
 .journal-detail-card {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  width: 84%; max-width: 300px; padding: 22px 20px;
-  background: var(--waffle-surface, #fff3c0);
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  /* Portrait "quilted square": narrow + tall, content up top with room to breathe;
+     the Close button is pushed to the very bottom (margin-top:auto on it). */
+  width: 82%; max-width: 270px; min-height: 400px; padding: 32px 26px 24px;
+  /* Quilted (tufted toilet-paper) surface on near-white: ±45° EMBOSSED seams (a
+     shadow groove + a white highlight beside it) forming diamonds, with a tufting
+     dimple at each lattice point (dot pitch = seam period × √2 = 30 × √2 ≈
+     42.43px). The inset shadows add the soft pillow puff. Tune the 30px period for
+     bigger/smaller squares (keep the 42.43 ≈ period×√2 in step). */
+  background-color: #fffdf9;
+  background-image:
+    radial-gradient(circle, rgba(150, 100, 50, 0.20) 0 2px, transparent 2.7px),
+    repeating-linear-gradient(45deg, rgba(150, 100, 50, 0.14) 0 1.5px, rgba(255, 255, 255, 0.65) 1.5px 3px, transparent 3px 30px),
+    repeating-linear-gradient(-45deg, rgba(150, 100, 50, 0.14) 0 1.5px, rgba(255, 255, 255, 0.65) 1.5px 3px, transparent 3px 30px),
+    linear-gradient(180deg, #ffffff 0%, #fff7ec 100%);
+  background-size: 42.43px 42.43px, auto, auto, auto;
   border: 3px solid var(--waffle-edge, #b85);
-  border-radius: 16px;
-  box-shadow: 0 14px 34px rgba(40, 16, 4, 0.45);
+  border-radius: 18px;
+  box-shadow:
+    0 14px 34px rgba(40, 16, 4, 0.45),
+    inset 0 2px 6px rgba(255, 255, 255, 0.8),
+    inset 0 -14px 30px rgba(150, 100, 50, 0.10);
   text-align: center;
 }
-.journal-detail-body { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.journal-detail-body { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.jdetail-coin { display: flex; flex-direction: column; align-items: center; }
 .jdetail-coin.locked { opacity: 0.7; }
-.jdetail-name { font-weight: bold; color: #6a4a2a; font-size: 18px; }
-.jdetail-blurb { font-size: 13px; color: #6a5238; line-height: 1.35; }
-.jdetail-line { font-size: 13px; font-weight: bold; color: #b07a32; }
+/* The tapped coin reads BIG on the detail panel: scale the whole gauge visual
+   (ring + face + emoji/scoops/face-img) uniformly. The margins reserve the space
+   the scale adds (86px → ~133px) so it doesn't crowd the name below. */
+.jdetail-coin .jcoin-gauge { transform: scale(1.55); margin: 28px 0 32px; }
+.jdetail-name { font-weight: bold; color: #6a4a2a; font-size: 22px; }
+.jdetail-blurb { font-size: 15px; color: #6a5238; line-height: 1.45; }
+.jdetail-line { font-size: 15px; font-weight: bold; color: #b07a32; }
 .jdetail-line.locked-hint { color: #9a8463; font-style: italic; font-weight: normal; }
 .journal-detail-close {
-  margin-top: 4px;
-  font-family: inherit; font-size: 15px; font-weight: bold; padding: 8px 22px;
+  margin-top: auto;   /* pin the button to the very bottom of the panel */
+  font-family: inherit; font-size: 17px; font-weight: bold; padding: 11px 30px;
   border: none; border-radius: 999px; cursor: pointer; color: #fff;
   background: linear-gradient(180deg, #d9a263, #bb7f47 60%, #a96e39);
   box-shadow: 0 4px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.35);
@@ -1517,7 +1565,7 @@ button.flash {
 /* Three-up button row: Journal (left) | Play Again (centre, primary) | Settings (right). */
 .menu-buttons.gameover-buttons {
   display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr;
+  grid-template-columns: 1fr 1.5fr 1fr;
   gap: 10px;
   max-width: 540px;
   margin: 14px auto 0;
@@ -1530,11 +1578,11 @@ button.flash {
   padding: 12px 8px;
 }
 .menu-buttons.gameover-buttons #startBtn {
-  font-size: 18px;
+  font-size: 20px;
 }
-/* Journal | Play Again | Settings fill the three columns; 🏠 Home sits on its
-   own full-width row beneath so Play Again stays the dominant CTA. */
-.menu-buttons.gameover-buttons .gameover-home-btn {
+/* Journal | Play Again (dominant) | Home fill the three columns; ⚙️ Settings sits
+   on its own full-width row beneath. */
+.menu-buttons.gameover-buttons .gameover-settings-btn {
   grid-column: 1 / -1;
   justify-self: center;
   padding: 10px 28px;
@@ -2034,10 +2082,32 @@ button.flash {
   margin-top: 18px;
 }
 /* Wave-transition now shows just Play + Journal — two columns, Play dominant. */
-#waveTransitionOverlay .wt-buttons { grid-template-columns: 1.2fr 1fr; }
-/* 🏠 Home sits on its own full-width row beneath the main buttons (pause +
-   wave-transition) so Resume / Play stay dominant. */
+/* End-of-day row: Journal | Play (dominant) | Home. */
+#waveTransitionOverlay .wt-buttons { grid-template-columns: 1fr 1.5fr 1fr; }
+#waveTransitionOverlay .wt-play-btn { font-size: 20px; padding: 16px 10px; }
+#waveTransitionOverlay .wt-home-btn { grid-column: auto; justify-self: stretch; padding: 12px 8px; }
+/* 🏠 Home sits on its own full-width row beneath the main buttons (pause menu only). */
 .wt-buttons .wt-home-btn { grid-column: 1 / -1; justify-self: center; padding: 10px 28px; }
+
+/* End-of-day stat card (Score / Combo Today / Longest Combo / Favorite). */
+.wt-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.wt-stats:empty { display: none; }
+.wt-stat {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  padding: 7px 4px;
+  text-align: center;
+}
+.wt-stat-value { font-weight: bold; font-size: 16px; color: #8a4a2a; line-height: 1.15; word-break: break-word; }
+.wt-stat-label {
+  font-size: 10px; font-weight: bold; color: #9a7a52;
+  text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px;
+}
 .wt-buttons button {
   font-family: inherit;
   font-size: 15px;

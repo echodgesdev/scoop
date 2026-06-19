@@ -140,9 +140,8 @@ export function wireReactions(game) {
   });
 
   game.bus.on('waveUp', () => {
-    // The "DAY N!" banner fires at the next-wave start (Game._frame, on
-    // night-cycle completion), not here.
-    game.hud.setGauge(game.world.waves.wave, 1);
+    // The day number rolls over at night-end (Game._frame), NOT here — the gauge
+    // is held by _dayRolling so it doesn't jump ahead during the cashout/transition.
     game.hud.flashWaveUp();
     game.sound.levelUp();
     game.haptics.wave();

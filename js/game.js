@@ -59,6 +59,13 @@ const ROUND_INTRO_START_S = 0.75;  // "START!"
 
 export class Game {
   constructor() {
+    // Kick the bundled font (styles.css @font-face) loading immediately so canvas
+    // text — bubbles, banners, the countdown — never flashes a fallback before it
+    // arrives. The DOM menu would trigger it anyway; this just front-runs it.
+    if (typeof document !== 'undefined' && document.fonts && document.fonts.load) {
+      document.fonts.load("400 16px 'Comic Sans MS'");
+      document.fonts.load("700 16px 'Comic Sans MS'");
+    }
     this.canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
     this.ctx = /** @type {CanvasRenderingContext2D} */ (this.canvas.getContext('2d'));
     // #stage is the container the canvas + HUD live in; its on-screen rect is
@@ -267,7 +274,7 @@ export class Game {
       const completedWave = Math.max(1, (wave || 1) - 1);
       setTimeout(() => this._runWaveCashout(completedWave), 700);
     });
-    this.bus.on('gameOver', () => this._endGame('Game Over.'));
+    this.bus.on('gameOver', () => this._endGame());
 
     // Window resize only re-letterboxes the (unchanged) virtual canvas; the
     // backing store is fixed per aspect. Fullscreen is just a bigger viewport.
@@ -629,6 +636,7 @@ export class Game {
         // kicked off here.
         this._dayRolling = false;
         this.world.challenges.recordWaveEnded();
+        this.world.shop.resetDayCombo();
         this._startRoundIntro();
       }
     }
@@ -828,6 +836,24 @@ export class Game {
   }
 
   /**
+   * End-of-day / end-of-run stat card: score, the day's best combo, the run's
+   * longest combo, and the flavor completed most often. Shared by the wave
+   * transition and the game-over screen.
+   */
+  _dayStats() {
+    let fav = null;
+    for (const r of this.world.recipes.getAll()) {
+      if (r.count > 0 && (!fav || r.count > fav.count)) fav = r;
+    }
+    return {
+      score: this.world.shop.score,
+      dayCombo: this.world.shop.dayBestCombo,
+      bestCombo: this.world.shop.bestCombo,
+      favFlavor: fav ? fav.name : '—'
+    };
+  }
+
+  /**
    * Pauses gameplay and asks the HUD to run the between-wave overlay:
    * cross-off animation for any earned challenges, optional fade-in of a
    * newly-unlocked set, then a countdown / Play button. Resumes when the
@@ -845,6 +871,7 @@ export class Game {
     // (and then reset the day/difficulty for the new week).
     const curSet = this.world.challenges.getCurrentSet();
     this._weekBefore = curSet ? curSet.index : Infinity;
+    const stats = this._dayStats();
     // The Day-0 → Day-1 transition is the tutorial end: 'first' (real play) auto-
     // advances to Set 2; 'replay' (sandbox) leaves challenges untouched. Any later
     // day is a normal transition (null).
@@ -864,6 +891,7 @@ export class Game {
         ...this.world.regulars.drainPendingReveals()
       ],
       discoveries: this.world.drainPendingDiscoveries(),
+      stats,
       tutorialMode: tutMode,
       onResume: () => this._endWaveTransition()
     });
@@ -884,7 +912,7 @@ export class Game {
     this._runNightCycle();
   }
 
-  _endGame(title = 'Game Over') {
+  _endGame() {
     this.running = false;
     this.loop.stop();
     // Reset transition state in case the player died mid-pause (shouldn't
@@ -901,10 +929,7 @@ export class Game {
     // shows the player's final state.
     this.world.challenges.commitEarned();
     this.hud.showGameOver(
-      title,
-      this.world.shop.score,
-      this.world.shop.bestCombo,
-      this.world.waves.dayInWeek,
+      this._dayStats(),
       () => this.start(),
       this.world.sessionRecipeEvents
     );

@@ -1032,9 +1032,9 @@ export class Hud {
    * starts a 3-second countdown to Resume. Any button click cancels the
    * countdown and converts the centre button to "Play".
    *
-   * @param {{ completedWave: number, completedDayInWeek?: number, weekDays?: number, reveals?: string[], discoveries?: string[], onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
+   * @param {{ completedWave: number, completedDayInWeek?: number, weekDays?: number, reveals?: string[], discoveries?: string[], stats?: ({ score: number, dayCombo: number, bestCombo: number, favFlavor: string } | null), onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
    */
-  showWaveTransition({ completedWave, completedDayInWeek = 1, weekDays = 7, reveals = [], discoveries = [], onResume, tutorialMode = null }) {
+  showWaveTransition({ completedWave, completedDayInWeek = 1, weekDays = 7, reveals = [], discoveries = [], stats = null, onResume, tutorialMode = null }) {
     if (!this.waveTransitionOverlayEl || !this.challenges) {
       // No overlay markup — resume immediately so the player isn't stuck.
       onResume();
@@ -1074,10 +1074,11 @@ export class Hud {
     const challengesEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-challenges'));
     const rewardsEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-rewards'));
 
-    if (titleEl) titleEl.textContent = `Day ${completedDayInWeek} Complete`;
-    if (subtitleEl) {
-      subtitleEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
-    }
+    // Header: the Week is the H1, "Day Complete" the H2.
+    if (titleEl) titleEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : 'All Weeks Complete';
+    if (subtitleEl) subtitleEl.textContent = 'Day Complete';
+    const statsEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-stats'));
+    if (statsEl) statsEl.innerHTML = stats ? this._wtStatsHtml(stats) : '';
     if (rewardsEl) {
       rewardsEl.classList.add('hidden');
       rewardsEl.innerHTML = '';
@@ -1262,10 +1263,7 @@ export class Hud {
             challengesEl.innerHTML = `<div class="wt-new-label">🏆 All Weeks complete!</div>`;
           }
         } else {
-          challengesEl.innerHTML =
-            `<div class="wt-new-label">Challenges done — finish the Week!</div>` +
-            this._weekMeterHtml({ days, target }) +
-            `<div class="wt-finish-note">Reach Day ${target} to unlock next week's challenges.</div>`;
+          challengesEl.innerHTML = this._weekMeterHtml({ days, target });
         }
         challengesEl.classList.remove('fading-out');
         challengesEl.classList.add('fading-in');
@@ -1274,6 +1272,16 @@ export class Hud {
     } else {
       this._startWtCountdown();
     }
+  }
+
+  /** End-of-day stat card: score, the day's best combo, the run's longest combo, favorite flavor. */
+  _wtStatsHtml(s) {
+    const cell = (label, value) =>
+      `<div class="wt-stat"><div class="wt-stat-value">${value}</div><div class="wt-stat-label">${label}</div></div>`;
+    return cell('Score', s.score)
+      + cell('Combo Today', `${s.dayCombo}×`)
+      + cell('Longest Combo', `${s.bestCombo}×`)
+      + cell('Favorite', s.favFlavor);
   }
 
   /**
@@ -1395,18 +1403,15 @@ export class Hud {
   }
 
   /**
-   * @param {string} title
-   * @param {number} score
-   * @param {number} bestCombo
-   * @param {number} wave
+   * @param {{ score: number, dayCombo: number, bestCombo: number, favFlavor: string }} stats
    * @param {() => void} onRestart
    * @param {{ unlocked: string[], mastered: string[] }} [recipeEvents]
    */
-  showGameOver(title, score, bestCombo, wave, onRestart, recipeEvents = { unlocked: [], mastered: [] }) {
-    const isRecord = score > this.best;
+  showGameOver(stats, onRestart, recipeEvents = { unlocked: [], mastered: [] }) {
+    const isRecord = stats.score > this.best;
     if (isRecord) {
-      this.best = score;
-      localStorage.setItem(BEST_KEY, String(score));
+      this.best = stats.score;
+      localStorage.setItem(BEST_KEY, String(stats.score));
     }
 
     this.onStart = onRestart;
@@ -1422,10 +1427,6 @@ export class Hud {
     }
     // Flash the Journal button as a CTA when there's something to celebrate.
     const flashCls = (nUnlocked > 0 || nMastered > 0) ? ' flash' : '';
-
-    // Suppress the dramatic title text — the overlay's appearance is signal
-    // enough that the round ended. The stats card is the focus now.
-    void title;
 
     // Build the current-challenges section that lives inside the card.
     let challengesSection = '';
@@ -1452,28 +1453,15 @@ export class Hud {
     this.overlayEl.innerHTML = `
       ${celebrations.join('')}
       <div class="gameover-card">
-        <div class="stats-row">
-          <div class="stat">
-            <div class="stat-label">Score</div>
-            <div class="stat-value">${score}${isRecord ? ' <span class="record-pill">🏆 NEW BEST</span>' : ''}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Day</div>
-            <div class="stat-value">${wave}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Best Combo</div>
-            <div class="stat-value">${bestCombo}×</div>
-          </div>
-        </div>
-        <div class="best-line">Best ever <strong>${this.best}</strong></div>
+        <div class="wt-stats">${this._wtStatsHtml(stats)}</div>
+        <div class="best-line">${isRecord ? '🏆 NEW BEST!' : `Best ever <strong>${this.best}</strong>`}</div>
         ${challengesSection}
       </div>
       <div class="menu-buttons gameover-buttons">
         <button id="journalBtn" class="secondary${flashCls}">📔 Journal</button>
         <button id="startBtn">▶ Play Again</button>
-        <button id="settingsBtn" class="secondary">⚙️ Settings</button>
-        <button id="homeBtn" class="secondary gameover-home-btn">🏠 Home</button>
+        <button id="homeBtn" class="secondary">🏠 Home</button>
+        <button id="settingsBtn" class="secondary gameover-settings-btn">⚙️ Settings</button>
       </div>
     `;
     this._wireMenuButtons();
