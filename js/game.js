@@ -863,6 +863,7 @@ export class Game {
         ...this.world.drainTutorialReveals(),
         ...this.world.regulars.drainPendingReveals()
       ],
+      discoveries: this.world.drainPendingDiscoveries(),
       tutorialMode: tutMode,
       onResume: () => this._endWaveTransition()
     });

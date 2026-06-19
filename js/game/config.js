@@ -186,6 +186,5 @@ export {
   SERVED_FLIGHT_ARC,
   MINI_SCOOP_RADIUS,
   MINI_CONE_OFFSET_X,
-  MINI_CONE_W,
   MINI_CONE_H
 } from './tuning.js';

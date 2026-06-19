@@ -1,9 +1,10 @@
 // @ts-check
 import { STATE } from '../game/shop.js';
-import { drawScoop } from './playerView.js';
+import { drawScoop, drawConeUnderStack } from './playerView.js';
 import { SCOOP_STATE } from './sprites.js';
 import { SpriteSheet } from './spriteSheet.js';
 import { glowCircle, glowRoundRect } from './glow.js';
+import { CONE_FRAME } from './sprites/coneSprite.js';
 import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 import HUD_SCOOP_SPRITE, { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR } from './powerupVisuals.js';
@@ -11,7 +12,6 @@ import {
   SCOOP_RADIUS,
   MINI_SCOOP_RADIUS,
   MINI_CONE_OFFSET_X,
-  MINI_CONE_W,
   MINI_CONE_H,
   MINI_CONE_FACE_OFFSET_PX,
   SERVED_FLIGHT_ARC,
@@ -274,22 +274,14 @@ export class Stations {
     // submerged they are. faceY already includes the slide-in offset.
     const baseY = faceY + MINI_CONE_FACE_OFFSET_PX;
 
-    // Mini cone.
-    ctx.save();
-    ctx.fillStyle = '#d18a4a';
-    ctx.strokeStyle = '#8a5a2a';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(baseX - MINI_CONE_W / 2, baseY - MINI_CONE_H);
-    ctx.lineTo(baseX + MINI_CONE_W / 2, baseY - MINI_CONE_H);
-    ctx.lineTo(baseX, baseY);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
     const spacing = MINI_SCOOP_RADIUS * 1.6;
     const scale = MINI_SCOOP_RADIUS / SCOOP_RADIUS;
+
+    // The bottom scoop's resting center (i = 0 of the stack below). The layered
+    // cone sprite — the same one the player carries, scaled down — is seated under
+    // it so its bowl nests the scoops, with BACK behind the stack and FRONT over it.
+    const seatY = baseY - MINI_CONE_H - MINI_SCOOP_RADIUS * 0.2;
+    drawConeUnderStack(ctx, baseX, seatY, scale, CONE_FRAME.BACK);
 
     for (let i = 0; i < served.length; i++) {
       const s = served[i];
@@ -313,6 +305,9 @@ export class Stations {
 
       drawScoop(ctx, x, y, s.color, scale * squash, SCOOP_STATE.CONE);
     }
+
+    // Cone FRONT — over the stack, so the bottom scoop nests into the bowl.
+    drawConeUnderStack(ctx, baseX, seatY, scale, CONE_FRAME.FRONT);
   }
 
   _drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, hex, rainbow, alpha = 1 }) {

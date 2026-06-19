@@ -649,6 +649,7 @@ export class TippingMode {
     const g = this.world;
     if (tip === TIP_COIN) {
       g.shop.addScore(TIP_COIN_POINTS);
+      g.challenges.recordCoinCollected();
       g.bus.emit('coin', { x, y, points: TIP_COIN_POINTS });
     } else {
       g.firePower(tip, g.player.x, g.player.stackTopY());

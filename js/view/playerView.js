@@ -24,78 +24,48 @@ const SLOSH_ARC = 6;    // log-arc curvature (higher = sharper bow near the top)
 
 const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'];
 
-// === Cone sprite (layered, grayscale, day-recolored) ========================
-// A back layer + a front layer the scoop stack draws between. The grayscale art
-// is recolored to a warm golden-orange (dimmed by the day cycle). CONE_SPRITE_W
-// is the on-screen art width and CONE_SPRITE_DY nudges it vertically so the bowl
-// meets the bottom scoop — tune these two if the cone reads too big/small or the
-// scoops don't nest right.
+// === Cone sprite (layered) ==================================================
+// A back layer + a front layer the scoop stack draws between. The sheet art is
+// already colorized, so the renderer just blits it — no per-frame recolor.
+// CONE_SPRITE_W is the on-screen art width and CONE_SPRITE_DY nudges it
+// vertically so the bowl meets the bottom scoop — tune these two if the cone
+// reads too big/small or the scoops don't nest right.
 const coneSheet = new SpriteSheet(CONE_SPRITE);
 const CONE_FRAME_PX = CONE_SPRITE.frame.width;        // 256
 const CONE_SPRITE_W = 168;                            // on-screen cone width (px)
 const CONE_SPRITE_DY = -14;                           // sprite-center offset from player.y
-// The cone's daylight color — a vibrant, yellowy-orange waffle (not a dull
-// brown). It's the multiply tint: the light wafer reads as ~this color while the
-// dark grid/outlines stay dark. Bump brighter / more yellow for more pop.
-const CONE_BASE = '#e9931c';
 
-function _lum(hex) {
-  const v = parseInt(hex.slice(1), 16);
-  return 0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255);
-}
-function _scaleHex(hex, f) {
-  const v = parseInt(hex.slice(1), 16);
-  const p = n => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
-  return '#' + p(((v >> 16) & 255) * f) + p(((v >> 8) & 255) * f) + p((v & 255) * f);
-}
-const _DAWN_FLOOR_LUM = _lum('#e8b97a');   // brightest day-cycle floor = full cone brightness
-const _CONE_TINT_STEPS = 13;
+// Bowl seat: how far BELOW the bottom scoop's center the cone-sprite center sits
+// (at scoopScale 1). Derived from the player layout above — CONE_SPRITE_DY +
+// CONE_HEIGHT/2 + the bottom scoop's 0.2r nudge (see scoopPosition) — so any
+// caller can seat a cone of any size under a stack and nest scoops exactly like
+// the player's cone. See drawConeUnderStack (used for the customers' mini-cones).
+const CONE_BOWL_SEAT = CONE_HEIGHT / 2 + CONE_SPRITE_DY + SCOOP_RADIUS * 0.2;
 
 /**
- * The cone's tint for the current time of day: CONE_BASE scaled by the day-cycle
- * floor's brightness (so the cone dims into dusk alongside the sand) but never
- * below 0.40, quantized to a few brightness STEPS so the recolored sprite caches
- * cheaply.
- * @param {string} floorHex the active cycle state's `floor` color
+ * Blit one cone-sheet frame (BACK or FRONT) as a square of side `w` centered at
+ * (cx, cy). The sheet art is already colorized. @returns {boolean} whether it drew.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx @param {number} cy @param {number} w @param {number} frame
  */
-export function coneTintFor(floorHex) {
-  const b = Math.max(0.40, Math.min(1, _lum(floorHex) / _DAWN_FLOOR_LUM));
-  const stepped = Math.round(b * _CONE_TINT_STEPS) / _CONE_TINT_STEPS;
-  return _scaleHex(CONE_BASE, stepped);
-}
-
-// Recolored cone frames, baked once per (frame, tint): the grayscale art
-// multiplied by the tint (the light wafer takes the tint color; the dark
-// grid/outlines stay dark), then clipped back to the sprite's alpha. Bounded by
-// the tint-step count above (≤ a couple dozen small canvases).
-/** @type {Map<string, HTMLCanvasElement>} */
-const _coneCache = new Map();
-function tintedConeFrame(frame, tint) {
-  if (!coneSheet.ready) return null;
-  const key = frame + '|' + tint;
-  const hit = _coneCache.get(key);
-  if (hit) return hit;
+function drawConeFrame(ctx, cx, cy, w, frame) {
+  if (!coneSheet.ready) return false;
   const F = CONE_FRAME_PX;
-  const c = document.createElement('canvas');
-  c.width = c.height = F;
-  const g = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
-  g.drawImage(coneSheet.img, frame * F, 0, F, F, 0, 0, F, F);  // grayscale art
-  g.globalCompositeOperation = 'multiply';
-  g.fillStyle = tint;
-  g.fillRect(0, 0, F, F);
-  g.globalCompositeOperation = 'destination-in';               // keep only the cone's pixels
-  g.drawImage(coneSheet.img, frame * F, 0, F, F, 0, 0, F, F);
-  _coneCache.set(key, c);
-  return c;
+  ctx.drawImage(coneSheet.img, frame * F, 0, F, F, cx - w / 2, cy - w / 2, w, w);
+  return true;
 }
 
-/** Blit a recolored cone frame centered on the cone. @returns {boolean} whether it drew. */
-function drawConeFrame(ctx, player, frame, tint) {
-  const c = tintedConeFrame(frame, tint);
-  if (!c) return false;
-  const w = CONE_SPRITE_W;
-  ctx.drawImage(c, player.x - w / 2, player.y + CONE_SPRITE_DY - w / 2, w, w);
-  return true;
+/**
+ * Draw one cone layer sized + positioned to seat a scoop stack whose bottom
+ * scoop is centered at (scoopX, scoopY) and drawn at `scoopScale` (1 = the
+ * player's full-size scoop). Shared by the player's cone and the customers' held
+ * mini-cones so both nest scoops identically. @returns {boolean} whether it drew.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} scoopX @param {number} scoopY bottom-scoop center (world)
+ * @param {number} scoopScale @param {number} frame one of CONE_FRAME
+ */
+export function drawConeUnderStack(ctx, scoopX, scoopY, scoopScale, frame) {
+  return drawConeFrame(ctx, scoopX, scoopY + CONE_BOWL_SEAT * scoopScale, CONE_SPRITE_W * scoopScale, frame);
 }
 
 /**
@@ -105,9 +75,8 @@ function drawConeFrame(ctx, player, frame, tint) {
  * @param {Player} player
  * @param {boolean} [rainbow] repaint every tray scoop as rainbow (purely visual)
  * @param {number} [alpha] render-interpolation fraction (previous→current x)
- * @param {string} [coneTint] day-recolored cone tint (see coneTintFor)
  */
-export function drawPlayer(ctx, player, rainbow = false, alpha = 1, coneTint = CONE_BASE) {
+export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
   // One translate moves the cone and every scoop riding it together:
   // 1. render interpolation — everything here is positioned off player.x, so
   //    shifting by (drawX − x) draws the whole assembly at the interpolated x;
@@ -129,7 +98,9 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1, coneTint = C
   if (player.flash > 0) {
     glowCircle(ctx, player.x, player.y, CONE_WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
   }
-  const coneReady = drawConeFrame(ctx, player, CONE_FRAME.BACK, coneTint);
+  const coneCx = player.x;
+  const coneCy = player.y + CONE_SPRITE_DY;
+  const coneReady = drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.BACK);
   if (!coneReady) drawTriangleCone(ctx, player);
 
   const stack = player.stack;
@@ -183,7 +154,7 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1, coneTint = C
   }
 
   // Cone FRONT — over the scoops, so the bottom scoop nests into the bowl.
-  if (coneReady) drawConeFrame(ctx, player, CONE_FRAME.FRONT, coneTint);
+  if (coneReady) drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.FRONT);
   ctx.restore();
 
   // Launched-scoop ghosts (committed toss): each rises, stretches tall, and fades

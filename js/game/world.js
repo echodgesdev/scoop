@@ -154,6 +154,9 @@ export class World {
     // Recipes unlocked / mastered during this session — drained on game over.
     /** @type {{ unlocked: string[], mastered: string[] }} */
     this.sessionRecipeEvents = { unlocked: [], mastered: [] };
+    // Recipe ids discovered (first completion) since the last day-end — drained by
+    // the wave transition to flip a reveal coin for each. @type {string[]}
+    this.pendingDiscoveries = [];
 
     // Set by the coordinator each frame: `tutorialActive` = the tutorial is
     // running (disables combos + perfect catches + the combo breaker so it can't
@@ -196,6 +199,13 @@ export class World {
     return out;
   }
 
+  /** Take + clear the recipe ids discovered since the last day-end (reveal coins). */
+  drainPendingDiscoveries() {
+    const out = this.pendingDiscoveries;
+    this.pendingDiscoveries = [];
+    return out;
+  }
+
   /**
    * Reset every model + progression-session counter for a fresh run. Flow,
    * presentation, and the loop are the coordinator's to reset.
@@ -228,6 +238,7 @@ export class World {
     // Wave 0 (the opening tutorial wave) leans harder toward demanded colors.
     this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
     this.sessionRecipeEvents = { unlocked: [], mastered: [] };
+    this.pendingDiscoveries = [];
     this.challenges.resetSession();
     // Tutorial flags clear on every reset; game.start re-applies tutorialSandbox
     // for a Settings replay, and the scripted tutorial sets freezePatience itself.
@@ -408,6 +419,7 @@ export class World {
       if (ev.wasNew) {
         this.sessionRecipeEvents.unlocked.push(ev.id);
         this.challenges.recordDiscover(ev.id);
+        this.pendingDiscoveries.push(ev.id);
         const rec = RECIPE_BY_ID.get(ev.id);
         this.bus.emit('discover', { id: ev.id, name: rec ? rec.name : '' });
       }

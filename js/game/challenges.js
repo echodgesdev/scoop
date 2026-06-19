@@ -215,6 +215,7 @@ export class Challenges {
         /** @type {Record<PickupTypeName, number>} */
         powerupsUsedByType: { heart: 0, feather: 0, pause: 0, rainbow: 0 },
         powerupsUsedTotal: 0,
+        coinTipsCollected: 0,   // lifetime coin tips cashed (Journal coin gauge)
         maxCombo: 0,
         // The campaign now opens on Wave 0 (the tutorial wave), so a fresh save
         // starts below Wave 1 — reaching Wave 1 is a real first milestone.
@@ -351,6 +352,18 @@ export class Challenges {
     this._checkCompletions();
     this._save();
   }
+
+  /** A coin tip was cashed — lifetime count for the Journal coin gauge. */
+  recordCoinCollected() {
+    if (this.frozen) return;
+    this.state.stats.coinTipsCollected = (this.state.stats.coinTipsCollected || 0) + 1;
+    this._save();
+  }
+
+  /** Lifetime times a power-up type was used (Journal gauge, /100). @param {PickupTypeName} type */
+  powerupUsedCount(type) { return this.state.stats.powerupsUsedByType[type] || 0; }
+  /** Lifetime coin tips cashed (Journal gauge, /100). */
+  coinCollectedCount() { return this.state.stats.coinTipsCollected || 0; }
 
   /** @param {number} combo */
   recordCombo(combo) {

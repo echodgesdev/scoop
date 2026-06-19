@@ -20,9 +20,15 @@ const REGULAR_EMPTY_COL = 0;         // column 0 = Empty white "shadow" — show
 /** @type {Map<string, number>} regular name → sprite-sheet row (animation index) */
 const REGULAR_ROW_BY_NAME = new Map(CUSTOMER_SPRITE.animations.map((a, i) => [a.name, i]));
 
-// Recipe-book scoop icon tile (px). The .recipe-scoop background-size in
-// styles.css is 7× this wide × this tall — keep them in step.
-const RECIPE_SCOOP_TILE = 28;
+// Journal coin tuning: a small scoop tile (stacked vertically inside the recipe
+// coin) and the gauge denominators for each collection (recipes use RECIPE_TARGET).
+const JCOIN_SCOOP_TILE = 20;
+const JCOIN_FACE_TILE = 70;           // regular face crop sized to the coin (vs the 120px collection tile)
+const REGULAR_GAUGE_MAX = 50;
+const POWERUP_GAUGE_MAX = 100;
+// Ring-gauge fill colors per collection (powerups use their own token color).
+const REGULAR_RING = '#06d6a0';
+const RECIPE_RING = '#ffb703';
 
 /** @typedef {import('../game/recipes.js').Recipes} Recipes */
 
@@ -61,6 +67,8 @@ export class Hud {
     this.challengesOverlayEl = journalPanel('challenges');
     this.regularsOverlayEl = journalPanel('regulars');
     this.powerupsOverlayEl = journalPanel('powerups');
+    // Tap-a-coin detail popup (lives outside the journal so it layers above it).
+    this.journalDetailEl = document.getElementById('journalDetail');
     this.settingsOverlayEl = settingsOverlayEl;
     this.waveTransitionOverlayEl = waveTransitionOverlayEl;
     this.pauseOverlayEl = pauseOverlayEl;
@@ -98,6 +106,8 @@ export class Hud {
     this._unlockQueueTimer = null;
     /** @type {string[]} regular names to flip-reveal this transition (set in showWaveTransition) */
     this._pendingRegularReveals = [];
+    /** @type {string[]} recipe ids discovered today to flip-reveal (set in showWaveTransition) */
+    this._pendingDiscoveries = [];
     /** @type {'first'|'replay'|null} tutorial-end transition mode (set in showWaveTransition) */
     this._wtTutorialMode = null;
     /** @type {number} the day just completed (for the Week meter / week-complete check) */
@@ -203,7 +213,20 @@ export class Hud {
       this.journalOverlayEl.querySelectorAll('.journal-tab').forEach(tab => {
         tab.addEventListener('click', () => this._setJournalTab(tab.getAttribute('data-tab') || 'recipes'));
       });
+      // Tap a coin → its detail popup (delegated; coins are re-rendered each open).
+      this.journalOverlayEl.addEventListener('click', (e) => {
+        const coin = /** @type {HTMLElement} */ (e.target).closest('.jcoin');
+        if (coin) this.showJournalDetail(coin.getAttribute('data-kind') || '', coin.getAttribute('data-id') || '');
+      });
       this.journalOverlayEl.dataset.tabsWired = '1';
+    }
+    // Journal detail popup: backdrop or Close dismisses it. Wired once.
+    if (this.journalDetailEl && !this.journalDetailEl.dataset.wired) {
+      this.journalDetailEl.addEventListener('click', (e) => {
+        const t = /** @type {HTMLElement} */ (e.target);
+        if (t === this.journalDetailEl || t.closest('.journal-detail-close')) this.hideJournalDetail();
+      });
+      this.journalDetailEl.dataset.wired = '1';
     }
 
     // Settings is a menu item on three overlays (home, game-over card, pause).
@@ -452,20 +475,49 @@ export class Hud {
     const listEl = this.powerupsOverlayEl.querySelector('.powerups-grid');
     if (!listEl) return;
     const tokens = [...PICKUP_TYPES, 'coin'];   // 4 power-ups + the coin cash tip
-    listEl.innerHTML = tokens.map(t => {
-      // Everything unlocks via the challenge sets — the coin tip from Set 1, the
-      // power-ups from later sets. (No challenges store → treat all as unlocked.)
+    listEl.innerHTML = `<div class="jcoin-grid">` + tokens.map(t => {
       const unlocked = !this.challenges
         ? true
         : (t === 'coin' ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
-      const cls = unlocked ? 'powerup-card' : 'powerup-card locked';
-      const desc = unlocked ? (PICKUP_DESC[t] || '') : '🔒 Unlock by clearing challenges';
-      return `<div class="${cls}">
-        <div class="powerup-coin" style="--ring:${PICKUP_RING_COLOR[t]}">${PICKUP_ICONS[t]}</div>
-        <div class="powerup-name">${PICKUP_NAME[t] || t}</div>
-        <div class="powerup-desc">${desc}</div>
-      </div>`;
-    }).join('');
+      const used = !this.challenges ? 0
+        : (t === 'coin' ? this.challenges.coinCollectedCount() : this.challenges.powerupUsedCount(t));
+      const pct = unlocked ? Math.min(100, (used / POWERUP_GAUGE_MAX) * 100) : 0;
+      return this._coinHtml({
+        kind: 'powerup', id: t,
+        inner: `<span class="jcoin-emoji">${PICKUP_ICONS[t]}</span>`,
+        ring: PICKUP_RING_COLOR[t], pct,
+        name: unlocked ? (PICKUP_NAME[t] || t) : '???',
+        locked: !unlocked
+      });
+    }).join('') + `</div>`;
+  }
+
+  // === Journal coin component (shared by recipes / regulars / power-ups) ======
+
+  /** Just the gauge ring + face (no button/name) — reused by the grid + detail popup. */
+  _coinVisual({ inner, ring, pct, badge = '' }) {
+    return `<span class="jcoin-gauge" style="--pct:${pct};--ring:${ring}"><span class="jcoin-face">${inner}</span>${badge}</span>`;
+  }
+
+  /** A tappable coin: gauge ring + face + name. data-kind/id drive the detail popup. */
+  _coinHtml({ kind, id, inner, ring, pct, name, locked, badge = '' }) {
+    return `<button class="jcoin${locked ? ' locked' : ''}" data-kind="${kind}" data-id="${id}">${this._coinVisual({ inner, ring, pct, badge })}<span class="jcoin-name">${name}</span></button>`;
+  }
+
+  /** Regular face cropped from the customer sheet, sized to the coin. */
+  _regularFaceInner(name, unlocked) {
+    const T = JCOIN_FACE_TILE;
+    const row = REGULAR_ROW_BY_NAME.get(name) || 0;
+    const col = unlocked ? REGULAR_FACE_COL : REGULAR_EMPTY_COL;
+    return `<span class="jcoin-face-img${unlocked ? '' : ' locked'}" style="background-position:-${col * T}px -${row * T}px"></span>`;
+  }
+
+  /** Recipe scoops stacked vertically inside a coin (grey blanks when locked). */
+  _coinScoops(colors, locked, size) {
+    const T = JCOIN_SCOOP_TILE;
+    const cols = locked ? Array.from({ length: size }, () => HUD_SCOOP_COL.empty) : colors.map(c => HUD_SCOOP_COL[c]);
+    const scoops = cols.map(col => `<span class="jcoin-scoop${locked ? ' empty' : ''}" style="background-position:-${col * T}px 0"></span>`).join('');
+    return `<span class="jcoin-scoops">${scoops}</span>`;
   }
 
   /**
@@ -479,39 +531,18 @@ export class Hud {
     const listEl = this.regularsOverlayEl.querySelector('.regulars-grid');
     const countEl = this.regularsOverlayEl.querySelector('.regulars-count');
     if (!listEl) return;
-
-    const all = this.regulars.getAll();
     if (countEl) countEl.textContent = `${this.regulars.unlockedCount()} / ${this.regulars.total} unlocked`;
 
-    const T = REGULAR_FACE_TILE;
-    const html = all.map(r => {
-      const row = REGULAR_ROW_BY_NAME.get(r.name) || 0;
-      // Unlocked → Default face (col 1); locked → the Empty white-shadow sprite
-      // (col 0), which CSS colorizes grey.
-      const col = r.unlocked ? REGULAR_FACE_COL : REGULAR_EMPTY_COL;
-      const pos = `background-position:-${col * T}px -${row * T}px`;
-      const cls = r.unlocked ? 'regular-card' : 'regular-card locked';
-      const name = r.unlocked ? r.name : '???';
-      let fav = '';
-      if (r.unlocked) {
-        const recipe = RECIPE_BY_ID.get(r.favoriteRecipe);
-        if (recipe) {
-          const dots = recipe.colors.map(c => `<span class="recipe-swatch" style="background:${COLORS[c]}"></span>`).join('');
-          fav = `<div class="regular-fav"><span class="regular-fav-pre">♥</span>${dots}<span class="regular-fav-name">${recipe.name}</span></div>`;
-        }
-      }
-      const blurb = r.unlocked
-        ? `<div class="regular-blurb">${r.blurb}</div>`
-        : `<div class="regular-blurb locked-hint">Serve them to unlock</div>`;
-      return `<div class="${cls}">
-        <div class="regular-face" style="${pos}"></div>
-        <div class="regular-name">${name}</div>
-        ${fav}
-        ${blurb}
-        <div class="regular-served">Served ${r.served}×</div>
-      </div>`;
-    }).join('');
-    listEl.innerHTML = html;
+    listEl.innerHTML = `<div class="jcoin-grid">` + this.regulars.getAll().map(r => {
+      const pct = r.unlocked ? Math.min(100, (r.served / REGULAR_GAUGE_MAX) * 100) : 0;
+      return this._coinHtml({
+        kind: 'regular', id: r.name,
+        inner: this._regularFaceInner(r.name, r.unlocked),
+        ring: REGULAR_RING, pct,
+        name: r.unlocked ? r.name : '???',
+        locked: !r.unlocked
+      });
+    }).join('') + `</div>`;
   }
 
   _renderRecipes() {
@@ -541,42 +572,104 @@ export class Hud {
         <span class="recipe-section-name">${g.name}</span>
         <span class="recipe-section-total">${mastered} / ${rows.length}</span>
       </div>`);
-      for (const r of rows) html.push(this._renderRecipeRow(r));
+      html.push(`<div class="jcoin-grid">${rows.map(r => this._recipeCoin(r)).join('')}</div>`);
     }
     listEl.innerHTML = html.join('');
   }
 
-  /** A single scoop icon cropped from the HUD scoop sheet. @param {number} col @param {boolean} [empty] */
-  _recipeScoop(col, empty = false) {
-    const T = RECIPE_SCOOP_TILE;
-    const cls = empty ? 'recipe-scoop empty' : 'recipe-scoop';
-    return `<span class="${cls}" style="background-position:-${col * T}px 0"></span>`;
+  /** One recipe coin: scoops stacked vertically, ring = completions / RECIPE_TARGET. */
+  _recipeCoin(r) {
+    const pct = r.locked ? 0 : Math.min(100, (r.count / RECIPE_TARGET) * 100);
+    return this._coinHtml({
+      kind: 'recipe', id: r.id,
+      inner: this._coinScoops(r.colors, r.locked, r.size),
+      ring: RECIPE_RING, pct,
+      name: r.locked ? '???' : r.name,
+      locked: r.locked,
+      badge: (!r.locked && r.mastered) ? '<span class="jcoin-star">⭐</span>' : ''
+    });
+  }
+
+  // === Journal detail popup (tap a coin → the info that used to crowd the card) =
+
+  /** @param {string} kind @param {string} id */
+  showJournalDetail(kind, id) {
+    if (!this.journalDetailEl) return;
+    let html = '';
+    if (kind === 'regular' && this.regulars) {
+      const r = this.regulars.getAll().find(x => x.name === id);
+      if (r) html = this._regularDetailHtml(r);
+    } else if (kind === 'powerup') {
+      html = this._powerupDetailHtml(id);
+    } else if (kind === 'recipe' && this.recipes) {
+      const r = this.recipes.getAll().find(x => x.id === id);
+      if (r) html = this._recipeDetailHtml(r);
+    }
+    if (!html) return;
+    const body = this.journalDetailEl.querySelector('.journal-detail-body');
+    if (body) body.innerHTML = html;
+    this.journalDetailEl.classList.remove('hidden');
+  }
+
+  hideJournalDetail() {
+    if (this.journalDetailEl) this.journalDetailEl.classList.add('hidden');
+  }
+
+  /** @param {{ name: string, unlocked: boolean, served: number, favoriteRecipe: string, blurb: string }} r */
+  _regularDetailHtml(r) {
+    const visual = this._coinVisual({
+      inner: this._regularFaceInner(r.name, r.unlocked), ring: REGULAR_RING,
+      pct: r.unlocked ? Math.min(100, (r.served / REGULAR_GAUGE_MAX) * 100) : 0
+    });
+    if (!r.unlocked) {
+      return `<div class="jdetail-coin locked">${visual}</div><div class="jdetail-name">???</div>
+        <div class="jdetail-line locked-hint">Serve them to unlock</div>`;
+    }
+    let fav = '';
+    const recipe = RECIPE_BY_ID.get(r.favoriteRecipe);
+    if (recipe) {
+      const dots = recipe.colors.map(c => `<span class="recipe-swatch" style="background:${COLORS[c]}"></span>`).join('');
+      fav = `<div class="regular-fav"><span class="regular-fav-pre">♥</span>${dots}<span class="regular-fav-name">${recipe.name}</span></div>`;
+    }
+    return `<div class="jdetail-coin">${visual}</div><div class="jdetail-name">${r.name}</div>
+      ${fav}<div class="jdetail-blurb">${r.blurb}</div>
+      <div class="jdetail-line">Served ${r.served} / ${REGULAR_GAUGE_MAX}</div>`;
+  }
+
+  /** @param {string} t power-up type or 'coin' */
+  _powerupDetailHtml(t) {
+    const unlocked = !this.challenges ? true
+      : (t === 'coin' ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
+    const used = !this.challenges ? 0
+      : (t === 'coin' ? this.challenges.coinCollectedCount() : this.challenges.powerupUsedCount(t));
+    const visual = this._coinVisual({
+      inner: `<span class="jcoin-emoji">${PICKUP_ICONS[t]}</span>`, ring: PICKUP_RING_COLOR[t],
+      pct: unlocked ? Math.min(100, (used / POWERUP_GAUGE_MAX) * 100) : 0
+    });
+    if (!unlocked) {
+      return `<div class="jdetail-coin locked">${visual}</div><div class="jdetail-name">???</div>
+        <div class="jdetail-line locked-hint">🔒 Unlock by clearing challenges</div>`;
+    }
+    return `<div class="jdetail-coin">${visual}</div><div class="jdetail-name">${PICKUP_NAME[t] || t}</div>
+      <div class="jdetail-blurb">${PICKUP_DESC[t] || ''}</div>
+      <div class="jdetail-line">Used ${used} / ${POWERUP_GAUGE_MAX}</div>`;
   }
 
   /** @param {ReturnType<Recipes['getAll']>[number]} r */
-  _renderRecipeRow(r) {
+  _recipeDetailHtml(r) {
+    const visual = this._coinVisual({
+      inner: this._coinScoops(r.colors, r.locked, r.size), ring: RECIPE_RING,
+      pct: r.locked ? 0 : Math.min(100, (r.count / RECIPE_TARGET) * 100),
+      badge: (!r.locked && r.mastered) ? '<span class="jcoin-star">⭐</span>' : ''
+    });
     if (r.locked) {
-      // Unknown recipe: one grey "empty" scoop per slot (the sheet's white scoop,
-      // colorized — same treatment as a locked regular's silhouette).
-      const blanks = Array.from({ length: r.size }, () => this._recipeScoop(HUD_SCOOP_COL.empty, true)).join('');
-      return `<div class="recipe-row locked">
-        <div class="recipe-colors">${blanks}</div>
-        <div class="recipe-name">???</div>
-        <div class="recipe-progress"><div class="recipe-progress-bar" style="width:0%"></div><span class="recipe-progress-text">?/${RECIPE_TARGET}</span></div>
-      </div>`;
+      return `<div class="jdetail-coin locked">${visual}</div><div class="jdetail-name">???</div>
+        <div class="jdetail-line locked-hint">Serve it once to discover it</div>`;
     }
-    const swatches = r.colors.map(c => this._recipeScoop(HUD_SCOOP_COL[c])).join('');
-    const pct = Math.min(100, (r.count / RECIPE_TARGET) * 100);
-    const star = r.mastered ? ' ⭐' : '';
-    const cls = r.mastered ? 'recipe-row mastered' : 'recipe-row';
-    return `<div class="${cls}">
-      <div class="recipe-colors">${swatches}</div>
-      <div class="recipe-name">${r.name}${star}</div>
-      <div class="recipe-progress">
-        <div class="recipe-progress-bar" style="width:${pct}%"></div>
-        <span class="recipe-progress-text">${r.count}/${RECIPE_TARGET}</span>
-      </div>
-    </div>`;
+    const group = GROUP_BY_ID.get(r.group);
+    return `<div class="jdetail-coin">${visual}</div><div class="jdetail-name">${r.name}${r.mastered ? ' ⭐' : ''}</div>
+      <div class="jdetail-blurb">${group ? group.name : ''}</div>
+      <div class="jdetail-line">Completed ${r.count} / ${RECIPE_TARGET}${r.mastered ? ' · Mastered!' : ''}</div>`;
   }
 
   /** @param {number} score */
@@ -874,6 +967,17 @@ export class Hud {
         <div class="wt-reveal-label">New Regular — <b>${item.name}</b>!</div>
       </div>`;
     }
+    if (item.kind === 'recipe') {
+      // A "?" coin that flips to the recipe's scoops stacked vertically.
+      const scoops = this._coinScoops(item.colors || [], false, (item.colors || []).length);
+      return `<div class="wt-reveal-item">
+        <div class="wt-reveal-coin"><div class="wt-reveal-inner">
+          <div class="wt-reveal-face wt-reveal-back wt-reveal-emoji" style="--ring:${RECIPE_RING}">?</div>
+          <div class="wt-reveal-face wt-reveal-front wt-reveal-scoops" style="--ring:${RECIPE_RING}">${scoops}</div>
+        </div></div>
+        <div class="wt-reveal-label">New Flavor — <b>${item.name}</b>!</div>
+      </div>`;
+    }
     const ring = item.ring || '#ffd166';
     return `<div class="wt-reveal-item">
       <div class="wt-reveal-coin"><div class="wt-reveal-inner">
@@ -928,9 +1032,9 @@ export class Hud {
    * starts a 3-second countdown to Resume. Any button click cancels the
    * countdown and converts the centre button to "Play".
    *
-   * @param {{ completedWave: number, completedDayInWeek?: number, weekDays?: number, reveals?: string[], onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
+   * @param {{ completedWave: number, completedDayInWeek?: number, weekDays?: number, reveals?: string[], discoveries?: string[], onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
    */
-  showWaveTransition({ completedWave, completedDayInWeek = 1, weekDays = 7, reveals = [], onResume, tutorialMode = null }) {
+  showWaveTransition({ completedWave, completedDayInWeek = 1, weekDays = 7, reveals = [], discoveries = [], onResume, tutorialMode = null }) {
     if (!this.waveTransitionOverlayEl || !this.challenges) {
       // No overlay markup — resume immediately so the player isn't stuck.
       onResume();
@@ -941,8 +1045,10 @@ export class Hud {
     this._wtDayInWeek = completedDayInWeek;
     this._wtWeekDays = weekDays;
     // The reveals (regulars met today) flip AFTER the cross-offs, together with
-    // any rewards the commit grants — built into one queue in _afterCrossOffs.
+    // any rewards the commit grants + recipes discovered today — built into one
+    // queue in _afterCrossOffs.
     this._pendingRegularReveals = reveals || [];
+    this._pendingDiscoveries = discoveries || [];
     this._clearUnlockQueue();
     const revealEl = this.waveTransitionOverlayEl.querySelector('.wt-reveal');
     if (revealEl) { revealEl.classList.add('hidden'); revealEl.innerHTML = ''; }
@@ -1084,11 +1190,18 @@ export class Hud {
     // The flip queue replaces the old static "🎁 Unlocked" text box — keep it hidden.
     if (rewardsEl) { rewardsEl.classList.add('hidden'); rewardsEl.innerHTML = ''; }
 
+    // Recipes discovered today flip in as coins too (capped so the queue stays short).
+    const discoveryCards = this._pendingDiscoveries.slice(0, 6).map(id => {
+      const rec = RECIPE_BY_ID.get(id);
+      return rec ? { kind: 'recipe', name: rec.name, colors: rec.colors } : null;
+    }).filter(Boolean);
     const queue = [
       ...this._pendingRegularReveals.map(name => ({ kind: 'regular', name })),
-      ...result.rewards.map(r => this._rewardToCard(r)).filter(Boolean)
+      ...result.rewards.map(r => this._rewardToCard(r)).filter(Boolean),
+      ...discoveryCards
     ];
     this._pendingRegularReveals = [];
+    this._pendingDiscoveries = [];
     this._runUnlockQueue(/** @type {any[]} */ (queue), () => this._afterUnlocks(challengesEl));
     // NOTE: commitEarned is idempotent (rewardsClaimed guard), so _endGame's
     // later commit is a no-op. The next set is only revealed by advanceSet(),

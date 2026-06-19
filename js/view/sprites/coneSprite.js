@@ -1,8 +1,8 @@
 // @ts-check
-// Cone sprite sheet — a compound, GRAYSCALE cone that replaces the flat triangle.
-// One row of 4 cells (256px). The art is grayscale so it can be recolored to the
-// scoop brown (and dimmed through the day cycle) by multiply-tinting — see
-// playerView.js. All four frames share the cell, so they overlay exactly.
+// Cone sprite sheet — a compound, colorized cone that replaces the flat triangle.
+// One row of 4 cells (256px). The art is fully colored in the sheet, so the
+// renderer blits it straight (no recolor) — see playerView.js. All four frames
+// share the cell, so they overlay exactly.
 //
 // Frames:
 //   0 REFERENCE — a cone with a scoop in it, showing how scoops nest in the bowl.
