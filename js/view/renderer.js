@@ -20,6 +20,39 @@ import { REACH } from '../game/shop.js';
 const ACTIVE_ARC_FRAC = 0.45;    // 0..this: arc up-and-over to the mid waypoint
 const ACTIVE_PAUSE_FRAC = 0.6;   // arc-frac..this: slight hold at the waypoint
 
+// === Overlay text styling (banner / round-intro / pause / FPS) ===============
+// All of the screen-text styling lives here so it isn't scattered through the
+// draw functions below. The font is built from a size + family; the rest are
+// fills, outlines, and vertical anchors (fractions of canvas height).
+const TITLE_FONT = "'Comic Sans MS', sans-serif";
+const PLAIN_FONT = 'sans-serif';
+const MONO_FONT  = "'Consolas', monospace";
+const boldFont = (px, family = TITLE_FONT) => `bold ${px}px ${family}`;
+
+const TITLE_FILL   = '#fff3c0';            // banner + round-intro words/numbers
+const START_FILL   = '#8ef0a8';            // the round-intro "START!" beat
+const PAUSE_FILL   = '#fff';
+const FPS_FILL     = '#39ff14';
+const TEXT_OUTLINE = 'rgba(0, 0, 0, 0.5)'; // dark stroke behind the big overlay text
+const FPS_OUTLINE  = 'rgba(0, 0, 0, 0.6)';
+const PAUSE_SCRIM  = 'rgba(0, 0, 0, 0.45)';// dim behind the PAUSED label
+const HURT_RGB       = '230, 57, 70';      // damage-flash tint (alpha is dynamic)
+const HURT_MAX_ALPHA = 0.35;
+const HURT_REF_S     = 0.3;                // game.hurt is seeded to ~0.3 on damage
+
+const BANNER_SIZE     = 64;
+const INTRO_NUM_SIZE  = 130;               // "3" / "2" / "1"
+const INTRO_WORD_SIZE = 60;                // "Week N" / "START!"
+const PAUSE_SIZE      = 52;
+const FPS_SIZE        = 20;
+
+const BANNER_Y_FRAC = 0.32;                // text center as a fraction of canvas height
+const INTRO_Y_FRAC  = 0.40;
+const BANNER_FADE_S = 0.4;                 // banner fades in over its final 0.4s
+const START_LABEL   = 'START!';            // round-intro beat that turns green
+const PAUSE_LABEL   = '⏸ PAUSED';
+const FPS_X = 12, FPS_Y = 12;
+
 /**
  * Draw one full frame. READS the game (its actors, effects, flags, banner, …)
  * and paints — never mutates.
@@ -77,56 +110,85 @@ export function drawFrame(ctx, game, alpha = 1) {
 
   if (game.flags.showHitboxes) drawHitboxes(ctx, game);
 
-  if (game.banner) {
-    const f = Math.min(1, game.banner.t / 0.4);
-    ctx.save();
-    ctx.globalAlpha = f;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = "bold 64px 'Comic Sans MS', sans-serif";
-    ctx.lineWidth = 8;
-    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
-    ctx.fillStyle = '#fff3c0';
-    const bx = game.bounds.width / 2 - x;
-    const by = game.bounds.height * 0.32 - y;
-    ctx.strokeText(game.banner.text, bx, by);
-    ctx.fillText(game.banner.text, bx, by);
-    ctx.restore();
-  }
+  // Screen-text overlays + flashes — all still inside the shake transform, so each
+  // counteracts the (x, y) offset to stay screen-fixed.
+  drawBanner(ctx, game, x, y);
+  drawRoundIntro(ctx, game, x, y);
+  drawHurtFlash(ctx, game, x, y);
+  drawPauseOverlay(ctx, game, x, y);
 
-  if (game.hurt > 0) {
-    ctx.fillStyle = `rgba(230, 57, 70, ${0.35 * (game.hurt / 0.3)})`;
-    ctx.fillRect(-x, -y, game.bounds.width, game.bounds.height);
-  }
+  ctx.restore();   // pop the shake transform
 
-  if (game.paused && game.running) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-    ctx.fillRect(-x, -y, game.bounds.width, game.bounds.height);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 52px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('⏸ PAUSED', game.bounds.width / 2 - x, game.bounds.height / 2 - y);
-  }
-  ctx.restore();
-
-  // The active running-power-up indicator (screen-fixed).
+  // Screen-fixed (drawn after the shake transform is popped).
   drawActivePowerup(ctx, game);
+  drawFps(ctx, game);
+}
 
-  // FPS overlay is screen-fixed (drawn after the shake transform is popped).
-  if (game.flags.showFps) {
-    ctx.save();
-    ctx.font = "bold 20px 'Consolas', monospace";
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    const label = `${Math.round(game.fps)} fps  scoops:${game.world.field.scoops.length}`;
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-    ctx.strokeText(label, 12, 12);
-    ctx.fillStyle = '#39ff14';
-    ctx.fillText(label, 12, 12);
-    ctx.restore();
-  }
+/**
+ * Stroke-then-fill one line of text with its own save/restore. The single seam
+ * for every screen-text overlay (banner, round-intro, pause label, FPS readout),
+ * so styling stays in the constants above rather than scattered inline.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {string} text
+ * @param {number} cx @param {number} cy  anchor (interpretation set by align/baseline)
+ * @param {{ font: string, fill: string, stroke?: string, lineWidth?: number, align?: CanvasTextAlign, baseline?: CanvasTextBaseline, alpha?: number }} style
+ */
+function drawText(ctx, text, cx, cy, { font, fill, stroke = TEXT_OUTLINE, lineWidth = 8, align = 'center', baseline = 'middle', alpha = 1 }) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = align;
+  ctx.textBaseline = baseline;
+  ctx.font = font;
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = stroke;
+  ctx.strokeText(text, cx, cy);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, cx, cy);
+  ctx.restore();
+}
+
+/** "DAY N!" / wave banner — fades in over its final BANNER_FADE_S. @param {CanvasRenderingContext2D} ctx @param {Game} game @param {number} ox @param {number} oy */
+function drawBanner(ctx, game, ox, oy) {
+  if (!game.banner) return;
+  const alpha = Math.min(1, game.banner.t / BANNER_FADE_S);
+  drawText(ctx, game.banner.text, game.bounds.width / 2 - ox, game.bounds.height * BANNER_Y_FRAC - oy,
+    { font: boldFont(BANNER_SIZE), fill: TITLE_FILL, alpha });
+}
+
+/** Round-start intro: a big "Week N" title (day 1) then the 3·2·1·START! countdown. @param {CanvasRenderingContext2D} ctx @param {Game} game @param {number} ox @param {number} oy */
+function drawRoundIntro(ctx, game, ox, oy) {
+  const text = game.roundIntroLabel && game.roundIntroLabel();
+  if (!text) return;
+  const isNum = /^[0-9]$/.test(text);
+  drawText(ctx, text, game.bounds.width / 2 - ox, game.bounds.height * INTRO_Y_FRAC - oy, {
+    font: boldFont(isNum ? INTRO_NUM_SIZE : INTRO_WORD_SIZE),
+    fill: text === START_LABEL ? START_FILL : TITLE_FILL,
+    lineWidth: 10
+  });
+}
+
+/** Full-screen red tint when the player just took damage. @param {CanvasRenderingContext2D} ctx @param {Game} game @param {number} ox @param {number} oy */
+function drawHurtFlash(ctx, game, ox, oy) {
+  if (game.hurt <= 0) return;
+  ctx.fillStyle = `rgba(${HURT_RGB}, ${HURT_MAX_ALPHA * (game.hurt / HURT_REF_S)})`;
+  ctx.fillRect(-ox, -oy, game.bounds.width, game.bounds.height);
+}
+
+/** Dim scrim + "⏸ PAUSED" label (debug-panel pause). @param {CanvasRenderingContext2D} ctx @param {Game} game @param {number} ox @param {number} oy */
+function drawPauseOverlay(ctx, game, ox, oy) {
+  if (!(game.paused && game.running)) return;
+  ctx.fillStyle = PAUSE_SCRIM;
+  ctx.fillRect(-ox, -oy, game.bounds.width, game.bounds.height);
+  drawText(ctx, PAUSE_LABEL, game.bounds.width / 2 - ox, game.bounds.height / 2 - oy,
+    { font: boldFont(PAUSE_SIZE, PLAIN_FONT), fill: PAUSE_FILL });
+}
+
+/** Top-left FPS + live-scoop readout (debug). @param {CanvasRenderingContext2D} ctx @param {Game} game */
+function drawFps(ctx, game) {
+  if (!game.flags.showFps) return;
+  const label = `${Math.round(game.fps)} fps  scoops:${game.world.field.scoops.length}`;
+  drawText(ctx, label, FPS_X, FPS_Y,
+    { font: boldFont(FPS_SIZE, MONO_FONT), fill: FPS_FILL, stroke: FPS_OUTLINE, lineWidth: 4, align: 'left', baseline: 'top' });
 }
 
 /**

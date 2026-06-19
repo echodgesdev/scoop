@@ -102,6 +102,10 @@ export class Hud {
     this._wtTutorialMode = null;
     /** @type {number} the day just completed (for the Week meter / week-complete check) */
     this._wtCompletedWave = 0;
+    /** @type {number} completed day's per-week position (1..weekDays) */
+    this._wtDayInWeek = 1;
+    /** @type {number} days per week (meter denominator) */
+    this._wtWeekDays = 7;
     this._wtInterrupted = false;
     /** @type {() => void} */
     this._wtResume = () => {};
@@ -924,9 +928,9 @@ export class Hud {
    * starts a 3-second countdown to Resume. Any button click cancels the
    * countdown and converts the centre button to "Play".
    *
-   * @param {{ completedWave: number, reveals?: string[], onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
+   * @param {{ completedWave: number, completedDayInWeek?: number, weekDays?: number, reveals?: string[], onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
    */
-  showWaveTransition({ completedWave, reveals = [], onResume, tutorialMode = null }) {
+  showWaveTransition({ completedWave, completedDayInWeek = 1, weekDays = 7, reveals = [], onResume, tutorialMode = null }) {
     if (!this.waveTransitionOverlayEl || !this.challenges) {
       // No overlay markup — resume immediately so the player isn't stuck.
       onResume();
@@ -934,6 +938,8 @@ export class Hud {
     }
     this._wtTutorialMode = tutorialMode;
     this._wtCompletedWave = completedWave;
+    this._wtDayInWeek = completedDayInWeek;
+    this._wtWeekDays = weekDays;
     // The reveals (regulars met today) flip AFTER the cross-offs, together with
     // any rewards the commit grants — built into one queue in _afterCrossOffs.
     this._pendingRegularReveals = reveals || [];
@@ -962,7 +968,7 @@ export class Hud {
     const challengesEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-challenges'));
     const rewardsEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-rewards'));
 
-    if (titleEl) titleEl.textContent = `Day ${completedWave} Complete`;
+    if (titleEl) titleEl.textContent = `Day ${completedDayInWeek} Complete`;
     if (subtitleEl) {
       subtitleEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
     }
@@ -1101,8 +1107,7 @@ export class Hud {
     // Tutorial end (first play): the "finish your run to unlock the next set" gate
     // does NOT apply — advance to Set 2 now and transition the panel to it.
     if (mode === 'first' && this.challenges) {
-      this.challenges.advanceSet();
-      this.challenges.setWeekStart(this._wtCompletedWave);   // Week 2 counts from here
+      this.challenges.advanceSet();   // coordinator restarts the week (day/difficulty) on resume
       if (challengesEl) {
         challengesEl.classList.add('fading-out');
         setTimeout(() => {
@@ -1124,16 +1129,16 @@ export class Hud {
     if (mode === 'replay') { this._startWtCountdown(); return; }
 
     // Normal day. Once all of the Week's challenges are done, the panel swaps to
-    // the "Complete the Week" meter (days played toward WEEK_DAYS). When the Week
-    // is fully done — challenges AND the 7th day — advance to next Week's challenges.
-    const day = this._wtCompletedWave;
+    // the "Complete the Week" meter (days played toward weekDays). When the Week is
+    // fully done — challenges AND the 7th day — advance to next Week's challenges
+    // (the coordinator restarts the week's day/difficulty on resume).
+    const days = this._wtDayInWeek, target = this._wtWeekDays;
     if (this.challenges && this.challenges.isCurrentSetComplete() && challengesEl) {
-      const weekDone = this.challenges.isWeekComplete(day);
+      const weekDone = days >= target;
       challengesEl.classList.add('fading-out');
       setTimeout(() => {
         if (weekDone) {
           const advanced = this.challenges.advanceSet();
-          this.challenges.setWeekStart(day);
           const next = advanced ? this.challenges.getCurrentSet() : null;
           if (next) {
             const rows = next.challenges.map(ch => this._renderChallengeRow(ch)).join('');
@@ -1144,11 +1149,10 @@ export class Hud {
             challengesEl.innerHTML = `<div class="wt-new-label">🏆 All Weeks complete!</div>`;
           }
         } else {
-          const wp = this.challenges.weekProgress(day);
           challengesEl.innerHTML =
             `<div class="wt-new-label">Challenges done — finish the Week!</div>` +
-            this._weekMeterHtml(wp) +
-            `<div class="wt-finish-note">Reach Day ${this.challenges.weekTargetDay()} to unlock next week's challenges.</div>`;
+            this._weekMeterHtml({ days, target }) +
+            `<div class="wt-finish-note">Reach Day ${target} to unlock next week's challenges.</div>`;
         }
         challengesEl.classList.remove('fading-out');
         challengesEl.classList.add('fading-in');

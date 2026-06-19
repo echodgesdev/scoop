@@ -24,6 +24,11 @@ import { recipesForWave } from './recipes.js';
 // ends. Count-based (not the phase arithmetic the campaign waves use).
 const WAVE0_GOAL = 11;
 
+// A week is this many days. The per-week DAY (1..WEEK_DAYS) drives difficulty and
+// the recipe-complexity ramp, so both reset every week; the absolute `wave` keeps
+// climbing for sim continuity. Keep in step with WEEK_DAYS in challenges.js.
+const WEEK_DAYS = 7;
+
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').WaveEventName} WaveEventName */
 /** @typedef {import('../types.js').Tuning} Tuning */
@@ -58,7 +63,8 @@ export class Waves {
     this.isDiscovered = isDiscovered || (() => false);
     // Declared here (not just in reset) so checkJs infers plain `number` rather
     // than `number | undefined` — reset() is called below but TS doesn't trace it.
-    this.wave = 0;            // 0 = the tutorial wave; campaign proper is 1+
+    this.wave = 0;            // 0 = the tutorial wave; campaign proper is 1+ (absolute, climbs)
+    this.weekStartWave = 0;   // absolute `wave` the current week began at — dayInWeek = wave − this
     this.phase = 1;           // 1-based, 1..PHASES_PER_WAVE
     this.servedInPhase = 0;
     this.completedPhases = 0; // 0..PHASES_PER_WAVE — phases cleared this wave
@@ -72,6 +78,7 @@ export class Waves {
   /** @param {number} [startWave] 0 = tutorial wave; 1 = skip straight to the campaign. */
   reset(startWave = 0) {
     this.wave = startWave;       // 0 = the tutorial wave; campaign proper is 1+
+    this.weekStartWave = startWave - 1;  // so the opening day reads as dayInWeek 1
     this.phase = 1;              // 1-based, 1..PHASES_PER_WAVE
     this.servedInPhase = 0;
     this.completedPhases = 0;    // 0..PHASES_PER_WAVE — phases cleared this wave
@@ -100,6 +107,32 @@ export class Waves {
     return Math.min(1, this.servedInPhase / this.phaseGoal);
   }
   get isCelebrating()  { return this.celebrating > 0; }
+
+  /**
+   * Per-week day (1..WEEK_DAYS). Difficulty (tuning) and the recipe-complexity
+   * ramp key off this rather than the absolute `wave`, so both restart each week.
+   * The tutorial (wave 0) reads as Day 1.
+   */
+  get dayInWeek() {
+    return Math.max(1, Math.min(WEEK_DAYS, this.wave - this.weekStartWave));
+  }
+
+  /** Days in a week (the meter denominator). */
+  get weekDays() { return WEEK_DAYS; }
+
+  /** Per-week day (1..WEEK_DAYS) for an arbitrary absolute wave (e.g. a completed day). */
+  dayInWeekFor(absWave) {
+    return Math.max(1, Math.min(WEEK_DAYS, absWave - this.weekStartWave));
+  }
+
+  /**
+   * Re-anchor the week to the current day so dayInWeek reads 1 again and the
+   * difficulty/recipe ramp restarts from the easiest. Called by the coordinator
+   * once a Week is completed (challenges done + the 7th day reached).
+   */
+  startNewWeek() {
+    this.weekStartWave = this.wave - 1;
+  }
 
   /**
    * Wave-wide gauge fraction (0..1). Each phase contributes an equal slice of
@@ -208,9 +241,10 @@ export class Waves {
    * @returns {{ recipe: string, colors: ScoopColor[], value: number, weight: number }}
    */
   pickOrder() {
-    const wave = this.wave;
+    const wave = this.wave;          // absolute — only the tutorial (wave 0) special-cases
+    const day = this.dayInWeek;      // per-week day — drives the complexity ramp (resets weekly)
     const unlocked = this.getUnlockedSections() || undefined;
-    let pool = recipesForWave(wave, unlocked);
+    let pool = recipesForWave(day, unlocked);
     // Wave 0: never hand out a color the player has already served, so each of
     // the five junior flavors comes up exactly once.
     if (wave === 0 && this.servedColors.size > 0) {
@@ -233,7 +267,7 @@ export class Waves {
       else bySize.set(r.size, [r]);
     }
     const sizes = [...bySize.keys()];
-    const weights = ORDER_SIZE_WEIGHTS[Math.min(wave, ORDER_SIZE_WEIGHTS.length - 1)] || {};
+    const weights = ORDER_SIZE_WEIGHTS[Math.min(day, ORDER_SIZE_WEIGHTS.length - 1)] || {};
     let chosenSize = sizes[0];
     const sizeWeights = sizes.map(s => Math.max(0, weights[s] != null ? weights[s] : 1));
     const total = sizeWeights.reduce((a, b) => a + b, 0);
@@ -251,7 +285,7 @@ export class Waves {
     // 2. Discovery bias (waves 1+): bigger waves favor surfacing recipes the
     //    player hasn't made yet, so the catalog keeps opening up.
     if (wave > 0) {
-      const bias = lerp(DISCOVERY_BIAS_START, DISCOVERY_BIAS_END, Math.min(1, (wave - 1) / WAVE_RAMP));
+      const bias = lerp(DISCOVERY_BIAS_START, DISCOVERY_BIAS_END, Math.min(1, (day - 1) / WAVE_RAMP));
       if (bias > 0 && Math.random() < bias) {
         const undiscovered = candidates.filter(r => !this.isDiscovered(r.id));
         if (undiscovered.length > 0) candidates = undiscovered;
@@ -273,7 +307,8 @@ export class Waves {
    * @returns {Tuning}
    */
   tuning(escalate = true) {
-    const s = escalate ? Math.min(1, (this.wave - 1) / WAVE_RAMP) : 0;
+    // Ramp keys off the per-week day, so difficulty resets to easiest each week.
+    const s = escalate ? Math.min(1, (this.dayInWeek - 1) / WAVE_RAMP) : 0;
     return {
       spawnInterval: lerp(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, s),
       fallMult:      lerp(1, FALL_SPEED_MULT_END, s),

@@ -51,6 +51,11 @@ const MAX_FRAME = 0.25;
 // Between-wave reset beat: a sped-up night cycle (sunset→midnight→dawn, crescent
 // moon arcing across) that plays after the cashout and before the wave overlay.
 const NIGHT_CYCLE_S = 2.8;   // slightly slower: room for the day-start beat (cone recenters, day # rolls over)
+// Round-start intro beats (seconds): an optional "Week N" title (day 1 of a week),
+// then a 3·2·1·START! countdown. The sim is frozen for the whole intro.
+const ROUND_INTRO_WEEK_S = 1.3;
+const ROUND_INTRO_BEAT_S = 0.65;   // each of "3", "2", "1"
+const ROUND_INTRO_START_S = 0.75;  // "START!"
 
 export class Game {
   constructor() {
@@ -155,10 +160,17 @@ export class Game {
     // right before the next wave). nightT drives the fast sky sweep + moon arc.
     this.inNightCycle = false;
     this.nightT = 0;
-    // The day number the HUD gauge SHOWS. It lags the sim's live wave: a completed
-    // day holds (full) through cashout/transition/night and only rolls over to the
-    // new day when the night sweep lands. See _syncHud + the night-cycle completion.
-    this._shownWave = 1;
+    // True from the moment a day completes (waveUp) until the night sweep lands —
+    // while set, the HUD gauge HOLDS the finished day (full) instead of rolling the
+    // day number over early. Cleared at night-cycle completion. See _syncHud.
+    this._dayRolling = false;
+    // Round-start intro: a brief "Week N → 3·2·1·START!" beat that freezes the sim
+    // (no scoops/customers) until it ends. Runs at each day's start (after the night
+    // sweep) and on the first campaign day; skipped during the scripted tutorial.
+    this.inRoundIntro = false;
+    this.roundIntroT = 0;
+    /** @type {string | null} week title shown before the countdown (day 1 only) */
+    this.roundIntroWeekTitle = null;
     // Dedicated "Esc" pause menu — separate from the debug-panel pause.
     this.inPauseMenu = false;
     // Set once the game-over panel is up. Stepping is dead, but effects keep
@@ -249,8 +261,9 @@ export class Game {
     // (emits waveUp / gameOver); the coordinator runs the timed flow.
     this.bus.on('waveUp', ({ wave }) => {
       // The wave just completed is (wave - 1) since waves.onServed already
-      // incremented. Let the wave-up banner read, then run the cashout, which
-      // opens the transition overlay when it ends.
+      // incremented. Hold the HUD day number (it rolls over at night-end), let the
+      // banner read, then run the cashout, which opens the transition overlay.
+      this._dayRolling = true;
       const completedWave = Math.max(1, (wave || 1) - 1);
       setTimeout(() => this._runWaveCashout(completedWave), 700);
     });
@@ -459,8 +472,8 @@ export class Game {
     const replaySandbox = forceTutorial && this.world.challenges.firstSetCleared();
     this.world.challenges.setFrozen(replaySandbox);
     // Weeks now advance MID-RUN when a Week is completed (all challenges done AND
-    // the 7th day reached — see Challenges.isWeekComplete), so there's no longer a
-    // "reveal the next set at game start" step here.
+    // the 7th day reached — handled by the coordinator + Waves), so there's no
+    // longer a "reveal the next set at game start" step here.
     // Day 0 (the tutorial) only plays until the first challenge set is cleared —
     // after that we jump straight to Day 1. "How to Play" and the debug "force
     // tutorial" flag override and replay it.
@@ -468,9 +481,8 @@ export class Game {
     // Reset the simulation (models + progression-session counters). The mode is
     // rebuilt inside, so re-derive the presentation tutorial from it afterward.
     this.world.reset(playWave0);
-    // Anchor the Week day-count just BELOW the run's opening day, so completing the
-    // opening day reads as "Day 1 / 7" and the 7th completed day fills the meter.
-    this.world.challenges.setWeekStart(this.world.waves.wave - 1);
+    // (The per-week day-count is anchored by Waves.reset → weekStartWave, so the
+    // opening day reads as Day 1; nothing to set here.)
     // Sandbox flag lives on World (the tip roller reads it); set after reset so a
     // prior run's value never leaks. Remember the run's tutorial mode for the
     // day-end transition (first play → auto-advance to Set 2; replay → no change).
@@ -487,7 +499,8 @@ export class Game {
     this.inNightCycle = false;
     this.inGameOver = false;
     this.nightT = 0;
-    this._shownWave = this.world.waves.wave;
+    this._dayRolling = false;
+    this.inRoundIntro = false;
 
     this._syncHud();
 
@@ -495,6 +508,8 @@ export class Game {
     // is actually in play.
     if (playWave0) this.tutorial.start(this);
     this._syncDayHint();
+    // Day-start beat for the opening campaign day (skipped while the tutorial runs).
+    this._startRoundIntro();
 
     this.loop.start({
       shouldStep: () => this._stepping(),
@@ -539,12 +554,12 @@ export class Game {
   _syncHud() {
     this.hud.setScore(this.world.shop.score);
     this.hud.setHealth(this.world.health / MAX_HEALTH);
-    // Deferred day rollover: while the live wave is ahead of the shown one (the day
-    // completed but the night sweep hasn't landed yet), hold the OLD day number with
-    // a full gauge. _shownWave catches up when the night cycle finishes.
-    const live = this.world.waves.wave;
-    const ahead = live > this._shownWave;
-    this.hud.setGauge(this._shownWave, ahead ? 1 : this.world.waves.waveFraction);
+    // Deferred day rollover: while a finished day is "rolling over" (cashout →
+    // transition → night sweep), HOLD the gauge so the per-week day number doesn't
+    // change until the night lands. It resumes (showing the new day) at night-end.
+    if (!this._dayRolling) {
+      this.hud.setGauge(this.world.waves.dayInWeek, this.world.waves.waveFraction);
+    }
     this._syncComboHud();
   }
 
@@ -580,7 +595,7 @@ export class Game {
    */
   _stepping() {
     return this.running && !this.paused && !this.inWaveTransition &&
-      !this.inPauseMenu && !this.inCashout && !this.inNightCycle;
+      !this.inPauseMenu && !this.inCashout && !this.inNightCycle && !this.inRoundIntro;
   }
 
   /**
@@ -608,13 +623,20 @@ export class Game {
       if (this.nightT >= 1) {
         this.nightT = 1;
         this.inNightCycle = false;
-        // Night sweep done — NOW roll the HUD day number over to the new day, and
-        // announce it. The per-day power-up counter resets here too (after the
-        // transition has committed the finished day's challenges).
-        this._shownWave = this.world.waves.wave;
+        // Night sweep done — release the gauge hold so the new day's number shows,
+        // and reset the per-day power-up counter (after the transition committed the
+        // finished day's challenges). The day-start beat (Week title + countdown) is
+        // kicked off here.
+        this._dayRolling = false;
         this.world.challenges.recordWaveEnded();
-        this.banner = { text: `DAY ${this.world.waves.wave}!`, t: 1.6 };
+        this._startRoundIntro();
       }
+    }
+
+    // Round-start intro countdown (frozen sim): advance and release at START.
+    if (this.inRoundIntro) {
+      this.roundIntroT += frame;
+      if (this.roundIntroT >= this._roundIntroDuration()) this.inRoundIntro = false;
     }
     // Visual-only systems run variable-step — including during the cashout /
     // night-cycle freezes, so particle pops keep animating while play is paused,
@@ -772,6 +794,40 @@ export class Game {
   }
 
   /**
+   * Kick off the round-start intro: a "Week N" title (only on day 1 of a week)
+   * followed by a 3·2·1·START! countdown. The sim is frozen for its duration
+   * (no scoops, no customers) and resumes at START. Skipped during the scripted
+   * tutorial, which paces itself.
+   */
+  _startRoundIntro() {
+    if (this.tutorial.active) { this.inRoundIntro = false; return; }
+    this.inRoundIntro = true;
+    this.roundIntroT = 0;
+    const set = this.world.challenges.getCurrentSet();
+    this.roundIntroWeekTitle = (this.world.waves.dayInWeek === 1 && set)
+      ? `Week ${set.index + 1}` : null;
+  }
+
+  _roundIntroDuration() {
+    const titleS = this.roundIntroWeekTitle ? ROUND_INTRO_WEEK_S : 0;
+    return titleS + ROUND_INTRO_BEAT_S * 3 + ROUND_INTRO_START_S;
+  }
+
+  /** The current big intro text ("Week N" / "3" / "2" / "1" / "START!"), or null. */
+  roundIntroLabel() {
+    if (!this.inRoundIntro) return null;
+    let t = this.roundIntroT;
+    if (this.roundIntroWeekTitle) {
+      if (t < ROUND_INTRO_WEEK_S) return this.roundIntroWeekTitle;
+      t -= ROUND_INTRO_WEEK_S;
+    }
+    if (t < ROUND_INTRO_BEAT_S) return '3';
+    if (t < ROUND_INTRO_BEAT_S * 2) return '2';
+    if (t < ROUND_INTRO_BEAT_S * 3) return '1';
+    return 'START!';
+  }
+
+  /**
    * Pauses gameplay and asks the HUD to run the between-wave overlay:
    * cross-off animation for any earned challenges, optional fade-in of a
    * newly-unlocked set, then a countdown / Play button. Resumes when the
@@ -785,6 +841,10 @@ export class Game {
     // so flush any in-flight pop-text / bursts now — otherwise they'd hang
     // motionless behind the overlay until the next wave resumes.
     this.effects.reset();
+    // Snapshot the week so _endWaveTransition can detect a mid-run week advance
+    // (and then reset the day/difficulty for the new week).
+    const curSet = this.world.challenges.getCurrentSet();
+    this._weekBefore = curSet ? curSet.index : Infinity;
     // The Day-0 → Day-1 transition is the tutorial end: 'first' (real play) auto-
     // advances to Set 2; 'replay' (sandbox) leaves challenges untouched. Any later
     // day is a normal transition (null).
@@ -793,6 +853,9 @@ export class Game {
       : null;
     this.hud.showWaveTransition({
       completedWave,
+      // The completed day's per-week position (1..7) drives the "Complete the Week" meter.
+      completedDayInWeek: this.world.waves.dayInWeekFor(completedWave),
+      weekDays: this.world.waves.weekDays,
       // Regulars to flip-reveal this day: the Day-0 tutorial's first starters,
       // then any mystery regular unlocked (served) today. The HUD plays them — and
       // the challenge rewards — as a one-at-a-time coin-flip queue after cross-offs.
@@ -810,6 +873,11 @@ export class Game {
     // challenges, close the overlay, then run the night-cycle reset, which
     // hands off to the next wave when it finishes.
     this.world.challenges.commitEarned();
+    // If the week advanced during the transition (challenges done + 7th day, or the
+    // tutorial graduating), restart the week: day # → 1 and difficulty → easiest.
+    const curSet = this.world.challenges.getCurrentSet();
+    const weekNow = curSet ? curSet.index : Infinity;
+    if (weekNow > (this._weekBefore ?? -1)) this.world.waves.startNewWeek();
     this.inWaveTransition = false;
     this.hud.hideWaveTransition();
     this._runNightCycle();
@@ -835,7 +903,7 @@ export class Game {
       title,
       this.world.shop.score,
       this.world.shop.bestCombo,
-      this.world.waves.wave,
+      this.world.waves.dayInWeek,
       () => this.start(),
       this.world.sessionRecipeEvents
     );
