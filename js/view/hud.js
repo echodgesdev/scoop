@@ -1152,12 +1152,21 @@ export class Hud {
     }
   }
 
-  /** Markup for the "Complete the Week" meter — a filled bar + "Day N / 7" count. */
+  /**
+   * The "Complete the Week" meter, styled as a challenge row (icon + title +
+   * progress bar + count) so it reads consistently with the challenges above it.
+   */
   _weekMeterHtml(wp) {
     const pct = Math.min(100, (wp.days / wp.target) * 100);
-    return `<div class="week-meter">
-      <div class="week-meter-fill" style="width:${pct}%"></div>
-      <span class="week-meter-text">Day ${wp.days} / ${wp.target}</span>
+    return `<div class="challenge-row">
+      <span class="challenge-icon">📅</span>
+      <div class="challenge-body">
+        <div class="challenge-title">Complete the Week</div>
+        <div class="challenge-progress">
+          <div class="challenge-progress-bar" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div class="challenge-count">${wp.days}/${wp.target}</div>
     </div>`;
   }
 

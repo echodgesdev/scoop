@@ -1,5 +1,6 @@
 // @ts-check
 import { PICKUP_TYPE } from './game/config.js';
+import { recipeIdFor, RECIPE_BY_ID } from './game/recipes.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
@@ -13,11 +14,12 @@ import { PICKUP_TYPE } from './game/config.js';
 export function wireReactions(game) {
   game.bus.on('catch', ({ scoop, perfect }) => {
     if (perfect) {
+      // Perfect catch: keep the burst + ding + flash, but no "Perfect!" word —
+      // floating text is reserved for the recipe name on serve.
       const top = { x: scoop.x, y: game.world.player.stackTopY() };
       game.sound.perfect();
       game.haptics.catch_();
       game.effects.burst(top.x, top.y, ['#fff', game.world.shop.hex(scoop.color)], 10);
-      game.effects.popText(top.x, top.y - 24, 'Perfect!', { color: '#ffec5c', size: 22, life: 0.7 });
       game.world.player.triggerFlash(0.25);
     } else {
       game.sound.catch_();
@@ -31,11 +33,15 @@ export function wireReactions(game) {
     game.hurt = 0.2;
   });
 
+  // Order completed: confetti burst at the customer, but the one floating label is
+  // the RECIPE NAME, popped at the cone (the player's locus). Points ride the HUD
+  // score; the combo rides the HUD combo meter — no extra floating text.
   game.bus.on('serve', ({ gained, colors, combo, x, y }) => {
     game.effects.burst(x, y, colors.map(c => game.world.shop.hex(c)));
-    game.effects.popText(x, y, `+${gained}`, { color: '#ffec5c', size: 28 });
-    if (combo > 1) {
-      game.effects.popText(x, y - 30, `${combo}× combo!`, { color: '#ff6fa3', size: 20, life: 0.8 });
+    const recipe = RECIPE_BY_ID.get(recipeIdFor(colors));
+    if (recipe) {
+      const cx = game.world.player.x, cy = game.world.player.stackTopY();
+      game.effects.popText(cx, cy - 30, recipe.name, { color: '#fff3c0', size: 24, life: 1.0 });
     }
     game.world.player.triggerFlash();
     game.effects.addShake(6);
