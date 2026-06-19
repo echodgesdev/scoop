@@ -36,22 +36,31 @@ function loadBest() {
 export class Hud {
   constructor({
     scoreEl, comboEl, healthFillEl, overlayEl, gaugeEl, flashEl,
-    recipesOverlayEl, challengesOverlayEl, regularsOverlayEl, powerupsOverlayEl, settingsOverlayEl,
+    journalOverlayEl, settingsOverlayEl,
     waveTransitionOverlayEl, pauseOverlayEl, challengeToastEl,
     recipes, challenges, regulars, sound, onStart, onHowToPlay, getInGame,
     getVolume, onSetVolume, getSensitivity, onSetSensitivity,
-    getHaptics, onSetHaptics, onResetProgress, onPauseToggle
+    getHaptics, onSetHaptics, onResetProgress, onPauseToggle, onHome
   }) {
     this.scoreEl = scoreEl;
     this.comboEl = comboEl;
     this.healthFillEl = healthFillEl;
     this.overlayEl = overlayEl;
+    // Snapshot the title markup now (from index.html) so Home can rebuild it —
+    // showGameOver overwrites overlayEl's contents with the game-over card.
+    this._titleHtml = overlayEl ? overlayEl.innerHTML : '';
     this.gaugeEl = gaugeEl;
     this.flashEl = flashEl;
-    this.recipesOverlayEl = recipesOverlayEl;
-    this.challengesOverlayEl = challengesOverlayEl;
-    this.regularsOverlayEl = regularsOverlayEl;
-    this.powerupsOverlayEl = powerupsOverlayEl;
+    // One Journal hub holds the four collection panels. Derive each panel element
+    // so the existing _render* methods (which query within their panel) are reused
+    // verbatim — the panels keep the original .recipes-list / .regulars-grid / etc.
+    this.journalOverlayEl = journalOverlayEl;
+    const journalPanel = (tab) => journalOverlayEl
+      ? journalOverlayEl.querySelector(`.journal-panel[data-tab="${tab}"]`) : null;
+    this.recipesOverlayEl = journalPanel('recipes');
+    this.challengesOverlayEl = journalPanel('challenges');
+    this.regularsOverlayEl = journalPanel('regulars');
+    this.powerupsOverlayEl = journalPanel('powerups');
     this.settingsOverlayEl = settingsOverlayEl;
     this.waveTransitionOverlayEl = waveTransitionOverlayEl;
     this.pauseOverlayEl = pauseOverlayEl;
@@ -123,6 +132,8 @@ export class Hud {
     this.onResetProgress = onResetProgress || (() => {});
     /** @type {() => void} — opens (or closes) the pause menu from the in-game ⏸ button. */
     this.onPauseToggle = onPauseToggle || (() => {});
+    /** @type {() => void} — abandon the current run and return to the title screen. */
+    this.onHome = onHome || (() => {});
     this.best = loadBest();
 
     // Initial state: title screen is visible so the HUD should be faded out
@@ -165,34 +176,28 @@ export class Hud {
       howBtn.dataset.wired = '1';
     }
 
-    const recipesBtn = document.getElementById('recipesBtn');
-    if (recipesBtn) recipesBtn.addEventListener('click', () => this.showRecipes());
+    // Journal hub: one button that opens the tabbed collections. #journalBtn is
+    // recreated on the title + game-over overlays, so (like #startBtn) it re-wires
+    // itself each call — no dataset guard.
+    const journalBtn = document.getElementById('journalBtn');
+    if (journalBtn) journalBtn.addEventListener('click', () => this.showJournal());
 
-    const closeBtn = document.getElementById('closeRecipesBtn');
-    if (closeBtn) closeBtn.addEventListener('click', () => this.hideRecipes());
+    // 🏠 Home on the game-over card (recreated each showGameOver, like #journalBtn,
+    // so it re-wires each call). The run already ended here — no confirm.
+    const homeBtn = document.getElementById('homeBtn');
+    if (homeBtn) homeBtn.addEventListener('click', () => this.onHome());
 
-    const challengesBtn = document.getElementById('challengesBtn');
-    if (challengesBtn) challengesBtn.addEventListener('click', () => this.showChallenges());
-
-    const closeChallengesBtn = document.getElementById('closeChallengesBtn');
-    if (closeChallengesBtn) closeChallengesBtn.addEventListener('click', () => this.hideChallenges());
-
-    const regularsBtn = document.getElementById('regularsBtn');
-    if (regularsBtn) regularsBtn.addEventListener('click', () => this.showRegulars());
-
-    const closeRegularsBtn = document.getElementById('closeRegularsBtn');
-    if (closeRegularsBtn && !closeRegularsBtn.dataset.wired) {
-      closeRegularsBtn.addEventListener('click', () => this.hideRegulars());
-      closeRegularsBtn.dataset.wired = '1';
+    // Close + tab buttons live in the persistent Journal markup — wire once.
+    const closeJournalBtn = document.getElementById('closeJournalBtn');
+    if (closeJournalBtn && !closeJournalBtn.dataset.wired) {
+      closeJournalBtn.addEventListener('click', () => this.hideJournal());
+      closeJournalBtn.dataset.wired = '1';
     }
-
-    const powerupsBtn = document.getElementById('powerupsBtn');
-    if (powerupsBtn) powerupsBtn.addEventListener('click', () => this.showPowerups());
-
-    const closePowerupsBtn = document.getElementById('closePowerupsBtn');
-    if (closePowerupsBtn && !closePowerupsBtn.dataset.wired) {
-      closePowerupsBtn.addEventListener('click', () => this.hidePowerups());
-      closePowerupsBtn.dataset.wired = '1';
+    if (this.journalOverlayEl && !this.journalOverlayEl.dataset.tabsWired) {
+      this.journalOverlayEl.querySelectorAll('.journal-tab').forEach(tab => {
+        tab.addEventListener('click', () => this._setJournalTab(tab.getAttribute('data-tab') || 'recipes'));
+      });
+      this.journalOverlayEl.dataset.tabsWired = '1';
     }
 
     // Settings is a menu item on three overlays (home, game-over card, pause).
@@ -258,25 +263,17 @@ export class Hud {
       pauseResumeBtn.addEventListener('click', () => this._pauseResume());
       pauseResumeBtn.dataset.wired = '1';
     }
-    const pauseRecipesBtn = document.getElementById('pauseRecipesBtn');
-    if (pauseRecipesBtn && !pauseRecipesBtn.dataset.wired) {
-      pauseRecipesBtn.addEventListener('click', () => this.showRecipes());
-      pauseRecipesBtn.dataset.wired = '1';
+    const pauseJournalBtn = document.getElementById('pauseJournalBtn');
+    if (pauseJournalBtn && !pauseJournalBtn.dataset.wired) {
+      pauseJournalBtn.addEventListener('click', () => this.showJournal());
+      pauseJournalBtn.dataset.wired = '1';
     }
-    const pauseChallengesBtn = document.getElementById('pauseChallengesBtn');
-    if (pauseChallengesBtn && !pauseChallengesBtn.dataset.wired) {
-      pauseChallengesBtn.addEventListener('click', () => this.showChallenges());
-      pauseChallengesBtn.dataset.wired = '1';
-    }
-    const pauseRegularsBtn = document.getElementById('pauseRegularsBtn');
-    if (pauseRegularsBtn && !pauseRegularsBtn.dataset.wired) {
-      pauseRegularsBtn.addEventListener('click', () => this.showRegulars());
-      pauseRegularsBtn.dataset.wired = '1';
-    }
-    const pausePowerupsBtn = document.getElementById('pausePowerupsBtn');
-    if (pausePowerupsBtn && !pausePowerupsBtn.dataset.wired) {
-      pausePowerupsBtn.addEventListener('click', () => this.showPowerups());
-      pausePowerupsBtn.dataset.wired = '1';
+    const pauseHomeBtn = document.getElementById('pauseHomeBtn');
+    if (pauseHomeBtn && !pauseHomeBtn.dataset.wired) {
+      pauseHomeBtn.addEventListener('click', () => {
+        if (window.confirm('Quit this run and return to the title? Your current score will be lost.')) this.onHome();
+      });
+      pauseHomeBtn.dataset.wired = '1';
     }
 
     const resetBtn = document.getElementById('resetProgressBtn');
@@ -288,23 +285,54 @@ export class Hud {
           this._renderRecipes();
           this._renderChallenges();
           this._renderRegulars();
+          this._renderPowerups();
         }
       });
       resetBtn.dataset.wired = '1';
     }
   }
 
-  /** Render the full challenges page and reveal the modal. */
-  showChallenges() {
-    this._renderChallenges();
-    if (this.challengesOverlayEl) this.challengesOverlayEl.classList.remove('hidden');
-    const btn = document.getElementById('challengesBtn');
-    if (btn) btn.classList.remove('flash');
+  // === Journal hub (tabbed collections) =====================================
+
+  /**
+   * Open the Journal hub to a given tab (recipes | regulars | powerups |
+   * challenges) and clear the CTA flash. The four show* methods are thin deep-link
+   * wrappers so existing callers (wave-transition, game-over CTA) keep working.
+   * @param {string} [tab]
+   */
+  showJournal(tab = 'recipes') {
+    this._setJournalTab(tab);
+    if (this.journalOverlayEl) this.journalOverlayEl.classList.remove('hidden');
+    const jb = document.getElementById('journalBtn');
+    if (jb) jb.classList.remove('flash');
+    const pjb = document.getElementById('pauseJournalBtn');
+    if (pjb) pjb.classList.remove('flash');
   }
 
-  hideChallenges() {
-    if (this.challengesOverlayEl) this.challengesOverlayEl.classList.add('hidden');
+  hideJournal() {
+    if (this.journalOverlayEl) this.journalOverlayEl.classList.add('hidden');
   }
+
+  /**
+   * Activate a Journal tab + its panel, then render that panel's content (so a
+   * tab only renders when first shown / re-shown). @param {string} tab
+   */
+  _setJournalTab(tab) {
+    if (!this.journalOverlayEl) return;
+    const valid = ['recipes', 'regulars', 'powerups', 'challenges'];
+    if (!valid.includes(tab)) tab = 'recipes';
+    this.journalOverlayEl.querySelectorAll('.journal-tab').forEach(t =>
+      t.classList.toggle('active', t.getAttribute('data-tab') === tab));
+    this.journalOverlayEl.querySelectorAll('.journal-panel').forEach(p =>
+      p.classList.toggle('active', p.getAttribute('data-tab') === tab));
+    if (tab === 'recipes') this._renderRecipes();
+    else if (tab === 'regulars') this._renderRegulars();
+    else if (tab === 'powerups') this._renderPowerups();
+    else if (tab === 'challenges') this._renderChallenges();
+  }
+
+  /** Deep-link wrapper → open the Journal to the Challenges tab. */
+  showChallenges() { this.showJournal('challenges'); }
 
   /**
    * Master-list view: every set rendered as a section, with the player's
@@ -402,37 +430,10 @@ export class Hud {
     </div>`;
   }
 
-  /** Render the book and reveal the modal. Drops the CTA flash if it was on. */
-  showRecipes() {
-    this._renderRecipes();
-    if (this.recipesOverlayEl) this.recipesOverlayEl.classList.remove('hidden');
-    const recipesBtn = document.getElementById('recipesBtn');
-    if (recipesBtn) recipesBtn.classList.remove('flash');
-  }
-
-  hideRecipes() {
-    if (this.recipesOverlayEl) this.recipesOverlayEl.classList.add('hidden');
-  }
-
-  /** Render the regulars collection and reveal the modal. */
-  showRegulars() {
-    this._renderRegulars();
-    if (this.regularsOverlayEl) this.regularsOverlayEl.classList.remove('hidden');
-  }
-
-  hideRegulars() {
-    if (this.regularsOverlayEl) this.regularsOverlayEl.classList.add('hidden');
-  }
-
-  /** Render the power-up reference and reveal the modal. */
-  showPowerups() {
-    this._renderPowerups();
-    if (this.powerupsOverlayEl) this.powerupsOverlayEl.classList.remove('hidden');
-  }
-
-  hidePowerups() {
-    if (this.powerupsOverlayEl) this.powerupsOverlayEl.classList.add('hidden');
-  }
+  /** Deep-link wrappers → open the Journal to a specific tab. */
+  showRecipes()  { this.showJournal('recipes'); }
+  showRegulars() { this.showJournal('regulars'); }
+  showPowerups() { this.showJournal('powerups'); }
 
   /**
    * Reference grid: one coin-style card per tip token — the four power-ups plus
@@ -688,6 +689,23 @@ export class Hud {
   hideOverlay() {
     this.overlayEl.classList.add('hidden');
     this._setMenuVisible(false);
+  }
+
+  /**
+   * Rebuild + show the title screen and hide every other menu — the Home target.
+   * showGameOver replaced the start markup with the game-over card, so restore the
+   * snapshot taken at construction, then re-wire and refresh the best-score line.
+   */
+  showTitle() {
+    this.hideJournal();
+    this.hideSettings();
+    this.hidePauseMenu();
+    this.hideWaveTransition();
+    this.overlayEl.innerHTML = this._titleHtml;
+    this._setMenuVisible(true);
+    this.overlayEl.classList.remove('hidden');
+    this._wireMenuButtons();
+    this.showTitleBest();
   }
 
   /**
@@ -1168,8 +1186,7 @@ export class Hud {
   _wireWaveTransitionButtons() {
     if (!this.waveTransitionOverlayEl) return;
     const playBtn = this.waveTransitionOverlayEl.querySelector('.wt-play-btn');
-    const recipesBtn = this.waveTransitionOverlayEl.querySelector('.wt-recipes-btn');
-    const challengesBtn = this.waveTransitionOverlayEl.querySelector('.wt-challenges-btn');
+    const journalBtn = this.waveTransitionOverlayEl.querySelector('.wt-journal-btn');
 
     // Idempotent listener attach via dataset flag.
     if (playBtn && !(/** @type {HTMLElement} */ (playBtn).dataset.wired)) {
@@ -1179,23 +1196,23 @@ export class Hud {
       });
       /** @type {HTMLElement} */ (playBtn).dataset.wired = '1';
     }
-    if (recipesBtn && !(/** @type {HTMLElement} */ (recipesBtn).dataset.wired)) {
-      recipesBtn.addEventListener('click', () => {
+    if (journalBtn && !(/** @type {HTMLElement} */ (journalBtn).dataset.wired)) {
+      journalBtn.addEventListener('click', () => {
         this._wtInterrupted = true;
         this._wtClearCountdown();
         this._showWtPlayButton();
-        this.showRecipes();
+        this.showJournal();
       });
-      /** @type {HTMLElement} */ (recipesBtn).dataset.wired = '1';
+      /** @type {HTMLElement} */ (journalBtn).dataset.wired = '1';
     }
-    if (challengesBtn && !(/** @type {HTMLElement} */ (challengesBtn).dataset.wired)) {
-      challengesBtn.addEventListener('click', () => {
-        this._wtInterrupted = true;
+    const homeBtn = this.waveTransitionOverlayEl.querySelector('.wt-home-btn');
+    if (homeBtn && !(/** @type {HTMLElement} */ (homeBtn).dataset.wired)) {
+      homeBtn.addEventListener('click', () => {
+        if (!window.confirm('Quit this run and return to the title? Your current score will be lost.')) return;
         this._wtClearCountdown();
-        this._showWtPlayButton();
-        this.showChallenges();
+        this.onHome();
       });
-      /** @type {HTMLElement} */ (challengesBtn).dataset.wired = '1';
+      /** @type {HTMLElement} */ (homeBtn).dataset.wired = '1';
     }
   }
 
@@ -1237,7 +1254,7 @@ export class Hud {
     if (nMastered > 0) {
       celebrations.push(`<p class="celebration master">⭐ ${nMastered} RECIPE${nMastered > 1 ? 'S' : ''} MASTERED!</p>`);
     }
-    // Flash the Recipes button as a CTA when there's something to celebrate.
+    // Flash the Journal button as a CTA when there's something to celebrate.
     const flashCls = (nUnlocked > 0 || nMastered > 0) ? ' flash' : '';
 
     // Suppress the dramatic title text — the overlay's appearance is signal
@@ -1287,12 +1304,10 @@ export class Hud {
         ${challengesSection}
       </div>
       <div class="menu-buttons gameover-buttons">
-        <button id="recipesBtn" class="secondary${flashCls}">📖 Recipes</button>
+        <button id="journalBtn" class="secondary${flashCls}">📔 Journal</button>
         <button id="startBtn">▶ Play Again</button>
-        <button id="challengesBtn" class="secondary">🎯 Challenges</button>
-        <button id="regularsBtn" class="secondary">😀 Regulars</button>
-        <button id="powerupsBtn" class="secondary">⚡ Power-ups</button>
         <button id="settingsBtn" class="secondary">⚙️ Settings</button>
+        <button id="homeBtn" class="secondary gameover-home-btn">🏠 Home</button>
       </div>
     `;
     this._wireMenuButtons();

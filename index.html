@@ -165,45 +165,41 @@
     <p class="tagline">Serve the beach’s freshest scoops!</p>
     <div class="menu-buttons">
       <button id="startBtn">▶ Start</button>
-      <button id="recipesBtn" class="secondary">📖 Recipes</button>
-      <button id="challengesBtn" class="secondary">🎯 Challenges</button>
-      <button id="regularsBtn" class="secondary">😀 Regulars</button>
-      <button id="powerupsBtn" class="secondary">⚡ Power-ups</button>
+      <button id="journalBtn" class="secondary">📔 Journal</button>
       <button id="settingsBtn" class="secondary">⚙️ Settings</button>
     </div>
     <p id="title-best"></p>
   </div>
 
-  <div id="recipesOverlay" class="hidden">
-    <div class="recipes-modal">
-      <h2>📖 Recipe Book</h2>
-      <div class="recipes-list"></div>
-      <button id="closeRecipesBtn">Close</button>
-    </div>
-  </div>
-
-  <div id="challengesOverlay" class="hidden">
-    <div class="challenges-modal">
-      <h2>🎯 Challenges</h2>
-      <div class="challenges-list"></div>
-      <button id="closeChallengesBtn">Close</button>
-    </div>
-  </div>
-
-  <div id="regularsOverlay" class="hidden">
-    <div class="regulars-modal">
-      <h2>😀 Regulars</h2>
-      <div class="regulars-count"></div>
-      <div class="regulars-grid"></div>
-      <button id="closeRegularsBtn">Close</button>
-    </div>
-  </div>
-
-  <div id="powerupsOverlay" class="hidden">
-    <div class="powerups-modal">
-      <h2>⚡ Power-ups</h2>
-      <div class="powerups-grid"></div>
-      <button id="closePowerupsBtn">Close</button>
+  <!-- Journal hub: one tabbed home for the four read-only collection screens
+       (Recipes / Regulars / Power-ups / Challenges). Each tab's panel keeps the
+       original inner container class so the existing Hud render methods are reused
+       verbatim. -->
+  <div id="journalOverlay" class="hidden">
+    <div class="journal-modal">
+      <h2>📔 Journal</h2>
+      <div class="journal-tabs" role="tablist">
+        <button class="journal-tab active" data-tab="recipes">📖 Recipes</button>
+        <button class="journal-tab" data-tab="regulars">😀 Regulars</button>
+        <button class="journal-tab" data-tab="powerups">⚡ Power-ups</button>
+        <button class="journal-tab" data-tab="challenges">🎯 Challenges</button>
+      </div>
+      <div class="journal-body">
+        <div class="journal-panel active" data-tab="recipes">
+          <div class="recipes-list"></div>
+        </div>
+        <div class="journal-panel" data-tab="regulars">
+          <div class="regulars-count"></div>
+          <div class="regulars-grid"></div>
+        </div>
+        <div class="journal-panel" data-tab="powerups">
+          <div class="powerups-grid"></div>
+        </div>
+        <div class="journal-panel" data-tab="challenges">
+          <div class="challenges-list"></div>
+        </div>
+      </div>
+      <button id="closeJournalBtn">Close</button>
     </div>
   </div>
 
@@ -217,9 +213,9 @@
       <div class="wt-challenges"></div>
       <div class="wt-rewards hidden"></div>
       <div class="wt-buttons">
-        <button class="wt-recipes-btn secondary">📖 Recipes</button>
         <button class="wt-play-btn"><span class="wt-play-label">Next Day in 3…</span></button>
-        <button class="wt-challenges-btn secondary">🎯 Challenges</button>
+        <button class="wt-journal-btn secondary">📔 Journal</button>
+        <button class="wt-home-btn secondary">🏠 Home</button>
       </div>
     </div>
   </div>
@@ -229,13 +225,11 @@
       <h2 class="wt-title">Paused</h2>
       <div class="wt-subtitle">Tap Resume or press Esc to continue</div>
       <div class="wt-buttons">
-        <button class="wt-recipes-btn secondary" id="pauseRecipesBtn">📖 Recipes</button>
+        <button class="wt-journal-btn secondary" id="pauseJournalBtn">📔 Journal</button>
         <button class="wt-play-btn" id="pauseResumeBtn">▶ Resume</button>
-        <button class="wt-challenges-btn secondary" id="pauseChallengesBtn">🎯 Challenges</button>
-        <button class="wt-regulars-btn secondary" id="pauseRegularsBtn">😀 Regulars</button>
-        <button class="wt-powerups-btn secondary" id="pausePowerupsBtn">⚡ Power-ups</button>
+        <button class="secondary" id="pauseSettingsBtn">⚙️ Settings</button>
+        <button class="wt-home-btn secondary" id="pauseHomeBtn">🏠 Home</button>
       </div>
-      <button class="secondary pause-settings-btn" id="pauseSettingsBtn">⚙️ Settings</button>
     </div>
   </div>
 

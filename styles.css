@@ -452,6 +452,7 @@ body.day-hint #gauge::before {
    centers in. */
 #overlay,
 #recipesOverlay,
+#journalOverlay,
 #challengesOverlay,
 #regularsOverlay,
 #powerupsOverlay,
@@ -635,6 +636,13 @@ body.menu-visible #hud {
   color: #333;
   border: 2px solid #888;
 }
+/* Title screen: Play is the dominant CTA above the quieter Journal/Settings.
+   Scoped off .gameover-buttons so the game-over grid keeps its compact sizing. */
+.menu-buttons:not(.gameover-buttons) #startBtn {
+  font-size: 22px;
+  padding: 14px 24px;
+  min-width: 240px;
+}
 
 #howToPlay {
   margin: 8px auto 0;
@@ -645,6 +653,63 @@ body.menu-visible #hud {
   text-align: left;
 }
 #howToPlay.hidden { display: none; }
+
+/* === Journal hub (tabbed collections) ====================================== */
+#journalOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+#journalOverlay.hidden { display: none; }
+
+.journal-modal {
+  max-width: 640px;
+  width: 92%;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.journal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.journal-tab {
+  font-family: inherit;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #7a5230;
+  background: rgba(255, 255, 255, 0.55);
+  border: 2px solid #e8c9a0;
+  transition: filter 0.15s ease, transform 0.08s ease;
+}
+.journal-tab:hover { filter: brightness(1.04); }
+.journal-tab.active {
+  color: #fff;
+  background: linear-gradient(180deg, #2fe3b4, #06d6a0 55%, #04b58a);
+  border-color: #04b58a;
+}
+
+/* One panel visible at a time; each fills the modal so its inner list scrolls
+   (the .recipes-list / .regulars-grid / .powerups-grid / .challenges-list inside
+   already carry flex:1 + overflow-y:auto). */
+.journal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.journal-panel { display: none; flex: 1; min-height: 0; }
+.journal-panel.active { display: flex; flex-direction: column; }
 
 /* === Recipe book modal ===================================================== */
 #recipesOverlay {
@@ -788,6 +853,7 @@ body.menu-visible #hud {
 /* Full-width modal close buttons — one shared base (the parlor candy gradient is
    layered on later in the theme block). Settings' close is a variant below. */
 #closeRecipesBtn,
+#closeJournalBtn,
 #closeChallengesBtn,
 #closeRegularsBtn,
 #closePowerupsBtn {
@@ -968,7 +1034,8 @@ button.flash {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 .regulars-modal h2,
-.powerups-modal h2 { margin: 0 0 4px 0; text-align: center; }
+.powerups-modal h2,
+.journal-modal h2 { margin: 0 0 4px 0; text-align: center; }
 .regulars-count {
   text-align: center;
   font-weight: bold;
@@ -1349,7 +1416,7 @@ button.flash {
   gap: 6px;
 }
 
-/* Three-up button row: Recipes (left) | Play Again (centre, primary) | Challenges (right). */
+/* Three-up button row: Journal (left) | Play Again (centre, primary) | Settings (right). */
 .menu-buttons.gameover-buttons {
   display: grid;
   grid-template-columns: 1fr 1.2fr 1fr;
@@ -1367,12 +1434,9 @@ button.flash {
 .menu-buttons.gameover-buttons #startBtn {
   font-size: 18px;
 }
-/* Top row holds Recipes | Play Again | Challenges; the remaining secondary
-   buttons (Regulars, Settings) each center on their own full-width row instead
-   of dangling alone in the grid's first column. */
-.menu-buttons.gameover-buttons #regularsBtn,
-.menu-buttons.gameover-buttons #powerupsBtn,
-.menu-buttons.gameover-buttons #settingsBtn {
+/* Journal | Play Again | Settings fill the three columns; 🏠 Home sits on its
+   own full-width row beneath so Play Again stays the dominant CTA. */
+.menu-buttons.gameover-buttons .gameover-home-btn {
   grid-column: 1 / -1;
   justify-self: center;
   padding: 10px 28px;
@@ -1871,6 +1935,11 @@ button.flash {
   gap: 10px;
   margin-top: 18px;
 }
+/* Wave-transition now shows just Play + Journal — two columns, Play dominant. */
+#waveTransitionOverlay .wt-buttons { grid-template-columns: 1.2fr 1fr; }
+/* 🏠 Home sits on its own full-width row beneath the main buttons (pause +
+   wave-transition) so Resume / Play stay dominant. */
+.wt-buttons .wt-home-btn { grid-column: 1 / -1; justify-self: center; padding: 10px 28px; }
 .wt-buttons button {
   font-family: inherit;
   font-size: 15px;
@@ -2018,6 +2087,7 @@ body.menu-visible #pauseBtn {
 
 /* --- Modal cards: vanilla cream with a faint waffle crosshatch. ---------- */
 .recipes-modal,
+.journal-modal,
 .challenges-modal,
 .regulars-modal,
 .powerups-modal,
@@ -2039,6 +2109,7 @@ body.menu-visible #pauseBtn {
 /* Striped awning with scalloped trim across each card's top. The mask keeps
    a straight 16px band plus a row of semicircles (one per 26px stripe). */
 .recipes-modal::before,
+.journal-modal::before,
 .challenges-modal::before,
 .regulars-modal::before,
 .powerups-modal::before,
@@ -2060,6 +2131,7 @@ body.menu-visible #pauseBtn {
 }
 
 .recipes-modal h2,
+.journal-modal h2,
 .challenges-modal h2,
 .regulars-modal h2,
 .powerups-modal h2,
@@ -2128,6 +2200,7 @@ body.menu-visible #pauseBtn {
 
 /* Waffle-brown close buttons on the book-style modals. */
 #closeRecipesBtn,
+#closeJournalBtn,
 #closeChallengesBtn,
 #closeRegularsBtn,
 #closePowerupsBtn,
@@ -2139,11 +2212,13 @@ body.menu-visible #pauseBtn {
   transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
 }
 #closeRecipesBtn:hover,
+#closeJournalBtn:hover,
 #closeChallengesBtn:hover,
 #closeRegularsBtn:hover,
 #closePowerupsBtn:hover,
 #closeSettingsBtn:hover { filter: brightness(1.06); }
 #closeRecipesBtn:active,
+#closeJournalBtn:active,
 #closeChallengesBtn:active,
 #closeRegularsBtn:active,
 #closePowerupsBtn:active,
@@ -2160,6 +2235,7 @@ body.menu-visible #pauseBtn {
 
 /* Warm the modal backdrops to match the golden-hour wash. */
 #recipesOverlay,
+#journalOverlay,
 #challengesOverlay,
 #regularsOverlay,
 #powerupsOverlay,

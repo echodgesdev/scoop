@@ -112,10 +112,7 @@ export class Game {
       overlayEl:  document.getElementById('overlay'),
       gaugeEl:    document.getElementById('gauge'),
       flashEl:    document.getElementById('screen-flash'),
-      recipesOverlayEl: document.getElementById('recipesOverlay'),
-      challengesOverlayEl: document.getElementById('challengesOverlay'),
-      regularsOverlayEl: document.getElementById('regularsOverlay'),
-      powerupsOverlayEl: document.getElementById('powerupsOverlay'),
+      journalOverlayEl: document.getElementById('journalOverlay'),
       settingsOverlayEl: document.getElementById('settingsOverlay'),
       waveTransitionOverlayEl: document.getElementById('waveTransitionOverlay'),
       pauseOverlayEl: document.getElementById('pauseOverlay'),
@@ -134,7 +131,8 @@ export class Game {
       getHaptics: () => this.haptics.enabled,
       onSetHaptics: v => this.haptics.setEnabled(v),
       onResetProgress: () => this._resetProgress(),
-      onPauseToggle: () => this._togglePause()
+      onPauseToggle: () => this._togglePause(),
+      onHome: () => this._goHome()
     });
 
     this.sound   = new Sound();
@@ -387,6 +385,28 @@ export class Game {
       this.inPauseMenu = true;
       this.hud.showPauseMenu({ onResume: () => this._togglePause() });
     }
+  }
+
+  /**
+   * Abandon the current run (if any) and return to the title screen — wired to the
+   * 🏠 Home buttons on the pause, wave-transition, and game-over menus. The pause /
+   * wave-transition buttons confirm first (the run's score is lost); game-over is
+   * already ended, so its Home just navigates.
+   */
+  _goHome() {
+    this.running = false;
+    this.loop.stop();
+    this.inWaveTransition = false;
+    this.inCashout = false;
+    this.inNightCycle = false;
+    this.inPauseMenu = false;
+    this.inGameOver = false;
+    this._dayHintShown = false;
+    this.hud.setDayHint(false);
+    // Persist earned-but-uncommitted challenge progress before leaving (mirrors
+    // _endGame; commitEarned is idempotent if the run already ended).
+    this.world.challenges.commitEarned();
+    this.hud.showTitle();
   }
 
   /**
