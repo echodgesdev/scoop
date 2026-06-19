@@ -36,7 +36,7 @@ export function wireReactions(game) {
   // Order completed: confetti burst at the customer, but the one floating label is
   // the RECIPE NAME, popped at the cone (the player's locus). Points ride the HUD
   // score; the combo rides the HUD combo meter — no extra floating text.
-  game.bus.on('serve', ({ gained, colors, combo, x, y }) => {
+  game.bus.on('serve', ({ colors, x, y }) => {
     game.effects.burst(x, y, colors.map(c => game.world.shop.hex(c)));
     const recipe = RECIPE_BY_ID.get(recipeIdFor(colors));
     if (recipe) {
