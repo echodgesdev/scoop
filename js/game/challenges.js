@@ -170,6 +170,10 @@ export const SETS = [
 
 const ALL_POWERUP_IDS = ['heart', 'feather', 'pause', 'rainbow'];
 
+// A "Week" = this many days. Once a Week's challenges are all done, the player must
+// also reach this many days (in one run) for the Week to complete + unlock the next.
+const WEEK_DAYS = 7;
+
 /**
  * Tracks challenge progress and unlock state. Persists across sessions.
  * One canonical instance owned by Game.
@@ -187,6 +191,10 @@ export class Challenges {
     // Per-wave runtime counter for "use X power-ups in one wave" — not
     // persisted; resets on each wave-up event.
     this.powerupsUsedThisWave = 0;
+    // Run-relative day the current Week's day-count started from (NOT persisted —
+    // weeks are completed within a single run). The Week meter and isWeekComplete
+    // measure days elapsed since this anchor. Set by game.start() / on Week advance.
+    this.weekStartDay = 0;
     // Transient: which challenges have already fired their "earned" toast
     // this session. Prevents double-firing when the same event re-checks.
     /** @type {Record<string, boolean>} */
@@ -444,6 +452,24 @@ export class Challenges {
   isCurrentSetComplete() {
     const set = SETS[this.state.currentSet];
     return !!set && set.challenges.every(c => this.state.completed[c.id]);
+  }
+
+  // === Week completion (challenges done + a full week of days) ================
+
+  /** Anchor the Week day-count to a run day. Called on game start + each Week advance. @param {number} day */
+  setWeekStart(day) { this.weekStartDay = day || 0; }
+
+  /** The run day that completes the current Week (anchor + WEEK_DAYS). */
+  weekTargetDay() { return this.weekStartDay + WEEK_DAYS; }
+
+  /** Days into the current Week (0..WEEK_DAYS) — drives the "Complete the Week" meter. @param {number} currentDay */
+  weekProgress(currentDay) {
+    return { days: Math.max(0, Math.min(WEEK_DAYS, currentDay - this.weekStartDay)), target: WEEK_DAYS };
+  }
+
+  /** A Week is complete once its challenges are all done AND WEEK_DAYS days have elapsed. @param {number} currentDay */
+  isWeekComplete(currentDay) {
+    return this.isCurrentSetComplete() && (currentDay - this.weekStartDay) >= WEEK_DAYS;
   }
 
   /**

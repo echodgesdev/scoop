@@ -100,6 +100,8 @@ export class Hud {
     this._pendingRegularReveals = [];
     /** @type {'first'|'replay'|null} tutorial-end transition mode (set in showWaveTransition) */
     this._wtTutorialMode = null;
+    /** @type {number} the day just completed (for the Week meter / week-complete check) */
+    this._wtCompletedWave = 0;
     this._wtInterrupted = false;
     /** @type {() => void} */
     this._wtResume = () => {};
@@ -350,11 +352,11 @@ export class Hud {
       const headerCls = `challenge-set ${set.status}`;
       const badge =
         set.status === 'completed' ? '<span class="set-badge done">Completed</span>'
-        : set.status === 'current' ? '<span class="set-badge current">Current Set</span>'
+        : set.status === 'current' ? '<span class="set-badge current">This Week</span>'
         : '<span class="set-badge locked">Locked</span>';
       html.push(`<div class="${headerCls}">
         <div class="challenge-set-header">
-          <span class="set-name">Set ${set.index + 1}: ${set.name}</span>
+          <span class="set-name">Week ${set.index + 1}: ${set.name}</span>
           ${badge}
         </div>`);
       // Rewards summary
@@ -924,6 +926,7 @@ export class Hud {
       return;
     }
     this._wtTutorialMode = tutorialMode;
+    this._wtCompletedWave = completedWave;
     // The reveals (regulars met today) flip AFTER the cross-offs, together with
     // any rewards the commit grants — built into one queue in _afterCrossOffs.
     this._pendingRegularReveals = reveals || [];
@@ -954,7 +957,7 @@ export class Hud {
 
     if (titleEl) titleEl.textContent = `Day ${completedWave} Complete`;
     if (subtitleEl) {
-      subtitleEl.textContent = cur ? `Set ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
+      subtitleEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
     }
     if (rewardsEl) {
       rewardsEl.classList.add('hidden');
@@ -1092,12 +1095,13 @@ export class Hud {
     // does NOT apply — advance to Set 2 now and transition the panel to it.
     if (mode === 'first' && this.challenges) {
       this.challenges.advanceSet();
+      this.challenges.setWeekStart(this._wtCompletedWave);   // Week 2 counts from here
       if (challengesEl) {
         challengesEl.classList.add('fading-out');
         setTimeout(() => {
           const cur = this.challenges.getCurrentSet();
           const rows = cur ? cur.challenges.map(ch => this._renderChallengeRow(ch)).join('') : '';
-          const label = cur ? `Next up — Set ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
+          const label = cur ? `Next up — Week ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
           challengesEl.innerHTML = `<div class="wt-new-label">${label}</div>${rows}`;
           challengesEl.classList.remove('fading-out');
           challengesEl.classList.add('fading-in');
@@ -1112,13 +1116,33 @@ export class Hud {
     // Tutorial replay (sandbox): challenges are frozen — no advance, no nudge.
     if (mode === 'replay') { this._startWtCountdown(); return; }
 
-    // Normal day: nudge to finish the run if this set just completed.
+    // Normal day. Once all of the Week's challenges are done, the panel swaps to
+    // the "Complete the Week" meter (days played toward WEEK_DAYS). When the Week
+    // is fully done — challenges AND the 7th day — advance to next Week's challenges.
+    const day = this._wtCompletedWave;
     if (this.challenges && this.challenges.isCurrentSetComplete() && challengesEl) {
+      const weekDone = this.challenges.isWeekComplete(day);
       challengesEl.classList.add('fading-out');
       setTimeout(() => {
-        challengesEl.innerHTML =
-          `<div class="wt-new-label">Challenge set complete!</div>` +
-          `<div class="wt-finish-note">Finish this run to unlock the next set of challenges.</div>`;
+        if (weekDone) {
+          const advanced = this.challenges.advanceSet();
+          this.challenges.setWeekStart(day);
+          const next = advanced ? this.challenges.getCurrentSet() : null;
+          if (next) {
+            const rows = next.challenges.map(ch => this._renderChallengeRow(ch)).join('');
+            challengesEl.innerHTML =
+              `<div class="wt-new-label">🎉 Week complete!</div>` +
+              `<div class="wt-new-label">Next up — Week ${next.index + 1}: ${next.name}</div>${rows}`;
+          } else {
+            challengesEl.innerHTML = `<div class="wt-new-label">🏆 All Weeks complete!</div>`;
+          }
+        } else {
+          const wp = this.challenges.weekProgress(day);
+          challengesEl.innerHTML =
+            `<div class="wt-new-label">Challenges done — finish the Week!</div>` +
+            this._weekMeterHtml(wp) +
+            `<div class="wt-finish-note">Reach Day ${this.challenges.weekTargetDay()} to unlock next week's challenges.</div>`;
+        }
         challengesEl.classList.remove('fading-out');
         challengesEl.classList.add('fading-in');
         this._startWtCountdown();
@@ -1126,6 +1150,15 @@ export class Hud {
     } else {
       this._startWtCountdown();
     }
+  }
+
+  /** Markup for the "Complete the Week" meter — a filled bar + "Day N / 7" count. */
+  _weekMeterHtml(wp) {
+    const pct = Math.min(100, (wp.days / wp.target) * 100);
+    return `<div class="week-meter">
+      <div class="week-meter-fill" style="width:${pct}%"></div>
+      <span class="week-meter-text">Day ${wp.days} / ${wp.target}</span>
+    </div>`;
   }
 
   _startWtCountdown() {
@@ -1270,7 +1303,7 @@ export class Hud {
         challengesSection = `
           <div class="card-divider"></div>
           <div class="gameover-challenges-header">
-            <span class="set-tag">Set ${cur.index + 1}</span>
+            <span class="set-tag">Week ${cur.index + 1}</span>
             <span class="set-tag-name">${cur.name}</span>
           </div>
           <div class="gameover-challenges-list">${rows}</div>`;

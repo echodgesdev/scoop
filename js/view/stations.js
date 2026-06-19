@@ -32,7 +32,7 @@ import {
 const FACE_SIZE = 168;        // on-screen head diameter (the layout anchor)
 const FACE_CELL_FILL = 0.70;  // fraction of the 256px cell the head fills (rest is padding)
 const FACE_SCALE = FACE_SIZE / (FACE_CELL_FILL * CUSTOMER_SPRITE.frame.height);
-const BUBBLE_H = 96;
+const BUBBLE_H = 78;   // tightened after the point-value line was removed
 const GAP = 18;          // between face and bubble
 const POP_TIME = 0.16;   // bubble scale-in duration
 
@@ -385,12 +385,8 @@ export class Stations {
       ctx.stroke();
     }
 
-    // Value
-    ctx.fillStyle = '#444';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${c.order.value}`, cx, top + 62);
+    // (Point value removed from the bubble — it was clutter; the swatches + tip
+    // token carry the read, and the score lives on the HUD.)
 
     // Patience bar
     const barX = left + 14;

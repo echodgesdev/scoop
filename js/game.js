@@ -51,7 +51,7 @@ const MAX_FRAME = 0.25;
 
 // Between-wave reset beat: a sped-up night cycle (sunset→midnight→dawn, crescent
 // moon arcing across) that plays after the cashout and before the wave overlay.
-const NIGHT_CYCLE_S = 2.0;
+const NIGHT_CYCLE_S = 2.8;   // slightly slower: room for the day-start beat (cone recenters, day # rolls over)
 
 export class Game {
   constructor() {
@@ -156,6 +156,10 @@ export class Game {
     // right before the next wave). nightT drives the fast sky sweep + moon arc.
     this.inNightCycle = false;
     this.nightT = 0;
+    // The day number the HUD gauge SHOWS. It lags the sim's live wave: a completed
+    // day holds (full) through cashout/transition/night and only rolls over to the
+    // new day when the night sweep lands. See _syncHud + the night-cycle completion.
+    this._shownWave = 1;
     // Dedicated "Esc" pause menu — separate from the debug-panel pause.
     this.inPauseMenu = false;
     // Set once the game-over panel is up. Stepping is dead, but effects keep
@@ -455,10 +459,9 @@ export class Game {
     // coins. A genuine first play (Set 1 not cleared yet) is the real thing.
     const replaySandbox = forceTutorial && this.world.challenges.firstSetCleared();
     this.world.challenges.setFrozen(replaySandbox);
-    // Reveal the next challenge set if last run completed the current one — the
-    // "next set appears only after the game ends" pacing (no-op when frozen).
-    // Must run BEFORE the tutorial-skip check below reads currentSet.
-    this.world.challenges.advanceSet();
+    // Weeks now advance MID-RUN when a Week is completed (all challenges done AND
+    // the 7th day reached — see Challenges.isWeekComplete), so there's no longer a
+    // "reveal the next set at game start" step here.
     // Day 0 (the tutorial) only plays until the first challenge set is cleared —
     // after that we jump straight to Day 1. "How to Play" and the debug "force
     // tutorial" flag override and replay it.
@@ -466,6 +469,9 @@ export class Game {
     // Reset the simulation (models + progression-session counters). The mode is
     // rebuilt inside, so re-derive the presentation tutorial from it afterward.
     this.world.reset(playWave0);
+    // Anchor the Week day-count just BELOW the run's opening day, so completing the
+    // opening day reads as "Day 1 / 7" and the 7th completed day fills the meter.
+    this.world.challenges.setWeekStart(this.world.waves.wave - 1);
     // Sandbox flag lives on World (the tip roller reads it); set after reset so a
     // prior run's value never leaks. Remember the run's tutorial mode for the
     // day-end transition (first play → auto-advance to Set 2; replay → no change).
@@ -482,6 +488,7 @@ export class Game {
     this.inNightCycle = false;
     this.inGameOver = false;
     this.nightT = 0;
+    this._shownWave = this.world.waves.wave;
 
     this._syncHud();
 
@@ -533,7 +540,12 @@ export class Game {
   _syncHud() {
     this.hud.setScore(this.world.shop.score);
     this.hud.setHealth(this.world.health / MAX_HEALTH);
-    this.hud.setGauge(this.world.waves.wave, this.world.waves.waveFraction);
+    // Deferred day rollover: while the live wave is ahead of the shown one (the day
+    // completed but the night sweep hasn't landed yet), hold the OLD day number with
+    // a full gauge. _shownWave catches up when the night cycle finishes.
+    const live = this.world.waves.wave;
+    const ahead = live > this._shownWave;
+    this.hud.setGauge(this._shownWave, ahead ? 1 : this.world.waves.waveFraction);
     this._syncComboHud();
   }
 
@@ -597,8 +609,9 @@ export class Game {
       if (this.nightT >= 1) {
         this.nightT = 1;
         this.inNightCycle = false;
-        // The recap modal + night sweep are done — announce the wave we're now
-        // entering.
+        // Night sweep done — NOW roll the HUD day number over to the new day, and
+        // announce it.
+        this._shownWave = this.world.waves.wave;
         this.banner = { text: `DAY ${this.world.waves.wave}!`, t: 1.6 };
       }
     }
@@ -750,6 +763,9 @@ export class Game {
   _runNightCycle() {
     if (!this.running) return;
     this.world.waves.endCelebration();
+    // Reset the cone to center for the fresh day — it snaps back during the night
+    // sweep so every day opens from the middle.
+    this.world.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
     this.nightT = 0;
     this.inNightCycle = true;
   }

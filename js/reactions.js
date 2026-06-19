@@ -1,5 +1,5 @@
 // @ts-check
-import { PICKUP_TYPE, HEART_HEAL_AMOUNT } from './game/config.js';
+import { PICKUP_TYPE } from './game/config.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
@@ -69,25 +69,19 @@ export function wireReactions(game) {
 
   // A power-up fired (a tip or the combo breaker). Heart heal vs. a timed
   // power-up differ only in the burst palette + which trigger ding plays.
-  game.bus.on('powerup', ({ type, x, y }) => {
+  // Power-up fired: a swirl of colored triangle shards around the CONE — no text.
+  // (Names live in the Power-ups Journal tab; the in-play read is purely the color.)
+  game.bus.on('powerup', ({ type }) => {
+    const cx = game.world.player.x, cy = game.world.player.stackTopY();
+    let palette;
     switch (type) {
-      case PICKUP_TYPE.HEART:
-        game.effects.burst(x, y, ['#ff6fa3', '#fff', '#ffd166'], 20);
-        game.effects.popText(x, y - 10, `+${HEART_HEAL_AMOUNT} ❤`, { color: '#ff6fa3', size: 24 });
-        break;
-      case PICKUP_TYPE.FEATHER:
-        game.effects.burst(x, y, ['#bfdcff', '#fff'], 16);
-        game.effects.popText(x, y - 10, 'Speed!', { color: '#5cb8ff', size: 24 });
-        break;
-      case PICKUP_TYPE.PAUSE:
-        game.effects.burst(x, y, ['#c9b6ff', '#fff'], 16);
-        game.effects.popText(x, y - 10, 'Frozen!', { color: '#b69aff', size: 24 });
-        break;
-      case PICKUP_TYPE.RAINBOW:
-        game.effects.burst(x, y, ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'], 30);
-        game.effects.popText(x, y - 10, 'Rainbow!', { color: '#ffb703', size: 26 });
-        break;
+      case PICKUP_TYPE.HEART:   palette = ['#ff4d6d', '#ff8fa3', '#ffd1dc']; break; // red
+      case PICKUP_TYPE.FEATHER: palette = ['#ffe14d', '#ffd166', '#fff3a0']; break; // yellow / lightning
+      case PICKUP_TYPE.PAUSE:   palette = ['#7ec8ff', '#bfe3ff', '#5cb8ff']; break; // blue / snow
+      case PICKUP_TYPE.RAINBOW: palette = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff']; break;
+      default:                  palette = ['#ffd700', '#ffb703', '#ffe9a0'];        // fallback gold
     }
+    game.effects.swirl(cx, cy, palette);
     game.world.player.triggerFlash(0.2);
     if (type === PICKUP_TYPE.HEART) game.sound.heart(); else game.sound.powerupTrigger();
     game.haptics.powerup();
@@ -110,10 +104,11 @@ export function wireReactions(game) {
     game.sound.catch_();
   });
 
-  // Coin tip: gold burst + points pop.
-  game.bus.on('coin', ({ x, y, points }) => {
-    game.effects.burst(x, y, ['#ffd700', '#fff7c0', '#fff'], 18);
-    game.effects.popText(x, y - 28, `+${points}`, { color: '#ffd700', size: 24 });
+  // Coin tip ($): a yellow/orange swirl around the cone — no text. Points still
+  // land on the HUD score counter.
+  game.bus.on('coin', () => {
+    const cx = game.world.player.x, cy = game.world.player.stackTopY();
+    game.effects.swirl(cx, cy, ['#ffd700', '#ffb703', '#ffe9a0']);
     game.sound.bubblePop();
   });
 
