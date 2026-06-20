@@ -2,7 +2,7 @@
 // The HUD-scoop sprite binding: builds the small scoop-icon SpriteSheet (the
 // speech-bubble wanted-color swatches + the recipe-book coins) and exposes the
 // color→column map plus a draw helper. Shared by bubbleView (canvas swatches) and
-// hudTemplates (the COL map for the journal's recipe coins).
+// coinTemplate (the COL map for the journal's recipe-coin scoops).
 import { SpriteSheet } from './spriteSheet.js';
 import HUD_SCOOP_SPRITE from './hudScoopSprite.js';
 
