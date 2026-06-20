@@ -16,6 +16,8 @@
 // progression (which regulars are unlocked, lifetime served counts) lives in the
 // persisted Regulars store (game/regulars.js), keyed by `name`.
 
+import { recipeIdFor, PINK, MINT, CHOCO, VANILLA, BLUEBERRY } from './recipes.js';
+
 /**
  * @typedef {object} CharacterDef
  * @property {string} name             display name; must match the sprite-sheet row
@@ -33,19 +35,19 @@
  *  · 4 MYSTERY (random encounters, days 3–7)
  *  · 4 CHALLENGE rewards (no flag) — Freddie/Harvey Green/Karen/Poop. */
 export const CHARACTERS = [
-  { name: 'Annie',        favoriteRecipe: 'pink+pink',          blurb: 'Overachiever — wants her scoop just so.',          starter: true },
-  { name: 'Amara',        favoriteRecipe: 'choco+choco+choco',  blurb: "Globetrotter chasing the world's best cone.",       starter: true },
-  { name: 'Sanjay',       favoriteRecipe: 'mint+mint',          blurb: 'Codes by day, craves mint by night.',               starter: true },
-  { name: 'Gerald',       favoriteRecipe: 'vanilla',            blurb: 'Retired, particular, tips in wisdom.',              starter: true },
-  { name: 'Chad',         favoriteRecipe: 'blueberry+blueberry',blurb: "Surf's up, scoops down. Brah.",                      starter: true },
-  { name: 'Missy',        favoriteRecipe: 'pink',               blurb: 'Sweet tooth, zero patience.',                       mystery: true },
-  { name: 'Axel',         favoriteRecipe: 'choco+choco',        blurb: 'Rides hard, eats harder.',                          mystery: true },
-  { name: 'Reginald',     favoriteRecipe: 'mint',               blurb: 'Insists on a spoon. And a napkin.',                 mystery: true },
-  { name: 'Chris',        favoriteRecipe: 'blueberry',          blurb: 'Just happy to be here, honestly.',                  mystery: true },
-  { name: 'Karen',        favoriteRecipe: 'mint+vanilla',       blurb: 'Would like to speak to the scooper.' },
-  { name: 'Freddie',      favoriteRecipe: 'pink+pink+pink',     blurb: 'Showman — demands a standing-ovation cone.' },
-  { name: 'Harvey Green', favoriteRecipe: 'mint+mint+mint',     blurb: 'A little green, a lot hungry.' },
-  { name: 'Poop',         favoriteRecipe: 'choco+choco+choco',  blurb: '...how is he even ordering?' }
+  { name: 'Annie',        favoriteRecipe: recipeIdFor([PINK, PINK]),            blurb: 'Overachiever — wants her scoop just so.',          starter: true },
+  { name: 'Amara',        favoriteRecipe: recipeIdFor([CHOCO, CHOCO, CHOCO]),   blurb: "Globetrotter chasing the world's best cone.",       starter: true },
+  { name: 'Sanjay',       favoriteRecipe: recipeIdFor([MINT, MINT]),            blurb: 'Codes by day, craves mint by night.',               starter: true },
+  { name: 'Gerald',       favoriteRecipe: recipeIdFor([VANILLA]),               blurb: 'Retired, particular, tips in wisdom.',              starter: true },
+  { name: 'Chad',         favoriteRecipe: recipeIdFor([BLUEBERRY, BLUEBERRY]),  blurb: "Surf's up, scoops down. Brah.",                      starter: true },
+  { name: 'Missy',        favoriteRecipe: recipeIdFor([PINK]),                  blurb: 'Sweet tooth, zero patience.',                       mystery: true },
+  { name: 'Axel',         favoriteRecipe: recipeIdFor([CHOCO, CHOCO]),          blurb: 'Rides hard, eats harder.',                          mystery: true },
+  { name: 'Reginald',     favoriteRecipe: recipeIdFor([MINT]),                  blurb: 'Insists on a spoon. And a napkin.',                 mystery: true },
+  { name: 'Chris',        favoriteRecipe: recipeIdFor([BLUEBERRY]),             blurb: 'Just happy to be here, honestly.',                  mystery: true },
+  { name: 'Karen',        favoriteRecipe: recipeIdFor([MINT, VANILLA]),         blurb: 'Would like to speak to the scooper.' },
+  { name: 'Freddie',      favoriteRecipe: recipeIdFor([PINK, PINK, PINK]),      blurb: 'Showman — demands a standing-ovation cone.' },
+  { name: 'Harvey Green', favoriteRecipe: recipeIdFor([MINT, MINT, MINT]),      blurb: 'A little green, a lot hungry.' },
+  { name: 'Poop',         favoriteRecipe: recipeIdFor([CHOCO, CHOCO, CHOCO]),   blurb: '...how is he even ordering?' }
 ];
 
 /** Roster lookup by name. */

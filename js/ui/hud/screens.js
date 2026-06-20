@@ -274,7 +274,18 @@ export class Screens {
   /** @param {{ onResume: () => void }} opts */
   showPauseMenu({ onResume }) {
     this._pauseResume = onResume;
-    if (this.pauseOverlayEl) this.pauseOverlayEl.classList.remove('hidden');
+    if (!this.pauseOverlayEl) return;
+    // Surface the current week's challenges (with live % progress) so the player
+    // can check what they're working toward without leaving the run.
+    const listEl = this.pauseOverlayEl.querySelector('.pause-challenges');
+    if (listEl) {
+      const cur = this.challenges && this.challenges.getCurrentSet();
+      listEl.innerHTML = cur
+        ? `<div class="wt-new-label">Week ${cur.index + 1}: ${cur.name}</div>`
+          + cur.challenges.map(ch => challengeRow(ch)).join('')
+        : '';
+    }
+    this.pauseOverlayEl.classList.remove('hidden');
   }
 
   hidePauseMenu() {

@@ -16,7 +16,7 @@ import {
   lerp,
   pickWeighted
 } from './config.js';
-import { recipesForWave } from './recipes.js';
+import { recipesForWave, ALL_RECIPES, GROUP } from './recipes.js';
 
 // Wave 0 (the scripted tutorial day) clears after a fixed number of SERVES. The
 // scripted tutorial guides 7 of them (move, patience demo, a pop lesson, a two-
@@ -29,6 +29,12 @@ const WAVE0_GOAL = 11;
 // the recipe-complexity ramp, so both reset every week; the absolute `wave` keeps
 // climbing for sim continuity. Keep in step with WEEK_DAYS in challenges.js.
 const WEEK_DAYS = 7;
+
+// Always-available order used only if the section/wave pool somehow resolves
+// empty (Junior Scoop is never gated, so this should never fire). Pulled from the
+// catalog instead of a hand-typed recipe so its id/colors/value can't drift from
+// the real Junior Scoop single.
+const FALLBACK_RECIPE = ALL_RECIPES.find(r => r.group === GROUP.JUNIOR_SCOOP) || ALL_RECIPES[0];
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').WaveEventName} WaveEventName */
@@ -255,7 +261,12 @@ export class Waves {
     if (pool.length === 0) {
       // Defensive fallback — at minimum the Junior Scoop section is always
       // unlocked, so this branch should only fire if WAVE_GROUPS is broken.
-      return { recipe: 'pink', colors: ['pink'], value: 50, weight: 1 };
+      return {
+        recipe: FALLBACK_RECIPE.id,
+        colors: FALLBACK_RECIPE.colors.slice(),
+        value:  FALLBACK_RECIPE.value,
+        weight: FALLBACK_RECIPE.weight
+      };
     }
 
     // 1. Bucket the pool by size and roll a size by the per-wave weights,

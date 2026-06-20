@@ -47,17 +47,15 @@ function challengeIcon(ch) {
 
 /** @param {{ id: string, type: string, param?: string, title: string, progress: number, target: number, completed: boolean }} ch */
 export function challengeRow(ch) {
-  const pct = Math.min(100, (ch.progress / ch.target) * 100);
+  const pct = Math.round(Math.min(100, (ch.progress / ch.target) * 100));
   const cls = ch.completed ? 'challenge-row completed' : 'challenge-row';
   const icon = challengeIcon(ch);
+  // Progress reads as a percentage (no bar) — completed rows show a check instead.
   return `<div class="${cls}">
       <span class="challenge-icon">${icon}</span>
       <div class="challenge-body">
         <div class="challenge-title">${ch.title}</div>
-        <div class="challenge-progress">
-          <div class="challenge-progress-bar" style="width:${pct}%"></div>
-        </div>
       </div>
-      <div class="challenge-count">${ch.completed ? '✓' : `${ch.progress}/${ch.target}`}</div>
+      <div class="challenge-count">${ch.completed ? '✓' : `${pct}%`}</div>
     </div>`;
 }

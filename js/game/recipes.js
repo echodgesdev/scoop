@@ -9,7 +9,22 @@ export const RECIPE_TARGET = 10; // serves to "master" a recipe
 // instead of raw strings, so the flavor set lives in one place and a typo is a
 // reference error. Display NAMES are baked into each recipe at seed time
 // (seed/gen-recipes.mjs builds them); there's no runtime name builder here.
-const PINK = 'pink', MINT = 'mint', CHOCO = 'choco', VANILLA = 'vanilla', BLUEBERRY = 'blueberry';
+export const PINK = 'pink', MINT = 'mint', CHOCO = 'choco', VANILLA = 'vanilla', BLUEBERRY = 'blueberry';
+
+// The seven recipe SECTION (group) ids — a frozen enum so anything that names a
+// section (challenge rewards in challenges.js, the wave-pool fallback) references
+// a constant, not a hand-typed string: a typo is then a reference error. The
+// GROUPS catalog below defines each group's `id` FROM this enum, so a section id
+// lives in exactly one place.
+export const GROUP = Object.freeze({
+  JUNIOR_SCOOP: 'JUNIOR_SCOOP',
+  DAILY_DOUBLE: 'DAILY_DOUBLE',
+  YIN_YANG: 'YIN_YANG',
+  ODD_COUPLE: 'ODD_COUPLE',
+  THREES_COMPANY: 'THREES_COMPANY',
+  BEST_TWO_OF_THREE: 'BEST_TWO_OF_THREE',
+  TRIPLE_THREAT: 'TRIPLE_THREAT'
+});
 
 /**
  * Recipe catalog — defined EXPLICITLY here, no combinatorial generation: each
@@ -28,7 +43,7 @@ const PINK = 'pink', MINT = 'mint', CHOCO = 'choco', VANILLA = 'vanilla', BLUEBE
  */
 /** @type {RecipeGroup[]} */
 export const GROUPS = [
-  { id: 'JUNIOR_SCOOP', name: "Junior Scoop", emoji: "🍦", size: 1, value: 50, weight: 1,
+  { id: GROUP.JUNIOR_SCOOP, name: "Junior Scoop", emoji: "🍦", size: 1, value: 50, weight: 1,
     recipes: [
       { name: "Strawberry", colors: [PINK] },
       { name: "Mint", colors: [MINT] },
@@ -36,7 +51,7 @@ export const GROUPS = [
       { name: "Vanilla", colors: [VANILLA] },
       { name: "Blueberry", colors: [BLUEBERRY] },
     ] },
-  { id: 'DAILY_DOUBLE', name: "Daily Double", emoji: "🍨", size: 2, value: 100, weight: 1,
+  { id: GROUP.DAILY_DOUBLE, name: "Daily Double", emoji: "🍨", size: 2, value: 100, weight: 1,
     recipes: [
       { name: "Double Strawberry", colors: [PINK, PINK] },
       { name: "Double Mint", colors: [MINT, MINT] },
@@ -44,7 +59,7 @@ export const GROUPS = [
       { name: "Double Vanilla", colors: [VANILLA, VANILLA] },
       { name: "Double Blueberry", colors: [BLUEBERRY, BLUEBERRY] },
     ] },
-  { id: 'YIN_YANG', name: "Yin & Yang", emoji: "☯️", size: 2, value: 100, weight: 1,
+  { id: GROUP.YIN_YANG, name: "Yin & Yang", emoji: "☯️", size: 2, value: 100, weight: 1,
     recipes: [
       { name: "Blueberry + Chocolate", colors: [CHOCO, BLUEBERRY] },
       { name: "Blueberry + Mint", colors: [MINT, BLUEBERRY] },
@@ -52,7 +67,7 @@ export const GROUPS = [
       { name: "Blueberry + Vanilla", colors: [VANILLA, BLUEBERRY] },
       { name: "Chocolate + Mint", colors: [MINT, CHOCO] },
     ] },
-  { id: 'ODD_COUPLE', name: "Odd Couple", emoji: "🎭", size: 2, value: 100, weight: 1,
+  { id: GROUP.ODD_COUPLE, name: "Odd Couple", emoji: "🎭", size: 2, value: 100, weight: 1,
     recipes: [
       { name: "Chocolate + Strawberry", colors: [PINK, CHOCO] },
       { name: "Chocolate + Vanilla", colors: [CHOCO, VANILLA] },
@@ -60,7 +75,7 @@ export const GROUPS = [
       { name: "Mint + Vanilla", colors: [MINT, VANILLA] },
       { name: "Strawberry + Vanilla", colors: [PINK, VANILLA] },
     ] },
-  { id: 'THREES_COMPANY', name: "Three's Company", emoji: "🎪", size: 3, value: 150, weight: 2,
+  { id: GROUP.THREES_COMPANY, name: "Three's Company", emoji: "🎪", size: 3, value: 150, weight: 2,
     recipes: [
       { name: "Triple Strawberry", colors: [PINK, PINK, PINK] },
       { name: "Triple Mint", colors: [MINT, MINT, MINT] },
@@ -68,7 +83,7 @@ export const GROUPS = [
       { name: "Triple Vanilla", colors: [VANILLA, VANILLA, VANILLA] },
       { name: "Triple Blueberry", colors: [BLUEBERRY, BLUEBERRY, BLUEBERRY] },
     ] },
-  { id: 'BEST_TWO_OF_THREE', name: "Best Two of Three", emoji: "🥈", size: 3, value: 150, weight: 2,
+  { id: GROUP.BEST_TWO_OF_THREE, name: "Best Two of Three", emoji: "🥈", size: 3, value: 150, weight: 2,
     recipes: [
       { name: "Double Blueberry + Chocolate", colors: [BLUEBERRY, BLUEBERRY, CHOCO] },
       { name: "Double Blueberry + Mint", colors: [BLUEBERRY, BLUEBERRY, MINT] },
@@ -76,7 +91,7 @@ export const GROUPS = [
       { name: "Double Blueberry + Vanilla", colors: [BLUEBERRY, BLUEBERRY, VANILLA] },
       { name: "Double Chocolate + Blueberry", colors: [CHOCO, CHOCO, BLUEBERRY] },
     ] },
-  { id: 'TRIPLE_THREAT', name: "Triple Threat", emoji: "🎨", size: 3, value: 150, weight: 2,
+  { id: GROUP.TRIPLE_THREAT, name: "Triple Threat", emoji: "🎨", size: 3, value: 150, weight: 2,
     recipes: [
       { name: "Blueberry + Strawberry + Vanilla", colors: [PINK, VANILLA, BLUEBERRY] },
       { name: "Chocolate + Mint + Strawberry", colors: [PINK, MINT, CHOCO] },
@@ -87,10 +102,13 @@ export const GROUPS = [
 ];
 
 /**
- * Canonical key for a color multiset. Order-independent.
+ * Canonical key for a color multiset. Order-independent — sort then join, so
+ * any permutation of the same colors yields one id. Exported so the customer
+ * roster can DEFINE favorite recipes from color arrays (game/customers.js)
+ * rather than hand-typing the joined string and risking a non-canonical order.
  * @param {ScoopColor[]} colors
  */
-function recipeIdFor(colors) {
+export function recipeIdFor(colors) {
   return [...colors].sort().join('+');
 }
 

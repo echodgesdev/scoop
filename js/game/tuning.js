@@ -113,9 +113,6 @@ export const ORDER_SIZE_WEIGHTS = [
   { 1: 18, 2: 37, 3: 45 },   // wave 5
   { 1: 12, 2: 30, 3: 58 },   // wave 6 — full 3-scoop core
   { 1: 10, 2: 25, 3: 65 },   // wave 7
-  { 1: 8,  2: 22, 3: 70 },   // wave 8
-  { 1: 7,  2: 20, 3: 73 },   // wave 9
-  { 1: 6,  2: 18, 3: 76 }    // wave 10+ — 3-scoop is the late-game core
 ];
 
 // === New-recipe discovery bias ===============================================

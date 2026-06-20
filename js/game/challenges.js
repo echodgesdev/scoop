@@ -2,6 +2,10 @@
 /** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
 /** @typedef {import('./recipes.js').Recipes} Recipes */
 
+import { PICKUP_TYPE, PICKUP_TYPES } from './config.js';
+import { GROUP } from './recipes.js';
+import { CHARACTER_BY_NAME } from './customers.js';
+
 const STORAGE_KEY = 'scoop.challenges';
 
 // === Master challenge sets ===================================================
@@ -56,9 +60,9 @@ const SETS = [
       { id: 's1-3', type: 'wave_reach',       target: 1, title: 'Reach Day 1' }
     ],
     rewards: [
-      { type: 'unlock_coin',    value: 'coin' },
-      { type: 'unlock_section', value: 'DAILY_DOUBLE' },
-      { type: 'unlock_section', value: 'YIN_YANG' }
+      { type: 'unlock_coin',    value: PICKUP_TYPE.COIN },
+      { type: 'unlock_section', value: GROUP.DAILY_DOUBLE },
+      { type: 'unlock_section', value: GROUP.YIN_YANG }
     ]
   },
   // Set 2 → Rainbow + Odd Couple. (Goals: only Coin available, so no power-up-use
@@ -71,21 +75,21 @@ const SETS = [
       { id: 's2-3', type: 'discover_recipes', target: 8,  title: 'Discover 8 recipes total' }
     ],
     rewards: [
-      { type: 'unlock_powerup', value: 'rainbow' },
-      { type: 'unlock_section', value: 'ODD_COUPLE' }
+      { type: 'unlock_powerup', value: PICKUP_TYPE.RAINBOW },
+      { type: 'unlock_section', value: GROUP.ODD_COUPLE }
     ]
   },
   // Set 3 → Freddie (character) + Three's Company. Rainbow is now available.
   {
     name: 'Making Regulars',
     challenges: [
-      { id: 's3-1', type: 'use_powerup_type', target: 2,  title: 'Use 2 🌈 Rainbow power-ups', param: 'rainbow' },
+      { id: 's3-1', type: 'use_powerup_type', target: 2,  title: 'Use 2 🌈 Rainbow power-ups', param: PICKUP_TYPE.RAINBOW },
       { id: 's3-2', type: 'discover_recipes', target: 12, title: 'Discover 12 recipes total' },
       { id: 's3-3', type: 'wave_reach',       target: 3,  title: 'Reach Day 3' }
     ],
     rewards: [
       { type: 'unlock_regular', value: 'Freddie' },
-      { type: 'unlock_section', value: 'THREES_COMPANY' }
+      { type: 'unlock_section', value: GROUP.THREES_COMPANY }
     ]
   },
   // Set 4 → Heart + Best Two of Three.
@@ -97,8 +101,8 @@ const SETS = [
       { id: 's4-3', type: 'master_recipes',   target: 2,  title: 'Master 2 recipes (10/10)' }
     ],
     rewards: [
-      { type: 'unlock_powerup', value: 'heart' },
-      { type: 'unlock_section', value: 'BEST_TWO_OF_THREE' }
+      { type: 'unlock_powerup', value: PICKUP_TYPE.HEART },
+      { type: 'unlock_section', value: GROUP.BEST_TWO_OF_THREE }
     ]
   },
   // Set 5 → Harvey Green (character) + Triple Threat (the last section). Heart
@@ -107,13 +111,13 @@ const SETS = [
   {
     name: 'Local Legend',
     challenges: [
-      { id: 's5-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❤️ Heart power-ups', param: 'heart' },
+      { id: 's5-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❤️ Heart power-ups', param: PICKUP_TYPE.HEART },
       { id: 's5-2', type: 'discover_recipes', target: 18, title: 'Discover 18 recipes total' },
       { id: 's5-3', type: 'wave_reach',       target: 4,  title: 'Reach Day 4' }
     ],
     rewards: [
       { type: 'unlock_regular', value: 'Harvey Green' },
-      { type: 'unlock_section', value: 'TRIPLE_THREAT' }
+      { type: 'unlock_section', value: GROUP.TRIPLE_THREAT }
     ]
   },
   // Set 6 → Freeze (Ice).
@@ -124,13 +128,13 @@ const SETS = [
       { id: 's6-2', type: 'master_recipes',   target: 4,  title: 'Master 4 recipes total' },
       { id: 's6-3', type: 'serve_customers',  target: 50, title: 'Serve 50 customers total' }
     ],
-    rewards: [{ type: 'unlock_powerup', value: 'pause' }]
+    rewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.PAUSE }]
   },
   // Set 7 → Karen (character). Freeze now available to use.
   {
     name: 'Speak to the Manager',
     challenges: [
-      { id: 's7-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❄️ Freeze power-ups', param: 'pause' },
+      { id: 's7-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❄️ Freeze power-ups', param: PICKUP_TYPE.PAUSE },
       { id: 's7-2', type: 'discover_recipes', target: 25, title: 'Discover 25 recipes total' },
       { id: 's7-3', type: 'wave_reach',       target: 5,  title: 'Reach Day 5' }
     ],
@@ -144,13 +148,13 @@ const SETS = [
       { id: 's8-2', type: 'serve_regular',    target: 15, title: 'Serve Gerald 15 times', param: 'Gerald' },
       { id: 's8-3', type: 'master_recipes',   target: 6,  title: 'Master 6 recipes total' }
     ],
-    rewards: [{ type: 'unlock_powerup', value: 'feather' }]
+    rewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.FEATHER }]
   },
   // Set 9 → Poop (character). Speed now available to use.
   {
     name: 'The Whole Crew',
     challenges: [
-      { id: 's9-1', type: 'use_powerup_type', target: 5,  title: 'Use 5 ⚡ Speed power-ups', param: 'feather' },
+      { id: 's9-1', type: 'use_powerup_type', target: 5,  title: 'Use 5 ⚡ Speed power-ups', param: PICKUP_TYPE.FEATHER },
       { id: 's9-2', type: 'wave_reach',       target: 7,  title: 'Reach Day 7' },
       { id: 's9-3', type: 'discover_recipes', target: 35, title: 'Discover every recipe (35)' }
     ],
@@ -168,7 +172,26 @@ const SETS = [
   }
 ];
 
-const ALL_POWERUP_IDS = ['heart', 'feather', 'pause', 'rainbow'];
+// Dev safety net for the one cross-reference with no compile-time link: regular
+// NAMES. Power-up values (PICKUP_TYPE) and section ids (GROUP) are now constants —
+// a typo in those is a reference error. Regular names are still hand-authored
+// strings that must match the customer roster (customers.js); a typo would
+// silently leave a reward ungrantable or a goal unreachable. The SETS table is
+// static, so this resolves every referenced name against the roster once at module
+// load and warns loudly (rather than throwing, so a stray typo can't white-screen
+// the game for a player).
+for (const set of SETS) {
+  for (const r of set.rewards) {
+    if (r.type === 'unlock_regular' && !CHARACTER_BY_NAME.has(r.value)) {
+      console.warn(`[challenges] unlock_regular reward references unknown regular "${r.value}"`);
+    }
+  }
+  for (const ch of set.challenges) {
+    if (ch.type === 'serve_regular' && (!ch.param || !CHARACTER_BY_NAME.has(ch.param))) {
+      console.warn(`[challenges] serve_regular goal "${ch.id}" references unknown regular "${ch.param}"`);
+    }
+  }
+}
 
 /**
  * Tracks challenge progress and unlock state. Persists across sessions.
@@ -212,8 +235,9 @@ export class Challenges {
         discoveredCount: 0,
         masteredCount: 0,
         customersServed: 0,
-        /** @type {Record<PickupTypeName, number>} */
-        powerupsUsedByType: { heart: 0, feather: 0, pause: 0, rainbow: 0 },
+        powerupsUsedByType: /** @type {Record<PickupTypeName, number>} */ (
+          Object.fromEntries(PICKUP_TYPES.map(t => [t, 0]))
+        ),
         powerupsUsedTotal: 0,
         coinTipsCollected: 0,   // lifetime coin tips cashed (Journal coin gauge)
         maxCombo: 0,
@@ -279,7 +303,7 @@ export class Challenges {
 
   /** @returns {PickupTypeName[]} */
   unlockedPowerupTypes() {
-    return /** @type {PickupTypeName[]} */ (ALL_POWERUP_IDS.filter(t => this.isPowerupUnlocked(t)));
+    return PICKUP_TYPES.filter(t => this.isPowerupUnlocked(t));
   }
 
   /** Coin tips unlock from Set 1 (the tutorial); gated like the power-ups. */
@@ -294,7 +318,7 @@ export class Challenges {
    * @returns {Set<string>}
    */
   unlockedSections() {
-    const out = new Set(['JUNIOR_SCOOP']);
+    const out = new Set([GROUP.JUNIOR_SCOOP]);
     for (let i = 0; i < SETS.length; i++) {
       if (!this.state.rewardsClaimed[i]) continue;
       for (const r of SETS[i].rewards) {

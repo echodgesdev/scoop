@@ -31,16 +31,13 @@ export function wtStatsHtml(s) {
  * progress bar + count) so it reads consistently with the challenges above it.
  */
 export function weekMeterHtml(wp) {
-  const pct = Math.min(100, (wp.days / wp.target) * 100);
+  const pct = Math.round(Math.min(100, (wp.days / wp.target) * 100));
   return `<div class="challenge-row">
       <span class="challenge-icon">📅</span>
       <div class="challenge-body">
         <div class="challenge-title">Complete the Week</div>
-        <div class="challenge-progress">
-          <div class="challenge-progress-bar" style="width:${pct}%"></div>
-        </div>
       </div>
-      <div class="challenge-count">${wp.days}/${wp.target}</div>
+      <div class="challenge-count">${pct}%</div>
     </div>`;
 }
 
