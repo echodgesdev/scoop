@@ -23,21 +23,20 @@ export function drawField(ctx, field, rainbow = false, alpha = 1) {
       drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color, s.speedMult);
       continue;
     }
-    // Missed: cross-fade into the sand. The scoop fades out as it sinks, while a
-    // translucent outline fades IN over it and flattens down — a soft imprint
-    // pressed into the sand rather than a hard sprite swap.
+    // Missed: the scoop puffs away into the sand. It fades out as it sinks, while a
+    // translucent outline swells outward and fades to nothing over it — a soft
+    // poof that grows and dissipates rather than a hard sprite swap.
     const p = Math.min(1, s.dissolve / SCOOP_DISSOLVE_S);
     ctx.save();
     ctx.globalAlpha = 1 - p;                       // scoop fades out
     drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color);
     ctx.restore();
     ctx.save();
-    ctx.globalAlpha = 0.55 * p;                    // outline fades in, kept translucent
-    const flatten = 1 - 0.7 * p;                   // squash vertically into the sand
-    const baseY = y + SCOOP_RADIUS;                // press down from the scoop's base
-    ctx.translate(s.x, baseY);
-    ctx.scale(1, flatten);
-    ctx.translate(-s.x, -baseY);
+    ctx.globalAlpha = 0.6 * Math.sin(p * Math.PI); // outline swells in then fades away
+    const grow = 1 + 0.9 * p;                      // expand outward from the center
+    ctx.translate(s.x, y);
+    ctx.scale(grow, grow);
+    ctx.translate(-s.x, -y);
     drawDissolveSprite(ctx, s.x, y, SCOOP_RADIUS);
     ctx.restore();
   }

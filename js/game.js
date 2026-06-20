@@ -51,10 +51,13 @@ const MAX_FRAME = 0.25;
 // Between-wave reset beat: a sped-up night cycle (sunset→midnight→dawn, crescent
 // moon arcing across) that plays after the cashout and before the wave overlay.
 const NIGHT_CYCLE_S = 2.8;   // slightly slower: room for the day-start beat (cone recenters, day # rolls over)
-// Round-start countdown beats (seconds): a 3·2·1·GO! countdown (the week is
-// announced in the night sky beforehand). The sim is frozen for the whole intro.
-const ROUND_INTRO_BEAT_S = 0.65;   // each of "3", "2", "1"
-const ROUND_INTRO_START_S = 0.75;  // "GO!"
+// Round-start countdown beats (seconds): a 3·2·1·GO! countdown. Between rounds the
+// week's challenges are shown in the sky during the night sweep beforehand; at a
+// fresh game start there's no sweep, so the intro leads with its own challenges-in-
+// the-sky preview. The sim is frozen for the whole intro.
+const ROUND_INTRO_PREVIEW_S = 2.4;  // start-of-game: challenges drift in the sky first
+const ROUND_INTRO_BEAT_S = 0.65;    // each of "3", "2", "1"
+const ROUND_INTRO_START_S = 0.75;   // "GO!"
 
 export class Game {
   constructor() {
@@ -175,6 +178,9 @@ export class Game {
     // sweep) and on the first campaign day; skipped during the scripted tutorial.
     this.inRoundIntro = false;
     this.roundIntroT = 0;
+    // At a fresh start the intro leads with a challenges-in-the-sky preview (between
+    // rounds the night sweep covers that). Set per _startRoundIntro call.
+    this._introPreview = false;
     // Dedicated "Esc" pause menu — separate from the debug-panel pause.
     this.inPauseMenu = false;
     // Set once the game-over panel is up. Stepping is dead, but effects keep
@@ -509,7 +515,8 @@ export class Game {
     if (playWave0) this.tutorial.start(this);
     this._syncDayHint();
     // Day-start beat for the opening campaign day (skipped while the tutorial runs).
-    this._startRoundIntro();
+    // `true` → lead with the challenges-in-the-sky preview (no night sweep at start).
+    this._startRoundIntro(true);
 
     this.loop.start({
       shouldStep: () => this._stepping(),
@@ -637,7 +644,13 @@ export class Game {
     // Round-start countdown (frozen sim) — drawn in the HUD now, not the canvas.
     if (this.inRoundIntro) {
       this.roundIntroT += frame;
-      this.hud.setRoundIntro(this.roundIntroLabel());
+      if (this._introPreview && this.roundIntroT < ROUND_INTRO_PREVIEW_S) {
+        // Fresh start: the week's challenges drift in the sky before the countdown.
+        this.hud.setNightSky(this.roundIntroT / ROUND_INTRO_PREVIEW_S);
+      } else {
+        this.hud.hideNightSky();   // idempotent once the preview's done
+        this.hud.setRoundIntro(this.roundIntroLabel());
+      }
       if (this.roundIntroT >= this._roundIntroDuration()) {
         this.inRoundIntro = false;
         this.hud.setRoundIntro(null);
@@ -804,23 +817,30 @@ export class Game {
    * (no scoops, no customers) and resumes at START. Skipped during the scripted
    * tutorial, which paces itself.
    */
-  _startRoundIntro() {
+  /** @param {boolean} [preview] lead with the challenges-in-the-sky beat (fresh start) */
+  _startRoundIntro(preview = false) {
     if (this.tutorial.active) { this.inRoundIntro = false; return; }
     this.inRoundIntro = true;
     this.roundIntroT = 0;
+    this._introPreview = preview;
   }
 
   _roundIntroDuration() {
-    return ROUND_INTRO_BEAT_S * 3 + ROUND_INTRO_START_S;
+    return (this._introPreview ? ROUND_INTRO_PREVIEW_S : 0)
+      + ROUND_INTRO_BEAT_S * 3 + ROUND_INTRO_START_S;
   }
 
   /**
-   * The current countdown beat ("3" / "2" / "1" / "GO!"), or null. The week is
-   * announced in the night sky beforehand, so the intro is just the countdown.
+   * The current countdown beat ("3" / "2" / "1" / "GO!"), or null. During a fresh
+   * start's leading challenges preview it returns null (the countdown hasn't begun).
    */
   roundIntroLabel() {
     if (!this.inRoundIntro) return null;
-    const t = this.roundIntroT;
+    let t = this.roundIntroT;
+    if (this._introPreview) {
+      if (t < ROUND_INTRO_PREVIEW_S) return null;
+      t -= ROUND_INTRO_PREVIEW_S;
+    }
     if (t < ROUND_INTRO_BEAT_S) return '3';
     if (t < ROUND_INTRO_BEAT_S * 2) return '2';
     if (t < ROUND_INTRO_BEAT_S * 3) return '1';

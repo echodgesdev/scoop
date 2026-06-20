@@ -40,6 +40,7 @@ export class NightSky {
   }
 
   hideChallenges() {
+    if (!this._skyShown) return;   // already hidden — avoid per-frame churn from the intro
     this._skyShown = false;
     if (this.skyEl) { this.skyEl.classList.add('hidden'); this.skyEl.innerHTML = ''; }
   }
