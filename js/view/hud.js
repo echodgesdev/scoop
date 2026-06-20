@@ -1,34 +1,19 @@
 // @ts-check
-import { COLORS, PICKUP_TYPE, PICKUP_TYPES } from '../game/config.js';
-import { RECIPE_TARGET, GROUPS, RECIPE_BY_ID, GROUP_BY_ID } from '../game/recipes.js';
-import CUSTOMER_SPRITE from './sprites/customerSprite.js';
-import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
-import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from './powerupVisuals.js';
+import { PICKUP_TYPE, PICKUP_TYPES } from '../game/config.js';
+import { GROUPS, RECIPE_BY_ID } from '../game/recipes.js';
+import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME } from './powerupVisuals.js';
+import { Toasts } from './toastUI.js';
+import {
+  REGULAR_GAUGE_MAX, POWERUP_GAUGE_MAX, REGULAR_RING,
+  coinHtml, regularFaceInner, recipeCoin, challengeRow, rewardLabel,
+  regularDetailHtml, powerupDetailHtml, recipeDetailHtml,
+  rewardToCard, unlockCardHtml, wtStatsHtml, weekMeterHtml
+} from './hudTemplates.js';
 
 // Unlock-reveal queue timing (one coin flips at a time). Tuned to match the
 // .wt-coin-flip CSS animation (0.4s hold + 0.9s flip) plus a short read beat
 // before the next card cuts in.
 const UNLOCK_ITEM_MS = 1650;
-
-// Regulars collection screen. Faces are cropped out of the shared sprite sheet
-// via CSS background-position: each regular's sheet ROW comes from the sprite
-// def (animation index), and a fixed COLUMN picks the expression. The .regular-
-// face tile size + background-size live in styles.css; keep them in step here.
-const REGULAR_FACE_TILE = 120;       // on-screen face tile (px); matches styles.css
-const REGULAR_FACE_COL = 1;          // column 1 = Default face — shown unlocked
-const REGULAR_EMPTY_COL = 0;         // column 0 = Empty white "shadow" — shown locked (CSS greys it)
-/** @type {Map<string, number>} regular name → sprite-sheet row (animation index) */
-const REGULAR_ROW_BY_NAME = new Map(CUSTOMER_SPRITE.animations.map((a, i) => [a.name, i]));
-
-// Journal coin tuning: a small scoop tile (stacked vertically inside the recipe
-// coin) and the gauge denominators for each collection (recipes use RECIPE_TARGET).
-const JCOIN_SCOOP_TILE = 20;
-const JCOIN_FACE_TILE = 70;           // regular face crop sized to the coin (vs the 120px collection tile)
-const REGULAR_GAUGE_MAX = 50;
-const POWERUP_GAUGE_MAX = 100;
-// Ring-gauge fill colors per collection (powerups use their own token color).
-const REGULAR_RING = '#06d6a0';
-const RECIPE_RING = '#ffb703';
 
 /** @typedef {import('../game/recipes.js').Recipes} Recipes */
 
@@ -72,7 +57,6 @@ export class Hud {
     this.settingsOverlayEl = settingsOverlayEl;
     this.waveTransitionOverlayEl = waveTransitionOverlayEl;
     this.pauseOverlayEl = pauseOverlayEl;
-    this.challengeToastEl = challengeToastEl;
     /** @type {Recipes} */
     this.recipes = recipes;
     /** @type {import('../game/challenges.js').Challenges} */
@@ -82,11 +66,8 @@ export class Hud {
     /** @type {import('../engine/audio.js').Sound} */
     this.sound = sound;
 
-    // Toast queue: challenges that just hit their requirement during play.
-    // Shown one at a time at the bottom of the screen, each fades in/out.
-    /** @type {Array<{ title: string, icon: string }>} */
-    this._toastQueue = [];
-    this._toastShowing = false;
+    // Mid-play toasts (challenge met / flavor discovered) — self-contained module.
+    this.toasts = new Toasts(challengeToastEl);
 
     // Last-written values for the per-frame HUD pull (_syncHud). The setters
     // below early-out when nothing visibly changed, so the gauge's SVG filter,
@@ -388,7 +369,7 @@ export class Hud {
         </div>`);
       // Rewards summary
       if (set.rewards.length > 0) {
-        const rewardsText = set.rewards.map(r => this._rewardLabel(r)).join(', ');
+        const rewardsText = set.rewards.map(r => rewardLabel(r)).join(', ');
         html.push(`<div class="challenge-set-rewards">Unlocks: ${rewardsText}</div>`);
       }
       // Challenges in this set — hide details for fully-locked future sets
@@ -396,67 +377,11 @@ export class Hud {
       if (set.status === 'locked') {
         html.push(`<div class="challenge-row locked"><div class="challenge-title">???</div></div>`);
       } else {
-        for (const ch of set.challenges) html.push(this._renderChallengeRow(ch));
+        for (const ch of set.challenges) html.push(challengeRow(ch));
       }
       html.push(`</div>`);
     }
     listEl.innerHTML = html.join('');
-  }
-
-  /** @param {{ type: string, value: string }} r */
-  _rewardLabel(r) {
-    if (r.type === 'unlock_powerup') {
-      const names = { heart: '❤️ Heart', feather: '⚡ Speed', pause: '❄️ Freeze', rainbow: '🌈 Rainbow' };
-      return names[r.value] || r.value;
-    }
-    if (r.type === 'unlock_coin') return '🪙 Coin tips';
-    if (r.type === 'unlock_regular') return `😀 ${r.value}`;
-    if (r.type === 'unlock_section') {
-      const g = GROUP_BY_ID.get(r.value);
-      return g ? `${g.emoji} ${g.name}` : r.value;
-    }
-    return r.value;
-  }
-
-  /** @param {{ type: string, param?: string }} ch */
-  _challengeIcon(ch) {
-    if (ch.type === 'use_powerup_type') {
-      switch (ch.param) {
-        case 'heart':   return '❤️';
-        case 'feather': return '⚡';
-        case 'pause':   return '❄️';
-        case 'rainbow': return '🌈';
-      }
-    }
-    switch (ch.type) {
-      case 'discover_recipes':  return '📖';
-      case 'master_recipes':    return '⭐';
-      case 'complete_section':  return '📚';
-      case 'serve_customers':   return '🍦';
-      case 'serve_regular':     return '😀';
-      case 'use_powerup_wave':
-      case 'use_powerup_total': return '⚡';
-      case 'combo_reach':       return '🔥';
-      case 'wave_reach':        return '🌊';
-      default:                  return '•';
-    }
-  }
-
-  /** @param {{ id: string, type: string, param?: string, title: string, progress: number, target: number, completed: boolean }} ch */
-  _renderChallengeRow(ch) {
-    const pct = Math.min(100, (ch.progress / ch.target) * 100);
-    const cls = ch.completed ? 'challenge-row completed' : 'challenge-row';
-    const icon = this._challengeIcon(ch);
-    return `<div class="${cls}">
-      <span class="challenge-icon">${icon}</span>
-      <div class="challenge-body">
-        <div class="challenge-title">${ch.title}</div>
-        <div class="challenge-progress">
-          <div class="challenge-progress-bar" style="width:${pct}%"></div>
-        </div>
-      </div>
-      <div class="challenge-count">${ch.completed ? '✓' : `${ch.progress}/${ch.target}`}</div>
-    </div>`;
   }
 
   /** Deep-link wrappers → open the Journal to a specific tab. */
@@ -482,7 +407,7 @@ export class Hud {
       const used = !this.challenges ? 0
         : (t === PICKUP_TYPE.COIN ? this.challenges.coinCollectedCount() : this.challenges.powerupUsedCount(t));
       const pct = unlocked ? Math.min(100, (used / POWERUP_GAUGE_MAX) * 100) : 0;
-      return this._coinHtml({
+      return coinHtml({
         kind: 'powerup', id: t,
         inner: `<span class="jcoin-emoji">${PICKUP_ICONS[t]}</span>`,
         ring: PICKUP_RING_COLOR[t], pct,
@@ -490,34 +415,6 @@ export class Hud {
         locked: !unlocked
       });
     }).join('') + `</div>`;
-  }
-
-  // === Journal coin component (shared by recipes / regulars / power-ups) ======
-
-  /** Just the gauge ring + face (no button/name) — reused by the grid + detail popup. */
-  _coinVisual({ inner, ring, pct, badge = '' }) {
-    return `<span class="jcoin-gauge" style="--pct:${pct};--ring:${ring}"><span class="jcoin-face">${inner}</span>${badge}</span>`;
-  }
-
-  /** A tappable coin: gauge ring + face + name. data-kind/id drive the detail popup. */
-  _coinHtml({ kind, id, inner, ring, pct, name, locked, badge = '' }) {
-    return `<button class="jcoin${locked ? ' locked' : ''}" data-kind="${kind}" data-id="${id}">${this._coinVisual({ inner, ring, pct, badge })}<span class="jcoin-name">${name}</span></button>`;
-  }
-
-  /** Regular face cropped from the customer sheet, sized to the coin. */
-  _regularFaceInner(name, unlocked) {
-    const T = JCOIN_FACE_TILE;
-    const row = REGULAR_ROW_BY_NAME.get(name) || 0;
-    const col = unlocked ? REGULAR_FACE_COL : REGULAR_EMPTY_COL;
-    return `<span class="jcoin-face-img${unlocked ? '' : ' locked'}" style="background-position:-${col * T}px -${row * T}px"></span>`;
-  }
-
-  /** Recipe scoops stacked vertically inside a coin (grey blanks when locked). */
-  _coinScoops(colors, locked, size) {
-    const T = JCOIN_SCOOP_TILE;
-    const cols = locked ? Array.from({ length: size }, () => HUD_SCOOP_COL.empty) : colors.map(c => HUD_SCOOP_COL[c]);
-    const scoops = cols.map(col => `<span class="jcoin-scoop${locked ? ' empty' : ''}" style="background-position:-${col * T}px 0"></span>`).join('');
-    return `<span class="jcoin-scoops">${scoops}</span>`;
   }
 
   /**
@@ -535,9 +432,9 @@ export class Hud {
 
     listEl.innerHTML = `<div class="jcoin-grid">` + this.regulars.getAll().map(r => {
       const pct = r.unlocked ? Math.min(100, (r.served / REGULAR_GAUGE_MAX) * 100) : 0;
-      return this._coinHtml({
+      return coinHtml({
         kind: 'regular', id: r.name,
-        inner: this._regularFaceInner(r.name, r.unlocked),
+        inner: regularFaceInner(r.name, r.unlocked),
         ring: REGULAR_RING, pct,
         name: r.unlocked ? r.name : '???',
         locked: !r.unlocked
@@ -572,22 +469,9 @@ export class Hud {
         <span class="recipe-section-name">${g.name}</span>
         <span class="recipe-section-total">${mastered} / ${rows.length}</span>
       </div>`);
-      html.push(`<div class="jcoin-grid">${rows.map(r => this._recipeCoin(r)).join('')}</div>`);
+      html.push(`<div class="jcoin-grid">${rows.map(r => recipeCoin(r)).join('')}</div>`);
     }
     listEl.innerHTML = html.join('');
-  }
-
-  /** One recipe coin: scoops stacked vertically, ring = completions / RECIPE_TARGET. */
-  _recipeCoin(r) {
-    const pct = r.locked ? 0 : Math.min(100, (r.count / RECIPE_TARGET) * 100);
-    return this._coinHtml({
-      kind: 'recipe', id: r.id,
-      inner: this._coinScoops(r.colors, r.locked, r.size),
-      ring: RECIPE_RING, pct,
-      name: r.locked ? '???' : r.name,
-      locked: r.locked,
-      badge: (!r.locked && r.mastered) ? '<span class="jcoin-star">⭐</span>' : ''
-    });
   }
 
   // === Journal detail popup (tap a coin → the info that used to crowd the card) =
@@ -598,12 +482,17 @@ export class Hud {
     let html = '';
     if (kind === 'regular' && this.regulars) {
       const r = this.regulars.getAll().find(x => x.name === id);
-      if (r) html = this._regularDetailHtml(r);
+      if (r) html = regularDetailHtml(r);
     } else if (kind === 'powerup') {
-      html = this._powerupDetailHtml(id);
+      const unlocked = !this.challenges ? true
+        : (id === PICKUP_TYPE.COIN ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(id));
+      const used = !this.challenges ? 0
+        : (id === PICKUP_TYPE.COIN ? this.challenges.coinCollectedCount()
+          : this.challenges.powerupUsedCount(/** @type {import('../types.js').PickupTypeName} */ (id)));
+      html = powerupDetailHtml(id, unlocked, used);
     } else if (kind === 'recipe' && this.recipes) {
       const r = this.recipes.getAll().find(x => x.id === id);
-      if (r) html = this._recipeDetailHtml(r);
+      if (r) html = recipeDetailHtml(r);
     }
     if (!html) return;
     const body = this.journalDetailEl.querySelector('.journal-detail-body');
@@ -613,64 +502,6 @@ export class Hud {
 
   hideJournalDetail() {
     if (this.journalDetailEl) this.journalDetailEl.classList.add('hidden');
-  }
-
-  /** @param {{ name: string, unlocked: boolean, served: number, favoriteRecipe: string, blurb: string }} r */
-  _regularDetailHtml(r) {
-    const visual = this._coinVisual({
-      inner: this._regularFaceInner(r.name, r.unlocked), ring: REGULAR_RING,
-      pct: r.unlocked ? Math.min(100, (r.served / REGULAR_GAUGE_MAX) * 100) : 0
-    });
-    if (!r.unlocked) {
-      return `<div class="jdetail-coin locked">${visual}</div><div class="jdetail-name">???</div>
-        <div class="jdetail-line locked-hint">Serve them to unlock</div>`;
-    }
-    let fav = '';
-    const recipe = RECIPE_BY_ID.get(r.favoriteRecipe);
-    if (recipe) {
-      const dots = recipe.colors.map(c => `<span class="recipe-swatch" style="background:${COLORS[c]}"></span>`).join('');
-      fav = `<div class="regular-fav"><span class="regular-fav-pre">♥</span>${dots}<span class="regular-fav-name">${recipe.name}</span></div>`;
-    }
-    return `<div class="jdetail-coin">${visual}</div><div class="jdetail-name">${r.name}</div>
-      ${fav}<div class="jdetail-blurb">${r.blurb}</div>
-      <div class="jdetail-line">Served ${r.served} / ${REGULAR_GAUGE_MAX}</div>`;
-  }
-
-  /** @param {string} t power-up type or PICKUP_TYPE.COIN */
-  _powerupDetailHtml(t) {
-    const unlocked = !this.challenges ? true
-      : (t === PICKUP_TYPE.COIN ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
-    const used = !this.challenges ? 0
-      : (t === PICKUP_TYPE.COIN ? this.challenges.coinCollectedCount()
-        : this.challenges.powerupUsedCount(/** @type {import('../types.js').PickupTypeName} */ (t)));
-    const visual = this._coinVisual({
-      inner: `<span class="jcoin-emoji">${PICKUP_ICONS[t]}</span>`, ring: PICKUP_RING_COLOR[t],
-      pct: unlocked ? Math.min(100, (used / POWERUP_GAUGE_MAX) * 100) : 0
-    });
-    if (!unlocked) {
-      return `<div class="jdetail-coin locked">${visual}</div><div class="jdetail-name">???</div>
-        <div class="jdetail-line locked-hint">🔒 Unlock by clearing challenges</div>`;
-    }
-    return `<div class="jdetail-coin">${visual}</div><div class="jdetail-name">${PICKUP_NAME[t] || t}</div>
-      <div class="jdetail-blurb">${PICKUP_DESC[t] || ''}</div>
-      <div class="jdetail-line">Used ${used} / ${POWERUP_GAUGE_MAX}</div>`;
-  }
-
-  /** @param {ReturnType<Recipes['getAll']>[number]} r */
-  _recipeDetailHtml(r) {
-    const visual = this._coinVisual({
-      inner: this._coinScoops(r.colors, r.locked, r.size), ring: RECIPE_RING,
-      pct: r.locked ? 0 : Math.min(100, (r.count / RECIPE_TARGET) * 100),
-      badge: (!r.locked && r.mastered) ? '<span class="jcoin-star">⭐</span>' : ''
-    });
-    if (r.locked) {
-      return `<div class="jdetail-coin locked">${visual}</div><div class="jdetail-name">???</div>
-        <div class="jdetail-line locked-hint">Serve it once to discover it</div>`;
-    }
-    const group = GROUP_BY_ID.get(r.group);
-    return `<div class="jdetail-coin">${visual}</div><div class="jdetail-name">${r.name}${r.mastered ? ' ⭐' : ''}</div>
-      <div class="jdetail-blurb">${group ? group.name : ''}</div>
-      <div class="jdetail-line">Completed ${r.count} / ${RECIPE_TARGET}${r.mastered ? ' · Mastered!' : ''}</div>`;
   }
 
   /** @param {number} score */
@@ -886,108 +717,12 @@ export class Hud {
   // === Mid-play toasts (challenge met / flavor discovered) ==================
 
   /** @param {{ title: string }} challenge */
-  showChallengeToast(challenge) {
-    if (!this.challengeToastEl) return;
-    this._toastQueue.push({ title: challenge.title, icon: '✓' });
-    if (!this._toastShowing) this._processToastQueue();
-  }
+  showChallengeToast(challenge) { this.toasts.challenge(challenge); }
 
   /** First-time flavor discovery — a quick named toast. @param {string} name */
-  showDiscoveryToast(name) {
-    if (!this.challengeToastEl) return;
-    this._toastQueue.push({ title: `New flavor — ${name}`, icon: '🍦' });
-    if (!this._toastShowing) this._processToastQueue();
-  }
-
-  _processToastQueue() {
-    if (!this.challengeToastEl) return;
-    if (this._toastQueue.length === 0) {
-      this._toastShowing = false;
-      return;
-    }
-    this._toastShowing = true;
-    const next = /** @type {{ title: string, icon: string }} */ (this._toastQueue.shift());
-    this.challengeToastEl.innerHTML =
-      `<span class="toast-check">${next.icon}</span><span class="toast-title">${next.title}</span>`;
-    // Trigger reflow so the class transition fires every time.
-    void this.challengeToastEl.offsetWidth;
-    this.challengeToastEl.classList.add('show');
-    setTimeout(() => {
-      if (this.challengeToastEl) this.challengeToastEl.classList.remove('show');
-      setTimeout(() => this._processToastQueue(), 400);
-    }, 1800);
-  }
+  showDiscoveryToast(name) { this.toasts.discovery(name); }
 
   // === Wave transition (between-wave overlay with cross-offs + countdown) ===
-
-  /**
-   * Map a committed challenge Reward to an unlock-reveal card descriptor, or null
-   * for reward types that don't get a coin (none today). Power-ups / coin /
-   * sections flip an emoji coin; a regular flips their silhouette → face.
-   * @param {{ type: string, value: string }} r
-   * @returns {{ kind: string, name?: string, emoji?: string, ring?: string, label?: string } | null}
-   */
-  _rewardToCard(r) {
-    if (r.type === 'unlock_regular') return { kind: 'regular', name: r.value };
-    if (r.type === 'unlock_coin') {
-      return { kind: 'coin', emoji: PICKUP_ICONS[PICKUP_TYPE.COIN], ring: PICKUP_RING_COLOR[PICKUP_TYPE.COIN], label: 'Coin Tips Unlocked!' };
-    }
-    if (r.type === 'unlock_powerup') {
-      return {
-        kind: 'powerup',
-        emoji: PICKUP_ICONS[r.value] || '⚡',
-        ring: PICKUP_RING_COLOR[r.value] || '#ffd166',
-        label: `New Power-up — ${PICKUP_NAME[r.value] || r.value}!`
-      };
-    }
-    if (r.type === 'unlock_section') {
-      const g = GROUP_BY_ID.get(r.value);
-      return { kind: 'section', emoji: g ? g.emoji : '🍨', ring: '#ffd166', label: `New Recipes — ${g ? g.name : r.value}!` };
-    }
-    return null;
-  }
-
-  /**
-   * Markup for one unlock coin. A 'regular' card crops silhouette/face from the
-   * customer sheet (back → front); the emoji kinds (coin/power-up/section) show a
-   * "?" coin that flips to the unlocked thing's emoji. Fresh markup each call so
-   * the CSS flip replays.
-   * @param {{ kind: string, name?: string, emoji?: string, ring?: string, label?: string }} item
-   */
-  _unlockCardHtml(item) {
-    if (item.kind === 'regular') {
-      const T = REGULAR_FACE_TILE;
-      const row = REGULAR_ROW_BY_NAME.get(item.name || '') || 0;
-      const back  = `background-position:-${REGULAR_EMPTY_COL * T}px -${row * T}px`;  // silhouette
-      const front = `background-position:-${REGULAR_FACE_COL * T}px -${row * T}px`;   // full face
-      return `<div class="wt-reveal-item">
-        <div class="wt-reveal-coin"><div class="wt-reveal-inner">
-          <div class="wt-reveal-face wt-reveal-back" style="${back}"></div>
-          <div class="wt-reveal-face wt-reveal-front" style="${front}"></div>
-        </div></div>
-        <div class="wt-reveal-label">New Regular — <b>${item.name}</b>!</div>
-      </div>`;
-    }
-    if (item.kind === 'recipe') {
-      // A "?" coin that flips to the recipe's scoops stacked vertically.
-      const scoops = this._coinScoops(item.colors || [], false, (item.colors || []).length);
-      return `<div class="wt-reveal-item">
-        <div class="wt-reveal-coin"><div class="wt-reveal-inner">
-          <div class="wt-reveal-face wt-reveal-back wt-reveal-emoji" style="--ring:${RECIPE_RING}">?</div>
-          <div class="wt-reveal-face wt-reveal-front wt-reveal-scoops" style="--ring:${RECIPE_RING}">${scoops}</div>
-        </div></div>
-        <div class="wt-reveal-label">New Flavor — <b>${item.name}</b>!</div>
-      </div>`;
-    }
-    const ring = item.ring || '#ffd166';
-    return `<div class="wt-reveal-item">
-      <div class="wt-reveal-coin"><div class="wt-reveal-inner">
-        <div class="wt-reveal-face wt-reveal-back wt-reveal-emoji" style="--ring:${ring}">?</div>
-        <div class="wt-reveal-face wt-reveal-front wt-reveal-emoji" style="--ring:${ring}">${item.emoji || ''}</div>
-      </div></div>
-      <div class="wt-reveal-label">${item.label || ''}</div>
-    </div>`;
-  }
 
   /**
    * Play an unlock-reveal QUEUE: show one coin, let it flip, then cut to the next
@@ -1012,7 +747,7 @@ export class Hud {
         done();
         return;
       }
-      el.innerHTML = this._unlockCardHtml(items[i]);
+      el.innerHTML = unlockCardHtml(items[i]);
       if (this.sound) this.sound.perfect();   // a little "ding" on each flip
       i += 1;
       this._unlockQueueTimer = /** @type {any} */ (setTimeout(showNext, UNLOCK_ITEM_MS));
@@ -1079,7 +814,7 @@ export class Hud {
     if (titleEl) titleEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : 'All Weeks Complete';
     if (subtitleEl) subtitleEl.textContent = 'Day Complete';
     const statsEl = /** @type {HTMLElement | null} */ (this.waveTransitionOverlayEl.querySelector('.wt-stats'));
-    if (statsEl) statsEl.innerHTML = stats ? this._wtStatsHtml(stats) : '';
+    if (statsEl) statsEl.innerHTML = stats ? wtStatsHtml(stats) : '';
     if (rewardsEl) {
       rewardsEl.classList.add('hidden');
       rewardsEl.innerHTML = '';
@@ -1089,7 +824,7 @@ export class Hud {
     // step below knows which to strike.
     if (challengesEl && cur) {
       challengesEl.innerHTML = cur.challenges.map(ch => {
-        const row = this._renderChallengeRow(ch);
+        const row = challengeRow(ch);
         if (!ch.completed && earnedIds.has(ch.id)) {
           // Insert the marker class — keep it hidden until the stagger
           // sequence below adds .struck which triggers the CSS strike.
@@ -1199,7 +934,7 @@ export class Hud {
     }).filter(Boolean);
     const queue = [
       ...this._pendingRegularReveals.map(name => ({ kind: 'regular', name })),
-      ...result.rewards.map(r => this._rewardToCard(r)).filter(Boolean),
+      ...result.rewards.map(r => rewardToCard(r)).filter(Boolean),
       ...discoveryCards
     ];
     this._pendingRegularReveals = [];
@@ -1227,7 +962,7 @@ export class Hud {
         challengesEl.classList.add('fading-out');
         setTimeout(() => {
           const cur = this.challenges.getCurrentSet();
-          const rows = cur ? cur.challenges.map(ch => this._renderChallengeRow(ch)).join('') : '';
+          const rows = cur ? cur.challenges.map(ch => challengeRow(ch)).join('') : '';
           const label = cur ? `Next up — Week ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
           challengesEl.innerHTML = `<div class="wt-new-label">${label}</div>${rows}`;
           challengesEl.classList.remove('fading-out');
@@ -1256,7 +991,7 @@ export class Hud {
           const advanced = this.challenges.advanceSet();
           const next = advanced ? this.challenges.getCurrentSet() : null;
           if (next) {
-            const rows = next.challenges.map(ch => this._renderChallengeRow(ch)).join('');
+            const rows = next.challenges.map(ch => challengeRow(ch)).join('');
             challengesEl.innerHTML =
               `<div class="wt-new-label">🎉 Week complete!</div>` +
               `<div class="wt-new-label">Next up — Week ${next.index + 1}: ${next.name}</div>${rows}`;
@@ -1264,7 +999,7 @@ export class Hud {
             challengesEl.innerHTML = `<div class="wt-new-label">🏆 All Weeks complete!</div>`;
           }
         } else {
-          challengesEl.innerHTML = this._weekMeterHtml({ days, target });
+          challengesEl.innerHTML = weekMeterHtml({ days, target });
         }
         challengesEl.classList.remove('fading-out');
         challengesEl.classList.add('fading-in');
@@ -1273,34 +1008,6 @@ export class Hud {
     } else {
       this._startWtCountdown();
     }
-  }
-
-  /** End-of-day stat card: score, the day's best combo, the run's longest combo, favorite flavor. */
-  _wtStatsHtml(s) {
-    const cell = (label, value) =>
-      `<div class="wt-stat"><div class="wt-stat-value">${value}</div><div class="wt-stat-label">${label}</div></div>`;
-    return cell('Score', s.score)
-      + cell('Combo Today', `${s.dayCombo}×`)
-      + cell('Longest Combo', `${s.bestCombo}×`)
-      + cell('Favorite', s.favFlavor);
-  }
-
-  /**
-   * The "Complete the Week" meter, styled as a challenge row (icon + title +
-   * progress bar + count) so it reads consistently with the challenges above it.
-   */
-  _weekMeterHtml(wp) {
-    const pct = Math.min(100, (wp.days / wp.target) * 100);
-    return `<div class="challenge-row">
-      <span class="challenge-icon">📅</span>
-      <div class="challenge-body">
-        <div class="challenge-title">Complete the Week</div>
-        <div class="challenge-progress">
-          <div class="challenge-progress-bar" style="width:${pct}%"></div>
-        </div>
-      </div>
-      <div class="challenge-count">${wp.days}/${wp.target}</div>
-    </div>`;
   }
 
   _startWtCountdown() {
@@ -1434,7 +1141,7 @@ export class Hud {
     if (this.challenges) {
       const cur = this.challenges.getCurrentSet();
       if (cur) {
-        const rows = cur.challenges.map(ch => this._renderChallengeRow(ch)).join('');
+        const rows = cur.challenges.map(ch => challengeRow(ch)).join('');
         challengesSection = `
           <div class="card-divider"></div>
           <div class="gameover-challenges-header">
@@ -1454,7 +1161,7 @@ export class Hud {
     this.overlayEl.innerHTML = `
       ${celebrations.join('')}
       <div class="gameover-card">
-        <div class="wt-stats">${this._wtStatsHtml(stats)}</div>
+        <div class="wt-stats">${wtStatsHtml(stats)}</div>
         <div class="best-line">${isRecord ? '🏆 NEW BEST!' : `Best ever <strong>${this.best}</strong>`}</div>
         ${challengesSection}
       </div>

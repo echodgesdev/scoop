@@ -44,7 +44,7 @@ const STORAGE_KEY = 'scoop.challenges';
  */
 
 /** @type {ChallengeSet[]} */
-export const SETS = [
+const SETS = [
   // Set 1 — the tutorial set: its three goals are guaranteed by finishing the
   // 3-customer Day-0 tutorial. Clearing it unlocks Coin tips PLUS the first two
   // recipe sections (Daily Double + Yin & Yang) — the tutorial-end celebration.

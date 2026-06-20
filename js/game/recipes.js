@@ -90,7 +90,7 @@ export const GROUPS = [
  * Canonical key for a color multiset. Order-independent.
  * @param {ScoopColor[]} colors
  */
-export function recipeIdFor(colors) {
+function recipeIdFor(colors) {
   return [...colors].sort().join('+');
 }
 

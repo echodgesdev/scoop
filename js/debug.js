@@ -23,8 +23,6 @@ export class DebugPanel {
    *   getPowerupWeights?: () => number[],
    *   onTutorialFlag?: (v: boolean) => void,
    *   getTutorialFlag?: () => boolean,
-   *   onDeliveryMode?: (name: string) => void,
-   *   getDeliveryMode?: () => string,
    *   onMaxStack?: (n: number) => void,
    *   getMaxStack?: () => number,
    *   onMaxLive?: (n: number) => void,
@@ -37,7 +35,7 @@ export class DebugPanel {
    *   getFallSpeed?: () => number
    * }} [opts]
    */
-  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onTipGap, getTipGap, onPowerupWeights, getPowerupWeights, onTutorialFlag, getTutorialFlag, onDeliveryMode, getDeliveryMode, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
+  constructor(flags, { onPauseChange, onWaveJump, onTimeJump, getWaveFraction, onDemandBias, getDemandBias, onPatience, getPatience, onTipGap, getTipGap, onPowerupWeights, getPowerupWeights, onTutorialFlag, getTutorialFlag, onMaxStack, getMaxStack, onMaxLive, getMaxLive, onSpawnInterval, getSpawnInterval, onComboBreakerToggle, getComboBreakerEnabled, onFallSpeed, getFallSpeed } = {}) {
     this.flags = flags;
     this.onPauseChange = onPauseChange || (() => {});
     this.onWaveJump = onWaveJump || (() => {});
@@ -53,8 +51,6 @@ export class DebugPanel {
     this.getPowerupWeights = getPowerupWeights || (() => [0.35, 0.3, 0.2, 0.15]);
     this.onTutorialFlag = onTutorialFlag || (() => {});
     this.getTutorialFlag = getTutorialFlag || (() => false);
-    this.onDeliveryMode = onDeliveryMode || (() => {});
-    this.getDeliveryMode = getDeliveryMode || (() => 'any');
     this.onMaxStack = onMaxStack || (() => {});
     this.getMaxStack = getMaxStack || (() => 6);
     this.onMaxLive = onMaxLive || (() => {});
@@ -102,16 +98,11 @@ export class DebugPanel {
   }
 
   /**
-   * Gameplay tuning (all modes): delivery method dropdown + the runtime sliders
-   * (max scoops on cone, max falling scoops, spawn interval, fall speed, horizon,
-   * combo-breaker threshold). Movement sensitivity lives in the Settings modal.
+   * Gameplay tuning: the runtime sliders (max scoops on cone, max falling scoops,
+   * spawn interval, fall speed) plus the combo-breaker toggle. Movement
+   * sensitivity lives in the Settings modal.
    */
   _wireGameplay() {
-    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugDelivery'));
-    if (sel) {
-      sel.value = this.getDeliveryMode();
-      sel.addEventListener('change', () => this.onDeliveryMode(sel.value));
-    }
     const int = n => String(Math.round(n));
     const oneDp = n => n.toFixed(1);
     const twoDp = n => n.toFixed(2);
@@ -288,8 +279,6 @@ export class DebugPanel {
     }
     const breakerCb = /** @type {HTMLInputElement | null} */ (document.getElementById('debugComboBreakerToggle'));
     if (breakerCb) breakerCb.checked = this.getComboBreakerEnabled();
-    const delSel = /** @type {HTMLSelectElement | null} */ (document.getElementById('debugDelivery'));
-    if (delSel) delSel.value = this.getDeliveryMode();
     // Re-sync gameplay sliders to live values (they can change between games).
     for (const s of this._sliders) {
       const slider = /** @type {HTMLInputElement | null} */ (document.getElementById(s.id));

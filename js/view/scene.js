@@ -1,5 +1,5 @@
 // @ts-check
-import { groundYFor } from '../game/config.js';
+import { GROUND_Y } from '../game/config.js';
 
 // === Per-frame caches =========================================================
 // The day-cycle state only changes on serves (wave progress is discrete), so
@@ -31,7 +31,7 @@ let _haloCache = { key: '', grad: null };
  * rises from behind / sets into the floor.
  */
 export function drawSkyAndSun(ctx, bounds, state) {
-  const groundY = groundYFor(bounds.height);
+  const groundY = GROUND_Y;
 
   ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
   ctx.fillRect(0, 0, bounds.width, bounds.height);
@@ -132,7 +132,7 @@ const STARS = [
  * @param {CanvasRenderingContext2D} ctx
  */
 export function drawNightSky(ctx, bounds, state) {
-  const groundY = groundYFor(bounds.height);
+  const groundY = GROUND_Y;
 
   ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
   ctx.fillRect(0, 0, bounds.width, bounds.height);
@@ -177,7 +177,7 @@ export function drawNightSky(ctx, bounds, state) {
  * the floor rather than over it.
  */
 export function drawSand(ctx, bounds, state) {
-  const groundY = groundYFor(bounds.height);
+  const groundY = GROUND_Y;
   ctx.fillStyle = state.floor;
   ctx.fillRect(0, groundY, bounds.width, bounds.height - groundY);
 }
@@ -236,7 +236,7 @@ let _waterCache = { key: '', grad: null };
  */
 export function drawOcean(ctx, bounds, state, time) {
   const W = bounds.width;
-  const groundY = groundYFor(bounds.height);
+  const groundY = GROUND_Y;
   const band = bounds.height - groundY;           // sand-band height
   if (band <= 4) return;
 

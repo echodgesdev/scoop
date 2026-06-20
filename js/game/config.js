@@ -2,10 +2,7 @@
 // Code-touching constants and enums. Balance numbers live in tuning.js and
 // are re-exported from here so existing call-sites don't need to change.
 
-import {
-  FLOOR_Y_RATIO as _FLOOR_Y_RATIO,
-  CONE_EMBED_PX as _CONE_EMBED_PX
-} from './tuning.js';
+import { GROUND_Y, CONE_EMBED_PX as _CONE_EMBED_PX } from './tuning.js';
 // The scoop sprite def is data (no rendering), so config reads it to derive the
 // scoop's collision size — single source of truth, set in the sprite editor.
 import SCOOP_SPRITE from '../view/sprites/scoopSprite.js';
@@ -35,8 +32,6 @@ export const COLOR_KEYS = /** @type {ScoopColor[]} */ (Object.keys(COLORS));
 // circle. SCOOP_RADIUS is the representative scalar (half-height) the rest of the
 // layout/tuning + the 1:1 draw scale use.
 const _scoopBody = SCOOP_SPRITE.animations[0].frames[0].body;
-/** @type {import('../types.js').SpriteBody | null} */
-export const SCOOP_BODY = _scoopBody;
 export const SCOOP_HALF_W = _scoopBody
   ? (_scoopBody.shape === 'rect' ? (_scoopBody.width || 0) / 2 : (_scoopBody.radius || 0))
   : 0;
@@ -99,12 +94,15 @@ export const PICKUP_TO_POWER = {
   [PICKUP_TYPE.RAINBOW]: POWERUP_TYPE.RAINBOW
 };
 
-// Stringly-typed config values, centralized as frozen enums so a typo is a
-// missing property (loud — undefined) instead of a silently-false comparison.
-/** Tray→customer delivery rule. @type {Readonly<{ANY:'any',SEQUENTIAL:'sequential',WHOLE:'whole'}>} */
-export const DELIVERY_MODE = Object.freeze({ ANY: 'any', SEQUENTIAL: 'sequential', WHOLE: 'whole' });
-
 // === Math util ================================================================
+/**
+ * Clamp `v` to the inclusive range [min, max].
+ * @param {number} v @param {number} min @param {number} max @returns {number}
+ */
+export function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
 /**
  * @param {number} a
  * @param {number} b
@@ -112,30 +110,33 @@ export const DELIVERY_MODE = Object.freeze({ ANY: 'any', SEQUENTIAL: 'sequential
  * @returns {number}
  */
 export function lerp(a, b, t) {
-  return a + (b - a) * Math.max(0, Math.min(1, t));
+  return a + (b - a) * clamp(t, 0, 1);
 }
 
 /**
- * Y-coordinate of the sand floor's top edge. Shared by scene (floor + sky
- * gradient end), dayCycle (sun horizon), and stations (customer ground line).
- * The sky/ground split is the fixed layout constant FLOOR_Y_RATIO (tuning.js).
- * @param {number} boundsHeight
- * @returns {number}
+ * Weighted random pick. Returns the chosen item (weighted by its `weight` field),
+ * or null when the list is empty. If every weight is <= 0 it falls back to a
+ * uniform pick, so a degenerate all-zero pool still returns something.
+ * @template {{ weight: number }} T
+ * @param {T[]} items
+ * @returns {T | null}
  */
-export function groundYFor(boundsHeight) {
-  return boundsHeight * _FLOOR_Y_RATIO;
+export function pickWeighted(items) {
+  if (items.length === 0) return null;
+  const total = items.reduce((sum, it) => sum + (it.weight > 0 ? it.weight : 0), 0);
+  if (total <= 0) return items[Math.floor(Math.random() * items.length)];
+  let r = Math.random() * total;
+  for (const it of items) {
+    r -= it.weight;
+    if (r <= 0) return it;
+  }
+  return items[items.length - 1];
 }
 
-/**
- * Y-coordinate of the cone *center*. The cone tip sits CONE_EMBED_PX below
- * the sand top, so the cone is partially in the floor instead of balancing
- * on its point.
- * @param {number} boundsHeight
- * @returns {number}
- */
-export function coneYFor(boundsHeight) {
-  return groundYFor(boundsHeight) + _CONE_EMBED_PX - CONE_HEIGHT / 2;
-}
+// Y of the cone *center*. The cone tip embeds CONE_EMBED_PX below the sand line,
+// so the center sits at GROUND_Y + CONE_EMBED_PX - CONE_HEIGHT/2 (with the current
+// values, right on the sand line). Absolute because the canvas height is fixed.
+export const CONE_Y = GROUND_Y + _CONE_EMBED_PX - CONE_HEIGHT / 2;
 
 // === Re-export balance numbers from tuning.js ================================
 export {
@@ -170,14 +171,13 @@ export {
   DAMAGE_PER_EXPIRE,
   HEAL_PER_SERVE,
   COMBO_CASHOUT_PER,
-  STACK_CASHOUT_PER_SCOOP,
   SPAWN_DEMAND_BIAS,
   WAVE0_DEMAND_BIAS,
   ORDER_SIZE_WEIGHTS,
   DISCOVERY_BIAS_START,
   DISCOVERY_BIAS_END,
   PARTIAL_SERVE_EXTEND_S,
-  FLOOR_Y_RATIO,
+  GROUND_Y,
   CONE_EMBED_PX,
   CUSTOMER_FACE_OFFSET_PX,
   MINI_CONE_FACE_OFFSET_PX,

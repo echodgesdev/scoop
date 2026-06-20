@@ -16,7 +16,7 @@ import {
   MINI_CONE_FACE_OFFSET_PX,
   SERVED_FLIGHT_ARC,
   CUSTOMER_FACE_OFFSET_PX,
-  groundYFor
+  GROUND_Y
 } from '../game/config.js';
 
 // Customers read at parity with the cone (bigger than a falling scoop) so the
@@ -40,8 +40,7 @@ const SWATCH_R   = 17;
 const SWATCH_GAP = 9;    // edge-to-edge between swatches
 const BUBBLE_PAD = 26;   // horizontal padding around the swatch row
 // Wanted-color scoops render at this display size, centered on the same slots the
-// old color circles used (so the bubble-width math below is unchanged). The sheet
-// renderer falls back to those circles until the scoop image loads.
+// old color circles used (so the bubble-width math below is unchanged).
 const SWATCH_SCOOP_SIZE = 40;
 const hudScoopSheet = new SpriteSheet(HUD_SCOOP_SPRITE);
 
@@ -56,32 +55,6 @@ function bubbleWidthFor(orderLen) {
   const swatches = Math.max(1, orderLen);
   const row = swatches * SWATCH_R * 2 + (swatches - 1) * SWATCH_GAP;
   return Math.max(150, row + BUBBLE_PAD * 2);
-}
-
-const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'];
-
-// Baked rainbow swatch (gradient circle + outline). Rainbow mode was creating
-// a fresh linear gradient per swatch per frame; this bakes one sprite at the
-// fixed swatch size and blits it.
-/** @type {HTMLCanvasElement | null} */
-let _rainbowSwatch = null;
-function rainbowSwatch() {
-  if (_rainbowSwatch) return _rainbowSwatch;
-  const d = SWATCH_R * 2 + 4;   // +2px margin so the stroke isn't clipped
-  const c = document.createElement('canvas');
-  c.width = c.height = d;
-  const g = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
-  const grad = g.createLinearGradient(2, 2, d - 2, d - 2);
-  RAINBOW_STOPS.forEach((col, i) => grad.addColorStop(i / (RAINBOW_STOPS.length - 1), col));
-  g.beginPath();
-  g.arc(d / 2, d / 2, SWATCH_R, 0, Math.PI * 2);
-  g.fillStyle = grad;
-  g.fill();
-  g.lineWidth = 2;
-  g.strokeStyle = '#333';
-  g.stroke();
-  _rainbowSwatch = c;
-  return c;
 }
 
 // Expression COLUMNS on the customer sheet (column 0 is the blank "Empty" face,
@@ -123,11 +96,11 @@ export class Stations {
   }
 
   layout(bounds) {
-    this.groundY = groundYFor(bounds.height);
+    this.groundY = GROUND_Y;
     this.width = bounds.width;
   }
 
-  draw(ctx, customers, { activeIndex, canServe, hex, pausePatience = false, rainbow = false, time = 0, tipLabel = false, coneX = null, alpha = 1 }) {
+  draw(ctx, customers, { activeIndex, canServe, pausePatience = false, rainbow = false, time = 0, tipLabel = false, coneX = null, alpha = 1 }) {
     // Precompute each customer's interpolated draw state once, then render in
     // LAYERS across all of them — faces, held cones, bubbles, tips — so a
     // customer that spawns next to another never covers the earlier one's bubble
@@ -171,7 +144,7 @@ export class Stations {
         const overlap = Math.max(0, 1 - Math.abs(it.cx - coneX) / range);
         bubbleAlpha = 1 - (1 - BUBBLE_MIN_ALPHA) * overlap;
       }
-      this._drawBubble(ctx, it.c, it.cx, it.faceY, pop, { servable: it.servable, active: it.active, patience: it.patience, hex, rainbow, alpha: bubbleAlpha });
+      this._drawBubble(ctx, it.c, it.cx, it.faceY, pop, { servable: it.servable, active: it.active, patience: it.patience, rainbow, alpha: bubbleAlpha });
     }
 
     // Layer 4 — tips on TOP of everything: a token showing the reward this
@@ -310,7 +283,7 @@ export class Stations {
     drawConeUnderStack(ctx, baseX, seatY, scale, CONE_FRAME.FRONT);
   }
 
-  _drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, hex, rainbow, alpha = 1 }) {
+  _drawBubble(ctx, c, cx, faceY, pop, { servable, active, patience, rainbow, alpha = 1 }) {
     const bubbleBottom = faceY - FACE_SIZE / 2 - GAP;
     const top = bubbleBottom - BUBBLE_H;
     const bubbleW = bubbleWidthFor(c.order.colors.length);
@@ -360,24 +333,9 @@ export class Stations {
     const scoopScale = SWATCH_SCOOP_SIZE / hudScoopSheet.frameW;
     for (let k = 0; k < n; k++) {
       const sx = firstX + k * step;
-      const color = c.order.colors[k];
       // A scoop icon per wanted color (rainbow mode → the rainbow scoop).
-      const col = rainbow ? HUD_SCOOP_COL.rainbow : HUD_SCOOP_COL[color];
-      if (hudScoopSheet.draw(ctx, 0, col, sx, swatchY, scoopScale)) continue;
-      // Fallback until the scoop sheet image loads: the old color circle /
-      // baked rainbow swatch.
-      if (rainbow) {
-        const sw = rainbowSwatch();
-        ctx.drawImage(sw, sx - sw.width / 2, swatchY - sw.height / 2);
-        continue;
-      }
-      ctx.beginPath();
-      ctx.arc(sx, swatchY, SWATCH_R, 0, Math.PI * 2);
-      ctx.fillStyle = hex(color);
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#333';
-      ctx.stroke();
+      const col = rainbow ? HUD_SCOOP_COL.rainbow : HUD_SCOOP_COL[c.order.colors[k]];
+      hudScoopSheet.draw(ctx, 0, col, sx, swatchY, scoopScale);
     }
 
     // (Point value removed from the bubble — it was clutter; the swatches + tip

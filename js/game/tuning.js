@@ -85,7 +85,6 @@ export const HEAL_PER_SERVE = DAMAGE_PER_EXPIRE / 3;
 // on the cone pops for a small bonus. Makes the end of a wave a payout beat and
 // clears the tray for a fresh start (health is NOT touched — it persists).
 export const COMBO_CASHOUT_PER = 25;        // points per combo point banked
-export const STACK_CASHOUT_PER_SCOOP = 10;  // points per leftover tray scoop
 
 // === Spawn demand coupling ====================================================
 // Probability that a freshly-spawned scoop is biased toward what waiting
@@ -137,20 +136,16 @@ export const DISCOVERY_BIAS_END = 0.6;     // wave WAVE_RAMP and beyond
 export const PARTIAL_SERVE_EXTEND_S = 1.2;
 
 // === Scene floor + actor embedding ===========================================
-// Sand floor lives at FLOOR_Y_RATIO of canvas height. Each actor positions
-// itself relative to that line — the cone tip embeds CONE_EMBED_PX below
-// the sand top, customers wade in by CUSTOMER_FACE_OFFSET_PX, and the
-// mini-cone they hold is embedded too.
-//
-// Customers sit well below the sand line so their speech bubbles (which
-// extend ~100px above each face) drop into the lower-screen zone instead
-// of overlapping the cone above them.
-// Sky/ground split — the fixed fraction of canvas height that is sky (ground
-// begins here); read via config.groundYFor. Shrunk from 0.65 → 0.55 for mobile:
-// a shorter sky cuts the fall distance (scoops arrive sooner) AND lifts the
-// whole play block up, growing the empty bottom band so a one-handed thumb rests
-// below the customers/orders instead of over them.
-export const FLOOR_Y_RATIO = 0.50;
+// The sand floor sits at the absolute line GROUND_Y. The play area is a fixed-
+// height virtual canvas (viewport BASE_HEIGHT = 1520), so the floor is an absolute
+// line, not a fraction of height. Each actor positions itself against it: the cone
+// tip embeds CONE_EMBED_PX below the sand top, customers wade in by
+// CUSTOMER_FACE_OFFSET_PX, and the mini-cone they hold is embedded too. Customers
+// sit well below the line so their speech bubbles (~100px tall) drop into the
+// lower-screen zone instead of overlapping the cone. (Sky is the top half; a
+// shorter sky cuts the fall distance and lifts the whole play block up, leaving
+// an empty bottom band so a one-handed thumb rests below the orders.)
+export const GROUND_Y = 760;
 // Cone sits deeper in the sand now (center ≈ on the sand line) so it reads as
 // planted in the ground rather than balancing on the surface. Shifts the cone
 // — and the whole stack riding on it — down with it.

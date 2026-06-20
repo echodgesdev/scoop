@@ -1,13 +1,12 @@
 // @ts-check
 import {
-  COLORS,
   CONE_WIDTH,
   CONE_HEIGHT,
   SCOOP_RADIUS,
   HANDOFF_DURATION_S
 } from '../game/config.js';
 import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../game/player.js';
-import { scoopSheet, SCOOP_STATE, drawScoopSprite } from './sprites.js';
+import { SCOOP_STATE, drawScoopSprite } from './sprites.js';
 import { SpriteSheet } from './spriteSheet.js';
 import CONE_SPRITE, { CONE_FRAME } from './sprites/coneSprite.js';
 import { glowCircle } from './glow.js';
@@ -21,8 +20,6 @@ import { glowCircle } from './glow.js';
 // top — so the column reads as one graceful swoosh trailing behind.
 const SLOSH_LAG = 2.4;  // ticks of extra delay per scoop above the bottom
 const SLOSH_ARC = 6;    // log-arc curvature (higher = sharper bow near the top)
-
-const RAINBOW_STOPS = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'];
 
 // === Cone sprite (layered) ==================================================
 // A back layer + a front layer the scoop stack draws between. The sheet art is
@@ -93,15 +90,13 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
   }
   if (tx !== 0 || ty !== 0) ctx.translate(tx, ty);
 
-  // Serve/catch flash halo, then the cone BACK (behind the scoops). Falls back
-  // to the flat triangle until the cone sheet image loads.
+  // Serve/catch flash halo, then the cone BACK (behind the scoops).
   if (player.flash > 0) {
     glowCircle(ctx, player.x, player.y, CONE_WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
   }
   const coneCx = player.x;
   const coneCy = player.y + CONE_SPRITE_DY;
-  const coneReady = drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.BACK);
-  if (!coneReady) drawTriangleCone(ctx, player);
+  drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.BACK);
 
   const stack = player.stack;
   for (let i = 0; i < stack.length; i++) {
@@ -145,16 +140,10 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
     } else {
       drawScoop(ctx, drawX, drawY, colorKey, drawScale, state);
     }
-
-    // The Scoop-Top sprite frame is the "deliver me next" highlight. Keep the
-    // amber ring only as a fallback for when the sheet hasn't loaded.
-    if (isTop && !scoopSheet.ready) {
-      drawTopRing(ctx, drawX, drawY, SCOOP_RADIUS * drawScale);
-    }
   }
 
   // Cone FRONT — over the scoops, so the bottom scoop nests into the bowl.
-  if (coneReady) drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.FRONT);
+  drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.FRONT);
   ctx.restore();
 
   // Launched-scoop ghosts (committed toss): each rises, stretches tall, and fades
@@ -177,76 +166,14 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
 }
 
 /**
- * Amber selection ring around the top (next-to-be-delivered) scoop. Mirrors the
- * active customer bubble's outline in stations.js (#ffb703 stroke + #ffd166 glow).
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} x @param {number} y @param {number} r drawn scoop radius
- */
-function drawTopRing(ctx, x, y, r) {
-  ctx.save();
-  glowCircle(ctx, x, y, r + 2.5, '#ffd166');
-  ctx.strokeStyle = '#ffb703';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.arc(x, y, r + 2.5, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-/**
- * Flat-triangle cone — the fallback drawn only until the cone sheet image loads
- * (the flash halo is drawn by the caller). @param {CanvasRenderingContext2D} ctx @param {Player} player
- */
-function drawTriangleCone(ctx, player) {
-  const cx = player.x;
-  const cy = player.y;
-  ctx.save();
-  ctx.fillStyle = '#d18a4a';
-  ctx.strokeStyle = '#8a5a2a';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(cx - CONE_WIDTH / 2, cy - CONE_HEIGHT / 2);
-  ctx.lineTo(cx + CONE_WIDTH / 2, cy - CONE_HEIGHT / 2);
-  ctx.lineTo(cx, cy + CONE_HEIGHT / 2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-}
-
-/**
- * One scoop: the sheet sprite for its flavor + state, or a procedural circle
- * fallback (also used for the rainbow power-up). Shared by the tray, the customer
- * mini-cones (stations), the falling field, and anywhere a scoop renders.
+ * One scoop: the sheet sprite for its flavor + state. Shared by the tray, the
+ * customer mini-cones (stations), the falling field, and anywhere a scoop renders.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x @param {number} y
  * @param {ScoopColor | 'rainbow'} colorKey
  * @param {number} [scale]
- * @param {number | string} [state] one of SCOOP_STATE (sprite row); ignored by the circle
+ * @param {number | string} [state] one of SCOOP_STATE (sprite row)
  */
 export function drawScoop(ctx, x, y, colorKey, scale = 1, state = SCOOP_STATE.CONE) {
-  const r = SCOOP_RADIUS * scale;
-  // Sheet sprite for this flavor + state (rainbow is now its own column) when the
-  // sheet's loaded; the procedural circle below is the fallback.
-  if (drawScoopSprite(ctx, x, y, r, colorKey, state)) return;
-  ctx.save();
-  if (colorKey === 'rainbow') {
-    const grad = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
-    RAINBOW_STOPS.forEach((c, i) => grad.addColorStop(i / (RAINBOW_STOPS.length - 1), c));
-    ctx.fillStyle = grad;
-  } else {
-    ctx.fillStyle = COLORS[colorKey];
-  }
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-  ctx.beginPath();
-  ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.25, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  drawScoopSprite(ctx, x, y, SCOOP_RADIUS * scale, colorKey, state);
 }

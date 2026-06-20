@@ -10,7 +10,7 @@
 
 const FRAME = 70;   // cell size, px
 const BODY_R = 35;  // collision-body radius the editor set for every cell
-const COLS = 6;     // columns = flavors: choco, pink, mint, vanilla, blueberry, rainbow
+const COLS = 7;     // 6 flavor columns (choco, pink, mint, vanilla, blueberry, rainbow) + 1 dissolve-outline column
 
 // Sheet rows, top→bottom: the on-screen scoop states, then the fall-speed pairs.
 const ROWS = [

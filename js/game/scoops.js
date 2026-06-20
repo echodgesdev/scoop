@@ -17,6 +17,12 @@ import {
 /** @typedef {import('../types.js').Hitbox} Hitbox */
 /** @typedef {import('../types.js').Tuning} Tuning */
 
+// Dissolve animation (a missed scoop sinking into the sand): it crosses the miss
+// line, takes an instant velocity cut, then keeps drifting at a fraction of its
+// fall speed until culled — a soft sink rather than streaming off-screen.
+const DISSOLVE_IMPACT_DAMP = 0.4;   // velocity kept the instant dissolve starts
+const DISSOLVE_DRIFT_MULT = 0.25;   // fraction of fall speed kept while dissolving
+
 /** @returns {ScoopColor} */
 function randomColor() {
   return COLOR_KEYS[Math.floor(Math.random() * COLOR_KEYS.length)];
@@ -155,7 +161,7 @@ export class ScoopField {
       // Dissolving: drift gently while fading, then cull. Not catchable.
       if (s.dissolve !== undefined) {
         s.dissolve += dt;
-        s.y += s.vy * dt * 0.25;
+        s.y += s.vy * dt * DISSOLVE_DRIFT_MULT;
         if (s.dissolve >= SCOOP_DISSOLVE_S) this.scoops.splice(i, 1);
         continue;
       }
@@ -170,7 +176,7 @@ export class ScoopField {
       // letting it stream off the bottom of the screen.
       if (s.y > missY) {
         s.dissolve = 0;
-        s.vy *= 0.4;
+        s.vy *= DISSOLVE_IMPACT_DAMP;
         continue;
       }
       // Safety net for any scoop that somehow slips past (e.g. an off-screen

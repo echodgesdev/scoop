@@ -26,9 +26,9 @@ import {
   COMBO_BREAKER_DURATION_MULT,
   SPAWN_DEMAND_BIAS,
   WAVE0_DEMAND_BIAS,
-  DELIVERY_MODE,
-  coneYFor,
-  groundYFor
+  CONE_Y,
+  GROUND_Y,
+  pickWeighted
 } from './config.js';
 import { Player } from './player.js';
 import { ScoopField, isCaught } from './scoops.js';
@@ -54,6 +54,10 @@ import { makeMode } from './modes/index.js';
 // (its draw-phase fractions live in the renderer).
 const PU_LEAVE_S = 0.3;
 const ACTIVE_SLIDE_S = 0.7;
+
+// Serve-completion FX (the "✓" tick, the burst, a coin tip) pops this many px
+// above the ground line — up near the customer's face, clear of the cone.
+const SERVE_FX_RISE = 60;
 
 export class World {
   /**
@@ -94,11 +98,7 @@ export class World {
     /** @type {string[]} */
     this._tutorialServed = [];
 
-    // Sim config (debug-tunable). Delivery method: how a tray serves an order
-    // ('any' | 'sequential' | 'whole'). Typed as string since the debug dropdown
-    // sets it from a plain string.
-    /** @type {string} */
-    this.deliveryMode = DELIVERY_MODE.ANY;
+    // Sim config (debug-tunable).
     /** @type {number | null} */
     this.spawnIntervalOverride = null;
     // Combo breaker: the score combo doubles as a charge meter — at this many
@@ -172,7 +172,7 @@ export class World {
   }
 
   /** Y of the sand-floor top edge — the customer ground line (no view dependency). */
-  _groundY() { return groundYFor(this.bounds.height); }
+  _groundY() { return GROUND_Y; }
 
   /**
    * Which regulars can walk up right now: every unlocked one, plus this run's
@@ -213,7 +213,7 @@ export class World {
    * @param {boolean} playWave0 whether the run opens on the tutorial wave
    */
   reset(playWave0) {
-    this.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+    this.player.reposition(this.bounds.width / 2, CONE_Y);
     this.player.clearStack();
     this.player.frozen = false;
     this.field.reset();
@@ -335,9 +335,9 @@ export class World {
   }
 
   /**
-   * Hand the top of the tray to customer `index` (the serve verb). Routes through
-   * the active delivery mode; emits handoff / partialServe presentation events and
-   * forwards completions to _onOrderComplete.
+   * Hand the top of the tray to customer `index` (the serve verb). Any-order,
+   * one-scoop-at-a-time delivery; emits handoff / partialServe presentation
+   * events and forwards completions to _onOrderComplete.
    * @param {number} index a waiting customer the cone is standing at
    */
   serve(index) {
@@ -349,26 +349,11 @@ export class World {
     const rainbow = this.powerups.rainbowActive;
     const customer = this.shop.list[index];
 
-    // 'whole' delivery: the entire tray must equal the order; serve it in one
-    // action (every scoop flies over, the tray clears).
-    if (this.deliveryMode === DELIVERY_MODE.WHOLE) {
-      const result = this.shop.serveWhole(index, this.player.colors(), rainbow);
-      if (!result.accepted) { this.bus.emit('serveFail', /** @type {any} */ ({})); return; }
-      for (let i = 0; i < stack.length; i++) {
-        const p = this.player.scoopPosition(i);
-        customer.order.served.push({ color: stack[i].color, t: 0, srcX: p.x, srcY: p.y });
-        this.bus.emit('handoff', { x: p.x, y: p.y, color: stack[i].color });
-      }
-      this.player.clearStack();
-      this._onOrderComplete(result, customer);
-      return;
-    }
-
-    // 1-at-a-time delivery ('any' or 'sequential'): hand over the top scoop.
+    // Hand over the top scoop.
     const topColor = stack[stack.length - 1].color;
     const srcPos = this.player.scoopPosition(stack.length - 1);
 
-    const result = this.shop.serveOne(index, topColor, rainbow, this.deliveryMode);
+    const result = this.shop.serveOne(index, topColor, rainbow);
     if (!result.accepted) {
       this.bus.emit('serveFail', /** @type {any} */ ({}));
       return;
@@ -389,7 +374,7 @@ export class World {
     this.bus.emit('handoff', { x: srcPos.x, y: srcPos.y, color: topColor });
 
     if (!result.complete) {
-      this.bus.emit('partialServe', { x: customer.x, y: this._groundY() - 60 });
+      this.bus.emit('partialServe', { x: customer.x, y: this._groundY() - SERVE_FX_RISE });
       return;
     }
     this._onOrderComplete(result, customer);
@@ -405,7 +390,7 @@ export class World {
   _onOrderComplete(result, customer) {
     const { gained, colors, event } = result;
     const cx = customer.x;
-    const cy = this._groundY() - 60;
+    const cy = this._groundY() - SERVE_FX_RISE;
 
     const targetY = this._groundY() + CUSTOMER_FACE_OFFSET_PX + customer.yOff;
     this.player.triggerHandoff(customer.x, targetY);
@@ -546,15 +531,8 @@ export class World {
       { type: PICKUP_TYPE.PAUSE,   weight: w[2] || 0 },
       { type: PICKUP_TYPE.RAINBOW, weight: w[3] || 0 }
     ].filter(p => this.challenges.isPowerupUnlocked(p.type));
-    if (pool.length === 0) return null;
-    const total = pool.reduce((a, p) => a + p.weight, 0);
-    if (total <= 0) return pool[Math.floor(Math.random() * pool.length)].type;
-    let r = Math.random() * total;
-    for (const p of pool) {
-      r -= p.weight;
-      if (r <= 0) return p.type;
-    }
-    return pool[pool.length - 1].type;
+    const pick = pickWeighted(pool);
+    return pick ? pick.type : null;
   }
 
   /** Customers expired (patience ran out): take damage; decide death. @param {number} count */

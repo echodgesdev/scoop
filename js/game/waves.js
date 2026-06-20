@@ -13,7 +13,8 @@ import {
   ORDER_SIZE_WEIGHTS,
   DISCOVERY_BIAS_START,
   DISCOVERY_BIAS_END,
-  lerp
+  lerp,
+  pickWeighted
 } from './config.js';
 import { recipesForWave } from './recipes.js';
 
@@ -268,18 +269,9 @@ export class Waves {
     }
     const sizes = [...bySize.keys()];
     const weights = ORDER_SIZE_WEIGHTS[Math.min(day, ORDER_SIZE_WEIGHTS.length - 1)] || {};
-    let chosenSize = sizes[0];
-    const sizeWeights = sizes.map(s => Math.max(0, weights[s] != null ? weights[s] : 1));
-    const total = sizeWeights.reduce((a, b) => a + b, 0);
-    if (total > 0) {
-      let roll = Math.random() * total;
-      for (let i = 0; i < sizes.length; i++) {
-        roll -= sizeWeights[i];
-        if (roll <= 0) { chosenSize = sizes[i]; break; }
-      }
-    } else {
-      chosenSize = sizes[Math.floor(Math.random() * sizes.length)];
-    }
+    const sizePool = sizes.map(s => ({ size: s, weight: Math.max(0, weights[s] != null ? weights[s] : 1) }));
+    const pickedSize = pickWeighted(sizePool);
+    const chosenSize = pickedSize ? pickedSize.size : sizes[0];
     let candidates = bySize.get(chosenSize) || pool;
 
     // 2. Discovery bias (waves 1+): bigger waves favor surfacing recipes the

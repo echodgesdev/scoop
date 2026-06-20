@@ -1,14 +1,13 @@
 // @ts-check
 import { SCOOP_RADIUS, SCOOP_DISSOLVE_S } from '../game/config.js';
-import { drawScoop } from './playerView.js';
-import { SCOOP_STATE, drawFallingScoop } from './sprites.js';
+import { drawFallingScoop, drawDissolveSprite } from './sprites.js';
 
 /** @typedef {import('../game/scoops.js').ScoopField} ScoopField */
 
 /**
- * Draw the falling-scoop field. Live scoops draw plain; missed ones fade + shrink
- * with an expanding white poof ring so the miss reads as fizzling into the sand.
- * Reads the field; never mutates it.
+ * Draw the falling-scoop field. Live scoops draw plain; a missed scoop cross-
+ * fades into the sand — the scoop fades out while a translucent outline fades in
+ * over it and flattens down. Reads the field; never mutates it.
  * @param {CanvasRenderingContext2D} ctx
  * @param {ScoopField} field
  * @param {boolean} [rainbow] repaint every scoop as rainbow (purely visual)
@@ -24,16 +23,22 @@ export function drawField(ctx, field, rainbow = false, alpha = 1) {
       drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color, s.speedMult);
       continue;
     }
+    // Missed: cross-fade into the sand. The scoop fades out as it sinks, while a
+    // translucent outline fades IN over it and flattens down — a soft imprint
+    // pressed into the sand rather than a hard sprite swap.
     const p = Math.min(1, s.dissolve / SCOOP_DISSOLVE_S);
     ctx.save();
-    ctx.globalAlpha = 1 - p;
-    drawScoop(ctx, s.x, y, rainbow ? 'rainbow' : s.color, 1 - 0.4 * p, SCOOP_STATE.DEFAULT);
-    ctx.globalAlpha = (1 - p) * 0.6;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(s.x, y, SCOOP_RADIUS * (1 + 0.7 * p), 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.globalAlpha = 1 - p;                       // scoop fades out
+    drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color);
+    ctx.restore();
+    ctx.save();
+    ctx.globalAlpha = 0.55 * p;                    // outline fades in, kept translucent
+    const flatten = 1 - 0.7 * p;                   // squash vertically into the sand
+    const baseY = y + SCOOP_RADIUS;                // press down from the scoop's base
+    ctx.translate(s.x, baseY);
+    ctx.scale(1, flatten);
+    ctx.translate(-s.x, -baseY);
+    drawDissolveSprite(ctx, s.x, y, SCOOP_RADIUS);
     ctx.restore();
   }
 }

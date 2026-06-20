@@ -1,5 +1,5 @@
 // @ts-check
-import { PICKUP_TYPE, PICKUP_TO_POWER, CUSTOMER_FACE_OFFSET_PX } from '../config.js';
+import { PICKUP_TYPE, PICKUP_TO_POWER, CUSTOMER_FACE_OFFSET_PX, pickWeighted } from '../config.js';
 import { STATE, REACH } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
 import { drawScoop } from '../../view/playerView.js';
@@ -629,13 +629,8 @@ export class TippingMode {
     }
     if (types.length === 0) return null;   // nothing eligible right now → no tip
 
-    const total = weights.reduce((a, b) => a + b, 0) || 1;
-    let r = Math.random() * total;
-    let pick = types[types.length - 1];
-    for (let i = 0; i < types.length; i++) {
-      r -= weights[i];
-      if (r <= 0) { pick = types[i]; break; }
-    }
+    const picked = pickWeighted(types.map((t, i) => ({ type: t, weight: weights[i] })));
+    const pick = picked ? picked.type : types[types.length - 1];
     // Charge a major against the day budget so the big ones stay rationed.
     if (pick !== PICKUP_TYPE.COIN && pick !== PICKUP_TYPE.HEART) this._majorTipsToday += 1;
     return pick;

@@ -90,8 +90,7 @@ export function drawFrame(ctx, game, alpha = 1) {
   const pausePatience = world.powerups.pauseActive || !game.flags.patternTimer;
   game.stations.draw(ctx, world.shop.list, {
     activeIndex:    world.shop.customerAt(world.player.x),
-    canServe:       i => world.shop.canServe(i, world.player.colors(), rainbow, world.deliveryMode),
-    hex:            c => world.shop.hex(c),
+    canServe:       i => world.shop.canServe(i, world.player.colors(), rainbow),
     pausePatience,
     rainbow,
     time:           game.clock,

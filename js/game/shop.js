@@ -5,8 +5,7 @@ import {
   PATTERN_TIME_START,
   COMBO_DECAY_S,
   PARTIAL_SERVE_EXTEND_S,
-  SERVED_FLIGHT_S,
-  DELIVERY_MODE
+  SERVED_FLIGHT_S
 } from './config.js';
 import { pickCustomer, CHARACTERS } from './customers.js';
 
@@ -435,49 +434,38 @@ export class Shop {
   }
 
   /**
-   * Would pressing ↑ here do something useful right now? Depends on the
-   * delivery mode (drives the green-bubble glow):
-   *   'any'        — top tray scoop is any color still in the order (default)
-   *   'sequential' — top tray scoop is the NEXT color in the order
-   *   'whole'      — the whole tray exactly equals the order (deliver at once)
-   * Rainbow is a wildcard for the 1-at-a-time modes.
+   * Would pressing ↑ here do something useful right now? (Drives the green-bubble
+   * glow.) True when the top tray scoop is any color the order still needs;
+   * rainbow is a wildcard, accepted as long as the order isn't yet complete.
    * @param {number} index
    * @param {ScoopColor[]} trayColors bottom-to-top
    * @param {boolean} [rainbow]
-   * @param {'any'|'sequential'|'whole'} [mode]
    */
-  canServe(index, trayColors, rainbow = false, mode = DELIVERY_MODE.ANY) {
+  canServe(index, trayColors, rainbow = false) {
     const c = this.customers[index];
     if (!c || c.state !== STATE.WAITING) return false;
     if (trayColors.length === 0) return false;
     const order = c.order.colors;
-    if (mode === DELIVERY_MODE.WHOLE) {
-      if (rainbow) return trayColors.length === order.length;
-      return multisetEqual(trayColors, order);
-    }
     if (rainbow) return order.length > 0;
     const top = trayColors[trayColors.length - 1];
-    if (mode === DELIVERY_MODE.SEQUENTIAL) return order[0] === top;
     return order.includes(top);
   }
 
   /**
-   * Hand one scoop (the top of the tray) to the customer under 'any' or
-   * 'sequential' delivery. Shrinks the remaining order by one and extends
-   * patience; completes the order when the last slot fills.
+   * Hand one scoop (the top of the tray) to the customer (any-order delivery).
+   * Shrinks the remaining order by one and extends patience; completes the order
+   * when the last slot fills.
    * @param {number} index
    * @param {ScoopColor} topColor
    * @param {boolean} [rainbow] wildcard: fills the next slot regardless of color
-   * @param {'any'|'sequential'} [mode]
    * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').TipName|null) }}
    */
-  serveOne(index, topColor, rainbow = false, mode = DELIVERY_MODE.ANY) {
+  serveOne(index, topColor, rainbow = false) {
     const c = this.customers[index];
     if (!c || c.state !== STATE.WAITING) return { accepted: false, complete: false };
 
     let matchIdx;
     if (rainbow) matchIdx = c.order.colors.length > 0 ? 0 : -1;
-    else if (mode === DELIVERY_MODE.SEQUENTIAL) matchIdx = c.order.colors[0] === topColor ? 0 : -1;
     else matchIdx = c.order.colors.indexOf(topColor);
     if (matchIdx < 0) return { accepted: false, complete: false };
 
@@ -492,26 +480,8 @@ export class Shop {
   }
 
   /**
-   * 'whole' delivery: the entire tray must equal the order (multiset). If it
-   * does, the order completes in one action and the caller clears the stack.
-   * @param {number} index
-   * @param {ScoopColor[]} trayColors
-   * @param {boolean} [rainbow] wildcard: only the count must match
-   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').TipName|null) }}
-   */
-  serveWhole(index, trayColors, rainbow = false) {
-    const c = this.customers[index];
-    if (!c || c.state !== STATE.WAITING) return { accepted: false, complete: false };
-    const ok = rainbow ? trayColors.length === c.order.colors.length
-                       : multisetEqual(trayColors, c.order.colors);
-    if (!ok) return { accepted: false, complete: false };
-    c.order.colors.length = 0;
-    return { accepted: true, complete: true, ...this._completeOrder(c) };
-  }
-
-  /**
    * Finalize a completed order: bank combo + score, mark the customer leaving,
-   * notify the wave director, and surface any tip. Shared by all delivery modes.
+   * notify the wave director, and surface any tip.
    * @param {Customer} c
    */
   _completeOrder(c) {
@@ -536,20 +506,4 @@ export class Shop {
 
     return { gained, colors, event, tip };
   }
-}
-
-/**
- * Order-independent equality of two color lists (same length, same counts).
- * @param {ScoopColor[]} a @param {ScoopColor[]} b
- */
-function multisetEqual(a, b) {
-  if (a.length !== b.length) return false;
-  /** @type {Record<string, number>} */
-  const counts = {};
-  for (const x of a) counts[x] = (counts[x] || 0) + 1;
-  for (const y of b) {
-    if (!counts[y]) return false;
-    counts[y] -= 1;
-  }
-  return true;
 }

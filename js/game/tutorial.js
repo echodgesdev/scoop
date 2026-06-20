@@ -64,7 +64,7 @@ export class TutorialBase {
     if (idx < 0) {
       return { text: touch ? 'Drag to a customer' : '◀  Move to a customer  ▶', x: px, y: underCone, point: 'up' };
     }
-    if (world.shop.canServe(idx, world.player.colors(), false, world.deliveryMode)) {
+    if (world.shop.canServe(idx, world.player.colors(), false)) {
       return { text: touch ? 'Tap to serve' : '↑ / Enter — Serve', x: px, y: coneTop - 28, point: 'down' };
     }
     const customer = world.shop.list[idx];

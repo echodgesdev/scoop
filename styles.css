@@ -408,13 +408,6 @@ body.day-hint #gauge::before {
   100% { box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.4); transform: translateX(0); }
 }
 
-.swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid #333;
-}
-
 #game {
   display: block;
   /* Backing store is the virtual resolution; CSS stretches it to fill #stage,
@@ -595,13 +588,6 @@ body.menu-visible #hud {
   flex-direction: column;
   gap: 8px;
 }
-.debug-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 15px;
-}
-
 .debug-row {
   display: flex;
   align-items: center;
@@ -2157,14 +2143,6 @@ button.flash {
 }
 .pause-modal .wt-title {
   color: #6a4a2a;
-}
-/* Pause menu has extra buttons (Regulars, Power-ups) beyond the 3-column grid;
-   center each on its own full-width row so they don't dangle. Scoped to the
-   pause buttons, so the wave-transition overlay (3 buttons) is untouched. */
-.wt-buttons #pauseRegularsBtn,
-.wt-buttons #pausePowerupsBtn {
-  grid-column: 1 / -1;
-  justify-self: center;
 }
 
 /* =========================================================================

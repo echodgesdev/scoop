@@ -18,7 +18,7 @@ import {
   MAX_HEALTH,
   COMBO_CASHOUT_PER,
   SPAWN_DEMAND_BIAS,
-  coneYFor
+  CONE_Y
 } from './game/config.js';
 import { Stations } from './view/stations.js';
 import { Hud } from './view/hud.js';
@@ -220,8 +220,6 @@ export class Game {
       getPowerupWeights: () => this.world.powerupWeights,
       onTutorialFlag: v => this.setShowTutorial(v),
       getTutorialFlag: () => this.showTutorial,
-      onDeliveryMode: name => { this.world.deliveryMode = name; },
-      getDeliveryMode: () => this.world.deliveryMode,
       onMaxStack: n => { this.world.maxStack = Math.max(1, Math.round(n)); },
       getMaxStack: () => this.world.maxStack,
       onMaxLive: n => this.world.field.setMaxLive(n),
@@ -301,7 +299,7 @@ export class Game {
   _applyAspect() {
     this.canvas.width = this.bounds.width;
     this.canvas.height = this.bounds.height;
-    this.world.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+    this.world.player.reposition(this.bounds.width / 2, CONE_Y);
     this.stations.layout(this.bounds);
     this.world.shop.layout(this.bounds.width);
     this._resize();
@@ -448,7 +446,7 @@ export class Game {
       this.bounds.height = d.height;
       this.canvas.width = d.width;
       this.canvas.height = d.height;
-      this.world.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+      this.world.player.reposition(this.bounds.width / 2, CONE_Y);
       this.stations.layout(this.bounds);
       this.world.shop.layout(this.bounds.width);
       // Reassigning canvas.width wipes the backing store to transparent, and
@@ -796,7 +794,7 @@ export class Game {
     this.world.waves.endCelebration();
     // Reset the cone to center for the fresh day — it snaps back during the night
     // sweep so every day opens from the middle.
-    this.world.player.reposition(this.bounds.width / 2, coneYFor(this.bounds.height));
+    this.world.player.reposition(this.bounds.width / 2, CONE_Y);
     this.nightT = 0;
     this.inNightCycle = true;
   }

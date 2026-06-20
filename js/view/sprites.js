@@ -13,6 +13,12 @@ import SCOOP_FAST_SPRITE from './sprites/scoopFastSprite.js';
 // Sheet columns, left→right (shared layout for both sheets).
 const FLAVOR_COL = { choco: 0, pink: 1, mint: 2, vanilla: 3, blueberry: 4, rainbow: 5 };
 
+// The dissolve "poof": a scoop-outline cell in the extra 7th column (beyond the
+// six flavor columns), drawn shrinking + fading as a missed scoop sinks into the
+// sand. Single frame, color-agnostic — base-sheet row index 1 ('Scoop'), col 6.
+const DISSOLVE_ROW = 1;
+const DISSOLVE_COL = 6;
+
 // On-screen scoop states (base-sheet row names). Falling scoops use DEFAULT (or
 // the fast sheet via drawFallingScoop); the tray stack uses CONE / CONE_TOP.
 export const SCOOP_STATE = Object.freeze({
@@ -73,6 +79,21 @@ function drawFrom(sheet, ctx, x, y, r, color, state) {
  */
 export function drawScoopSprite(ctx, x, y, r, color, state) {
   return drawFrom(scoopSheet, ctx, x, y, r, color, state);
+}
+
+/**
+ * Blit the scoop-outline dissolve frame, scaled to world radius `r`. The caller
+ * sets globalAlpha for the fade. Color-agnostic. Returns false if the sheet isn't
+ * loaded / the frame is missing.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} x @param {number} y @param {number} r
+ * @returns {boolean}
+ */
+export function drawDissolveSprite(ctx, x, y, r) {
+  const f = scoopSheet.frame(DISSOLVE_ROW, DISSOLVE_COL);
+  if (!f) return false;
+  const bodyR = (f.body && f.body.radius) ? f.body.radius : scoopSheet.frameH / 2;
+  return scoopSheet.draw(ctx, DISSOLVE_ROW, DISSOLVE_COL, x, y, r / bodyR);
 }
 
 /**
