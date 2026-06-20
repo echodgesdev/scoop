@@ -3,8 +3,9 @@
 // elements + its own rendering/wiring:
 //   liveHud.js        — the always-on readouts (score / combo / gauge / health / day-hint + flashes)
 //   journal.js        — the tabbed collection hub + the tap-a-coin detail popup
-//   waveTransition.js — the between-day flow (cross-offs → unlock flips → countdown)
-//   screens.js        — title / game-over / settings / pause overlays + their button wiring
+//   roundOver.js      — the full-screen round-over modal (next-wave AND game over): tap-gated
+//                       sequence of cross-offs → unlock carousel → score card
+//   screens.js        — title / settings / pause overlays + their button wiring
 //   toastUI.js        — mid-play toasts
 // This file builds those controllers, injects the few cross-concern callbacks
 // between them (e.g. "open the Journal", "go Home", re-render on reset), and
@@ -13,7 +14,7 @@
 import { Toasts } from './toastUI.js';
 import { LiveHud } from './liveHud.js';
 import { Journal } from './journal.js';
-import { WaveTransition } from './waveTransition.js';
+import { RoundOver } from './roundOver.js';
 import { Screens } from './screens.js';
 
 export class Hud {
@@ -34,8 +35,9 @@ export class Hud {
     // The tabbed Journal hub + its tap-a-coin detail popup.
     this.journal = new Journal({ journalOverlayEl, recipes, challenges, regulars });
 
-    // The between-day wave-transition flow. Reaches the Journal + Home via callbacks.
-    this.waveTransition = new WaveTransition({
+    // The full-screen round-over modal (next-wave + game over). Reaches the Journal
+    // + Home via callbacks.
+    this.roundOver = new RoundOver({
       overlayEl: waveTransitionOverlayEl, challenges, sound,
       onShowJournal: () => this.journal.show(),
       onHome
@@ -76,25 +78,31 @@ export class Hud {
   showDiscoveryToast(name) { this.toasts.discovery(name); }
 
   // === Menu screens → Screens =================================================
-  /** Home target: hide the journal + wave transition, then rebuild the title. */
+  /** Home target: hide the journal + round-over modal, then rebuild the title. */
   showTitle() {
     this.journal.hide();
-    this.waveTransition.hide();
+    this.roundOver.hide();
     this.screens.showTitle();
   }
   hideOverlay() { this.screens.hideOverlay(); }
   /**
+   * Game over routes through the same full-screen modal as the next-wave recap
+   * (item: identical except the primary button). Screens owns the best-score, so
+   * record it there first, then hand the result to the modal's score card.
    * @param {{ score: number, dayCombo: number, bestCombo: number, favFlavor: string }} stats
    * @param {() => void} onRestart
    * @param {{ unlocked: string[], mastered: string[] }} [recipeEvents]
    */
-  showGameOver(stats, onRestart, recipeEvents) { this.screens.showGameOver(stats, onRestart, recipeEvents); }
+  showGameOver(stats, onRestart, recipeEvents) {
+    const { isRecord, best } = this.screens.recordScore(stats.score);
+    this.roundOver.showGameOver({ stats, onRestart, recipeEvents, isRecord, best });
+  }
   /** @param {{ onResume: () => void }} opts */
   showPauseMenu(opts) { this.screens.showPauseMenu(opts); }
   hidePauseMenu() { this.screens.hidePauseMenu(); }
 
-  // === Wave transition → WaveTransition =======================================
-  /** @param {Parameters<WaveTransition['show']>[0]} opts */
-  showWaveTransition(opts) { this.waveTransition.show(opts); }
-  hideWaveTransition() { this.waveTransition.hide(); }
+  // === Round-over modal → RoundOver ===========================================
+  /** @param {Parameters<RoundOver['showNextWave']>[0]} opts */
+  showWaveTransition(opts) { this.roundOver.showNextWave(opts); }
+  hideWaveTransition() { this.roundOver.hide(); }
 }

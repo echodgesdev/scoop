@@ -2,7 +2,7 @@
 // Wave-transition (between-day) card markup: the end-of-day stats grid, the
 // "Complete the Week" meter, and the unlock-reveal flip coins (a committed
 // challenge reward mapped to a card, then rendered as a back→front flip). Pure
-// string builders, driven by waveTransition.js.
+// string builders, driven by roundOver.js.
 //
 // The reveals show collection items, so the regular-face crop + recipe ring come
 // from collectionTemplate and the recipe scoops from coinTemplate — no redefining.
@@ -16,14 +16,23 @@ import { regularFacePos, RECIPE_RING } from './collectionTemplate.js';
 // The unlock-reveal face tile (px) — larger than the journal coin's; matches styles.css.
 const REGULAR_FACE_TILE = 120;
 
-/** End-of-day stat card: score, the day's best combo, the run's longest combo, favorite flavor. */
-export function wtStatsHtml(s) {
-  const cell = (label, value) =>
-    `<div class="wt-stat"><div class="wt-stat-value">${value}</div><div class="wt-stat-label">${label}</div></div>`;
-  return cell('Score', s.score)
-    + cell('Combo Today', `${s.dayCombo}×`)
-    + cell('Longest Combo', `${s.bestCombo}×`)
-    + cell('Favorite', s.favFlavor);
+/**
+ * End-of-round score card as a table (label · value rows). On game over, a Best
+ * row is appended and flagged when it's a new record.
+ * @param {{ score: number, dayCombo: number, bestCombo: number, favFlavor: string }} stats
+ * @param {{ isRecord?: boolean, best?: number }} [extra]
+ */
+export function scoreTableHtml(stats, extra = {}) {
+  const rows = [
+    ['Score', stats.score],
+    ['Combo Today', `${stats.dayCombo}×`],
+    ['Longest Combo', `${stats.bestCombo}×`],
+    ['Favorite', stats.favFlavor]
+  ];
+  if (extra.best != null) rows.push(['Best', extra.isRecord ? '🏆 NEW BEST!' : extra.best]);
+  const body = rows.map(([label, value]) =>
+    `<div class="ro-score-row"><span class="ro-score-label">${label}</span><span class="ro-score-value">${value}</span></div>`).join('');
+  return `<div class="ro-score-table">${body}</div>`;
 }
 
 /**

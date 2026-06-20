@@ -1,14 +1,12 @@
 // @ts-check
-// The menu overlays: the title screen ↔ game-over card (they share one element),
-// the Settings modal, and the Pause menu — plus the best-score line and the
-// idempotent wiring for every menu button across them. The persistent buttons
-// (settings sliders, pause, reset…) wire once via a dataset guard; the buttons
-// recreated on each overlay rewrite (#startBtn, #journalBtn, #homeBtn, #settingsBtn)
-// re-wire themselves each call. Cross-concern buttons (open Journal, Home) fire
-// injected callbacks. Card markup from the template builders.
+// The menu overlays: the title screen, the Settings modal, and the Pause menu —
+// plus the best-score record and the idempotent wiring for every menu button across
+// them. The persistent buttons (settings sliders, pause, reset…) wire once via a
+// dataset guard; the title buttons recreated on rebuild (#startBtn, #journalBtn,
+// #settingsBtn) re-wire themselves each call. Cross-concern buttons (open Journal)
+// fire injected callbacks. (Game over now routes through the round-over modal.)
 
 import { challengeRow } from './templates/challengeTemplate.js';
-import { wtStatsHtml } from './templates/waveTransitionTemplate.js';
 
 const BEST_KEY = 'scoop.best';
 
@@ -36,8 +34,8 @@ export class Screens {
     onStart, onHowToPlay, onPauseToggle, onHome, onResetProgress, onShowJournal
   }) {
     this.overlayEl = overlayEl;
-    // Snapshot the title markup now (from index.html) so Home can rebuild it —
-    // showGameOver overwrites overlayEl's contents with the game-over card.
+    // Snapshot the title markup so showTitle can rebuild it with fresh button
+    // elements, keeping the (guard-less) re-wiring idempotent.
     this._titleHtml = overlayEl ? overlayEl.innerHTML : '';
     this.settingsOverlayEl = settingsOverlayEl;
     this.pauseOverlayEl = pauseOverlayEl;
@@ -110,12 +108,7 @@ export class Screens {
     const journalBtn = document.getElementById('journalBtn');
     if (journalBtn) journalBtn.addEventListener('click', () => this.onShowJournal());
 
-    // 🏠 Home on the game-over card (recreated each showGameOver, like #journalBtn,
-    // so it re-wires each call). The run already ended here — no confirm.
-    const homeBtn = document.getElementById('homeBtn');
-    if (homeBtn) homeBtn.addEventListener('click', () => this.onHome());
-
-    // Settings is a menu item on three overlays (home, game-over card, pause).
+    // Settings is a menu item on the title + pause overlays.
     // Each wires once via the dataset guard; #settingsBtn is recreated on every
     // overlay rewrite, so it re-wires itself then.
     const settingsBtn = document.getElementById('settingsBtn');
@@ -211,9 +204,9 @@ export class Screens {
 
   /**
    * Rebuild + show the title screen and hide the settings/pause menus — the Home
-   * target. showGameOver replaced the start markup with the game-over card, so
-   * restore the snapshot taken at construction, then re-wire and refresh the
-   * best-score line. (The coordinator hides the Journal + wave-transition first.)
+   * target. Rebuilds the title markup from the construction snapshot so its buttons
+   * get fresh listeners on re-wire, then refreshes the best-score line. (The
+   * coordinator hides the Journal + round-over modal first.)
    */
   showTitle() {
     this.hideSettings();
@@ -292,7 +285,7 @@ export class Screens {
     if (this.pauseOverlayEl) this.pauseOverlayEl.classList.add('hidden');
   }
 
-  // === Title / game-over ====================================================
+  // === Best score ============================================================
 
   /** Title screen: surface the current best so there's something to beat. */
   showTitleBest() {
@@ -301,67 +294,17 @@ export class Screens {
   }
 
   /**
-   * @param {{ score: number, dayCombo: number, bestCombo: number, favFlavor: string }} stats
-   * @param {() => void} onRestart
-   * @param {{ unlocked: string[], mastered: string[] }} [recipeEvents]
+   * Record a final score: persist the best, refresh the title line, and report
+   * whether it set a new record (the round-over modal shows it on the score card).
+   * @param {number} score @returns {{ isRecord: boolean, best: number }}
    */
-  showGameOver(stats, onRestart, recipeEvents = { unlocked: [], mastered: [] }) {
-    const isRecord = stats.score > this.best;
+  recordScore(score) {
+    const isRecord = score > this.best;
     if (isRecord) {
-      this.best = stats.score;
-      localStorage.setItem(BEST_KEY, String(stats.score));
+      this.best = score;
+      localStorage.setItem(BEST_KEY, String(score));
     }
-
-    this.onStart = onRestart;
-
-    const nUnlocked = recipeEvents.unlocked.length;
-    const nMastered = recipeEvents.mastered.length;
-    const celebrations = [];
-    if (nUnlocked > 0) {
-      celebrations.push(`<p class="celebration unlock">🎉 ${nUnlocked} NEW RECIPE${nUnlocked > 1 ? 'S' : ''} UNLOCKED!</p>`);
-    }
-    if (nMastered > 0) {
-      celebrations.push(`<p class="celebration master">⭐ ${nMastered} RECIPE${nMastered > 1 ? 'S' : ''} MASTERED!</p>`);
-    }
-    // Flash the Journal button as a CTA when there's something to celebrate.
-    const flashCls = (nUnlocked > 0 || nMastered > 0) ? ' flash' : '';
-
-    // Build the current-challenges section that lives inside the card.
-    let challengesSection = '';
-    if (this.challenges) {
-      const cur = this.challenges.getCurrentSet();
-      if (cur) {
-        const rows = cur.challenges.map(ch => challengeRow(ch)).join('');
-        challengesSection = `
-          <div class="card-divider"></div>
-          <div class="gameover-challenges-header">
-            <span class="set-tag">Week ${cur.index + 1}</span>
-            <span class="set-tag-name">${cur.name}</span>
-          </div>
-          <div class="gameover-challenges-list">${rows}</div>`;
-      } else {
-        challengesSection = `
-          <div class="card-divider"></div>
-          <p class="celebration master">🏆 ALL CHALLENGES COMPLETE!</p>`;
-      }
-    }
-
-    this._setMenuVisible(true);
-    this.overlayEl.classList.remove('hidden');
-    this.overlayEl.innerHTML = `
-      ${celebrations.join('')}
-      <div class="gameover-card">
-        <div class="wt-stats">${wtStatsHtml(stats)}</div>
-        <div class="best-line">${isRecord ? '🏆 NEW BEST!' : `Best ever <strong>${this.best}</strong>`}</div>
-        ${challengesSection}
-      </div>
-      <div class="menu-buttons gameover-buttons">
-        <button id="journalBtn" class="secondary${flashCls}">📔 Journal</button>
-        <button id="startBtn">▶ Play Again</button>
-        <button id="homeBtn" class="secondary">🏠 Home</button>
-        <button id="settingsBtn" class="secondary gameover-settings-btn">⚙️ Settings</button>
-      </div>
-    `;
-    this._wireMenuButtons();
+    this.showTitleBest();
+    return { isRecord, best: this.best };
   }
 }
