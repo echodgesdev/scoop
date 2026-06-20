@@ -1,10 +1,11 @@
 // @ts-check
-// The menu overlays: the title screen, the Settings modal, and the Pause menu —
-// plus the best-score record and the idempotent wiring for every menu button across
-// them. The persistent buttons (settings sliders, pause, reset…) wire once via a
-// dataset guard; the title buttons recreated on rebuild (#startBtn, #journalBtn,
-// #settingsBtn) re-wire themselves each call. Cross-concern buttons (open Journal)
-// fire injected callbacks. (Game over now routes through the round-over modal.)
+// The menu overlays: the title screen (tap-to-begin + a Journal/High-Scores/Settings
+// bottom bar), the Settings + High Scores modals, and the Pause menu — plus the
+// best-score record and the idempotent wiring for every menu button. Persistent
+// buttons (settings sliders, pause, reset…) wire once via a dataset guard; the title
+// buttons + tap target are recreated on each rebuild, so they re-wire each call.
+// Cross-concern buttons (open Journal) fire injected callbacks. (Game over routes
+// through the round-over modal.)
 
 import { challengeListHtml } from './templates/challengeTemplate.js';
 
@@ -39,6 +40,7 @@ export class Screens {
     this._titleHtml = overlayEl ? overlayEl.innerHTML : '';
     this.settingsOverlayEl = settingsOverlayEl;
     this.pauseOverlayEl = pauseOverlayEl;
+    this.highScoresOverlayEl = document.getElementById('highScoresOverlay');
     /** @type {import('../../game/challenges.js').Challenges} */
     this.challenges = challenges;
 
@@ -78,7 +80,6 @@ export class Screens {
     // Initial state: title screen is visible so the HUD should be faded out
     // until the player presses Start. Managed via body.menu-visible.
     this._setMenuVisible(true);
-    this.showTitleBest();
     this._wireMenuButtons();
   }
 
@@ -89,8 +90,20 @@ export class Screens {
    * rewrite so freshly-created buttons get listeners.
    */
   _wireMenuButtons() {
-    const startBtn = document.getElementById('startBtn');
-    if (startBtn) startBtn.addEventListener('click', () => this.onStart());
+    // Tap anywhere on the title content (not the bottom bar) to begin — the same
+    // "tap" verb as the round-over modal. Recreated each title rebuild, so re-wired.
+    const titleContent = this.overlayEl ? this.overlayEl.querySelector('.title-content') : null;
+    if (titleContent) titleContent.addEventListener('click', () => this.onStart());
+
+    // High Scores modal (placeholder for now). #highScoresBtn is recreated on the
+    // title rebuild so it re-wires each call; its Close button is persistent (guard).
+    const highScoresBtn = document.getElementById('highScoresBtn');
+    if (highScoresBtn) highScoresBtn.addEventListener('click', () => this.showHighScores());
+    const closeHighScoresBtn = document.getElementById('closeHighScoresBtn');
+    if (closeHighScoresBtn && !closeHighScoresBtn.dataset.wired) {
+      closeHighScoresBtn.addEventListener('click', () => this.hideHighScores());
+      closeHighScoresBtn.dataset.wired = '1';
+    }
 
     // How to Play lives in the Settings modal now (persistent element → guard
     // against re-wiring). Close Settings first, then launch the tutorial. The
@@ -103,8 +116,7 @@ export class Screens {
     }
 
     // Journal hub: one button that opens the tabbed collections. #journalBtn is
-    // recreated on the title + game-over overlays, so (like #startBtn) it re-wires
-    // itself each call — no dataset guard.
+    // recreated on each title rebuild, so it re-wires itself each call — no guard.
     const journalBtn = document.getElementById('journalBtn');
     if (journalBtn) journalBtn.addEventListener('click', () => this.onShowJournal());
 
@@ -215,7 +227,6 @@ export class Screens {
     this._setMenuVisible(true);
     this.overlayEl.classList.remove('hidden');
     this._wireMenuButtons();
-    this.showTitleBest();
   }
 
   /**
@@ -262,6 +273,23 @@ export class Screens {
     if (this.settingsOverlayEl) this.settingsOverlayEl.classList.add('hidden');
   }
 
+  // === High scores (placeholder) ============================================
+
+  showHighScores() {
+    if (!this.highScoresOverlayEl) return;
+    const body = this.highScoresOverlayEl.querySelector('.highscores-body');
+    if (body) {
+      body.innerHTML = this.best > 0
+        ? `<div class="highscore-row"><span class="highscore-label">Best</span><span class="highscore-value">${this.best}</span></div>`
+        : `<div class="highscore-empty">No runs yet — tap to begin!</div>`;
+    }
+    this.highScoresOverlayEl.classList.remove('hidden');
+  }
+
+  hideHighScores() {
+    if (this.highScoresOverlayEl) this.highScoresOverlayEl.classList.add('hidden');
+  }
+
   // === Pause menu ===========================================================
 
   /** @param {{ onResume: () => void }} opts */
@@ -286,15 +314,9 @@ export class Screens {
 
   // === Best score ============================================================
 
-  /** Title screen: surface the current best so there's something to beat. */
-  showTitleBest() {
-    const el = document.getElementById('title-best');
-    if (el) el.textContent = this.best > 0 ? `Best: ${this.best}` : '';
-  }
-
   /**
-   * Record a final score: persist the best, refresh the title line, and report
-   * whether it set a new record (the round-over modal shows it on the score card).
+   * Record a final score: persist the best and report whether it set a new record
+   * (shown on the round-over score card + the High Scores modal).
    * @param {number} score @returns {{ isRecord: boolean, best: number }}
    */
   recordScore(score) {
@@ -303,7 +325,6 @@ export class Screens {
       this.best = score;
       localStorage.setItem(BEST_KEY, String(score));
     }
-    this.showTitleBest();
     return { isRecord, best: this.best };
   }
 }

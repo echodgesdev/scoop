@@ -158,14 +158,16 @@
   </div>
 
   <div id="overlay">
-    <h1>🍦 <span class="title-word">Poop in a Scoop</span> 🍦</h1>
-    <p class="tagline">Serve the beach’s freshest scoops!</p>
-    <div class="menu-buttons">
-      <button id="startBtn">▶ Start</button>
+    <div class="title-content">
+      <h1><span class="title-word">Poop in a Scoop</span></h1>
+      <p class="tagline">Serve the beach’s freshest scoops!</p>
+      <div class="title-tap">tap to begin</div>
+    </div>
+    <div class="title-buttons wt-buttons">
       <button id="journalBtn" class="secondary">📔 Journal</button>
+      <button id="highScoresBtn" class="secondary">🏆 High Scores</button>
       <button id="settingsBtn" class="secondary">⚙️ Settings</button>
     </div>
-    <p id="title-best"></p>
   </div>
 
   <!-- Journal hub: one tabbed home for the four read-only collection screens
@@ -267,6 +269,14 @@
         <p class="settings-danger-note">Wipes challenges, recipes, power-ups &amp; unlocked regulars. This cannot be undone.</p>
       </div>
       <button id="closeSettingsBtn">Close</button>
+    </div>
+  </div>
+
+  <div id="highScoresOverlay" class="hidden">
+    <div class="settings-modal highscores-modal">
+      <h2>🏆 High Scores</h2>
+      <div class="highscores-body"></div>
+      <button id="closeHighScoresBtn">Close</button>
     </div>
   </div>
   </div><!-- #stage -->

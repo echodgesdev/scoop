@@ -335,11 +335,6 @@ body.day-hint #gauge::before {
   margin: 4px 0;
 }
 
-#title-best {
-  font-size: 26px;
-  font-weight: bold;
-  color: #ffd166;
-}
 
 #health-panel {
   /* Two-row layout: health bar on top, score below — they share one panel
@@ -421,12 +416,9 @@ body.day-hint #gauge::before {
 #overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  color: white;
+  color: white;       /* background set by the parlor theme below */
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;   /* tap-to-begin content (flex:1) + bottom button bar */
   z-index: 20;
   text-align: center;
 }
@@ -441,9 +433,8 @@ body.day-hint #gauge::before {
   max-width: 600px;
 }
 
-/* (Overlay buttons are styled by .menu-buttons + the parlor theme at the end
-   of this file — a legacy `#overlay button` rule used to live here and its ID
-   specificity overrode every class-level button style inside the overlay.) */
+/* (Title-screen buttons live in .title-buttons and pick up the .wt-buttons candy
+   theme defined with the parlor styles near the end of this file.) */
 
 #overlay {
   /* Cross-fades with the HUD when transitioning between menu and gameplay. */
@@ -613,42 +604,6 @@ body.menu-visible #hud {
   border-radius: 10px;
   background: #06d6a0;
   cursor: pointer;
-}
-
-/* === Start / Game-over menu buttons ======================================== */
-.menu-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 18px auto;
-  align-items: center;
-}
-.menu-buttons button {
-  min-width: 220px;
-  font-family: inherit;
-  font-size: 18px;
-  font-weight: bold;
-  padding: 10px 16px;
-  border: none;
-  border-radius: 10px;
-  background: #06d6a0;
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
-}
-.menu-buttons button:hover {
-  filter: brightness(1.05);
-}
-.menu-buttons button.secondary {
-  background: #fff;
-  color: #333;
-  border: 2px solid #888;
-}
-/* Title screen: Play is the dominant CTA above the quieter Journal/Settings. */
-.menu-buttons #startBtn {
-  font-size: 22px;
-  padding: 14px 24px;
-  min-width: 240px;
 }
 
 #howToPlay {
@@ -1933,18 +1888,6 @@ body.menu-visible #pauseBtn {
   color: #fff3d6;
   text-shadow: 0 2px 6px rgba(40, 16, 4, 0.65);
 }
-#title-best {
-  /* Little hanging shop-sign plank under the menu. */
-  font-size: 20px;
-  font-weight: bold;
-  color: #fff3c0;
-  background: linear-gradient(180deg, #a4713d, #8a5a2a);
-  border: 2px solid #6d4521;
-  border-radius: 999px;
-  padding: 8px 24px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-}
-#title-best:empty { display: none; }
 
 /* --- Modal cards: vanilla cream with a faint waffle crosshatch. ---------- */
 .recipes-modal,
@@ -2288,4 +2231,77 @@ body.sky-challenges #pauseBtn {
 @keyframes ch-reveal {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* === Home page (title screen) ============================================= */
+/* Tap anywhere on the content to begin; Journal · High Scores · Settings sit in a
+   bottom bar (reusing the .wt-buttons candy theme), like the round-over modal. */
+.title-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 18px;
+  cursor: pointer;
+}
+.title-tap {
+  margin-top: 16px;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: #fff3d6;
+  text-shadow: 0 2px 6px rgba(40, 16, 4, 0.6);
+  animation: ro-hint-pulse 1.4s ease-in-out infinite;
+}
+#overlay .title-buttons {
+  flex: 0 0 auto;
+  margin-top: 0;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+/* High Scores modal — placeholder; reuses the .settings-modal card. */
+#highScoresOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(32, 17, 8, 0.62);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+  box-sizing: border-box;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+           max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+}
+#highScoresOverlay.hidden { display: none; }
+.highscores-body { margin: 6px 0 4px; min-width: 220px; }
+.highscore-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+}
+.highscore-label {
+  font-size: 13px; font-weight: bold; text-transform: uppercase;
+  letter-spacing: 0.6px; color: #9a7a52;
+}
+.highscore-value { font-size: 24px; font-weight: bold; color: #3a2a1a; }
+.highscore-empty { color: #8a6a4a; font-size: 15px; padding: 14px 8px; text-align: center; }
+#closeHighScoresBtn {
+  margin-top: 14px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(180deg, #d9a263, #bb7f47 60%, #a96e39);
+  box-shadow: 0 4px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }
