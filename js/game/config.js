@@ -58,25 +58,26 @@ export const UPCOMING_COUNT = 4;
 export const SLOT_COUNT = 5;
 
 // === Enums (frozen string maps) ==============================================
-/** @type {Readonly<{HEART:'heart',FEATHER:'feather',PAUSE:'pause',RAINBOW:'rainbow'}>} */
+// Every tip token a customer can grant: the four power-ups plus COIN, the cash
+// tip (bonus points, no power-up effect). COIN is a first-class member so it's
+// always referenced as PICKUP_TYPE.COIN — never a bare 'coin' string. It is kept
+// OUT of PICKUP_TYPES (the power-up set below) on purpose: that array drives
+// weights, unlocks, and the active slot, and coin is a reward, not a power-up.
+/** @type {Readonly<{HEART:'heart',FEATHER:'feather',PAUSE:'pause',RAINBOW:'rainbow',COIN:'coin'}>} */
 export const PICKUP_TYPE = Object.freeze({
   HEART: 'heart',
   FEATHER: 'feather',
   PAUSE: 'pause',
-  RAINBOW: 'rainbow'
+  RAINBOW: 'rainbow',
+  COIN: 'coin'
 });
-/** @type {PickupTypeName[]} */
+/** The four power-ups only — coin is excluded (see PICKUP_TYPE). @type {PickupTypeName[]} */
 export const PICKUP_TYPES = [
   PICKUP_TYPE.HEART,
   PICKUP_TYPE.FEATHER,
   PICKUP_TYPE.PAUSE,
   PICKUP_TYPE.RAINBOW
 ];
-
-// The non-power-up customer tip: a coin (bonus points), the sibling of the four
-// power-up tips. Kept OUT of PICKUP_TYPE/PICKUP_TYPES so it never leaks into the
-// power-up sets (unlocks, weights, active slot) — it's a reward, not a power-up.
-export const TIP_COIN = 'coin';
 
 /** @type {Readonly<{SPEED:'speed',PAUSE:'pause',RAINBOW:'rainbow'}>} */
 export const POWERUP_TYPE = Object.freeze({

@@ -75,9 +75,9 @@ export class Shop {
     // When true the wave director's auto-spawn/reconcile is suspended so the
     // tutorial can stage a specific customer. Existing customers still animate.
     this.scripted = false;
-    // Tipping mode: returns a tip (PickupTypeName | 'coin') for a new customer,
-    // or null for no tip. Game wires this; default = never tip.
-    /** @type {() => (import('../types.js').PickupTypeName | 'coin' | null)} */
+    // Tipping mode: returns a tip (TipName: a power-up or the coin) for a new
+    // customer, or null for no tip. Game wires this; default = never tip.
+    /** @type {() => (import('../types.js').TipName | null)} */
     this.tipRoller = () => null;
     // The pool of regulars a new spawn can draw from. World narrows this to the
     // unlocked set (+ the run's mystery candidate once their day arrives); default
@@ -86,7 +86,7 @@ export class Shop {
     this.rosterSource = () => CHARACTERS;
   }
 
-  /** @param {() => (import('../types.js').PickupTypeName | 'coin' | null)} fn */
+  /** @param {() => (import('../types.js').TipName | null)} fn */
   setTipRoller(fn) {
     this.tipRoller = fn;
   }
@@ -131,7 +131,7 @@ export class Shop {
    * Inject a customer with an explicit order at a chosen slot (scripted tutorial).
    * @param {number} slot
    * @param {ScoopColor[]} colors
-   * @param {{ value?: number, weight?: number, character?: string|null, tip?: (import('../types.js').PickupTypeName|'coin'|null) }} [opts]
+   * @param {{ value?: number, weight?: number, character?: string|null, tip?: (import('../types.js').TipName|null) }} [opts]
    *   `character` pins a specific regular (e.g. resurrecting the same one in the
    *   death demo); `tip` attaches a tip token (the step-9 coin). Defaults match a
    *   plain mid-size single order with no tip and a random regular.
@@ -469,7 +469,7 @@ export class Shop {
    * @param {ScoopColor} topColor
    * @param {boolean} [rainbow] wildcard: fills the next slot regardless of color
    * @param {'any'|'sequential'} [mode]
-   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').PickupTypeName|'coin'|null) }}
+   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').TipName|null) }}
    */
   serveOne(index, topColor, rainbow = false, mode = DELIVERY_MODE.ANY) {
     const c = this.customers[index];
@@ -497,7 +497,7 @@ export class Shop {
    * @param {number} index
    * @param {ScoopColor[]} trayColors
    * @param {boolean} [rainbow] wildcard: only the count must match
-   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').PickupTypeName|'coin'|null) }}
+   * @returns {{ accepted: boolean, complete: boolean, gained?: number, colors?: ScoopColor[], event?: WaveEventName | null, tip?: (import('../types.js').TipName|null) }}
    */
   serveWhole(index, trayColors, rainbow = false) {
     const c = this.customers[index];

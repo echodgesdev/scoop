@@ -10,6 +10,10 @@
  * @typedef {'heart'|'feather'|'pause'|'rainbow'} PickupTypeName
  *   String tag for a power-up type (granted via customer tips / the combo breaker).
  *
+ * @typedef {PickupTypeName|'coin'} TipName
+ *   Any tip a customer can grant: a power-up, or the coin cash tip
+ *   (PICKUP_TYPE.COIN). Use this anywhere a value may be either.
+ *
  * @typedef {'speed'|'pause'|'rainbow'} PowerUpTypeName
  *   String tag for a timed power-up (note: 'heart' is instant, not a power-up).
  *
@@ -64,7 +68,7 @@
  * @property {'happy'|'angry'|null} mood
  * @property {Order} order
  * @property {string|null} character  roster key / sprite-sheet row name of the assigned regular (see game/customers.js); null only if the roster is exhausted
- * @property {(PickupTypeName|'coin'|null)} [tip]  tipping mode: reward granted on order completion
+ * @property {(TipName|null)} [tip]  tipping mode: reward granted on order completion
  *
  * @typedef {object} Tuning
  * @property {number} spawnInterval

@@ -1,5 +1,5 @@
 // @ts-check
-import { COLORS, PICKUP_TYPES } from '../game/config.js';
+import { COLORS, PICKUP_TYPE, PICKUP_TYPES } from '../game/config.js';
 import { RECIPE_TARGET, GROUPS, RECIPE_BY_ID, GROUP_BY_ID } from '../game/recipes.js';
 import CUSTOMER_SPRITE from './sprites/customerSprite.js';
 import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
@@ -474,13 +474,13 @@ export class Hud {
     if (!this.powerupsOverlayEl) return;
     const listEl = this.powerupsOverlayEl.querySelector('.powerups-grid');
     if (!listEl) return;
-    const tokens = [...PICKUP_TYPES, 'coin'];   // 4 power-ups + the coin cash tip
+    const tokens = [...PICKUP_TYPES, PICKUP_TYPE.COIN];   // 4 power-ups + the coin cash tip
     listEl.innerHTML = `<div class="jcoin-grid">` + tokens.map(t => {
       const unlocked = !this.challenges
         ? true
-        : (t === 'coin' ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
+        : (t === PICKUP_TYPE.COIN ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
       const used = !this.challenges ? 0
-        : (t === 'coin' ? this.challenges.coinCollectedCount() : this.challenges.powerupUsedCount(t));
+        : (t === PICKUP_TYPE.COIN ? this.challenges.coinCollectedCount() : this.challenges.powerupUsedCount(t));
       const pct = unlocked ? Math.min(100, (used / POWERUP_GAUGE_MAX) * 100) : 0;
       return this._coinHtml({
         kind: 'powerup', id: t,
@@ -636,12 +636,13 @@ export class Hud {
       <div class="jdetail-line">Served ${r.served} / ${REGULAR_GAUGE_MAX}</div>`;
   }
 
-  /** @param {string} t power-up type or 'coin' */
+  /** @param {string} t power-up type or PICKUP_TYPE.COIN */
   _powerupDetailHtml(t) {
     const unlocked = !this.challenges ? true
-      : (t === 'coin' ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
+      : (t === PICKUP_TYPE.COIN ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(t));
     const used = !this.challenges ? 0
-      : (t === 'coin' ? this.challenges.coinCollectedCount() : this.challenges.powerupUsedCount(t));
+      : (t === PICKUP_TYPE.COIN ? this.challenges.coinCollectedCount()
+        : this.challenges.powerupUsedCount(/** @type {import('../types.js').PickupTypeName} */ (t)));
     const visual = this._coinVisual({
       inner: `<span class="jcoin-emoji">${PICKUP_ICONS[t]}</span>`, ring: PICKUP_RING_COLOR[t],
       pct: unlocked ? Math.min(100, (used / POWERUP_GAUGE_MAX) * 100) : 0
@@ -929,7 +930,7 @@ export class Hud {
   _rewardToCard(r) {
     if (r.type === 'unlock_regular') return { kind: 'regular', name: r.value };
     if (r.type === 'unlock_coin') {
-      return { kind: 'coin', emoji: PICKUP_ICONS.coin, ring: PICKUP_RING_COLOR.coin, label: 'Coin Tips Unlocked!' };
+      return { kind: 'coin', emoji: PICKUP_ICONS[PICKUP_TYPE.COIN], ring: PICKUP_RING_COLOR[PICKUP_TYPE.COIN], label: 'Coin Tips Unlocked!' };
     }
     if (r.type === 'unlock_powerup') {
       return {

@@ -1,5 +1,5 @@
 // @ts-check
-import { PICKUP_TYPE, TIP_COIN, PICKUP_TO_POWER, CUSTOMER_FACE_OFFSET_PX } from '../config.js';
+import { PICKUP_TYPE, PICKUP_TO_POWER, CUSTOMER_FACE_OFFSET_PX } from '../config.js';
 import { STATE, REACH } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
 import { drawScoop } from '../../view/playerView.js';
@@ -7,6 +7,7 @@ import { drawScoop } from '../../view/playerView.js';
 /** @typedef {import('../../game.js').Game} Game */
 /** @typedef {import('../world.js').World} World */
 /** @typedef {import('../../types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../../types.js').TipName} TipName */
 /** @typedef {import('../../types.js').Bounds} Bounds */
 /** @typedef {import('../../types.js').Customer} Customer */
 /** @typedef {import('../../types.js').ScoopColor} ScoopColor */
@@ -190,7 +191,7 @@ class TippingTutorial extends TutorialBase {
    * Stage a fresh scripted customer at `slot` (order = `order`) and start plopping
    * `plop` (bottom→top) onto a frozen, emptied cone — the shared opening of every
    * ghost beat. @param {Game} game @param {number} slot @param {ScoopColor[]} order
-   * @param {ScoopColor[]} plop @param {{ character?: string|null, tip?: (PickupTypeName|'coin'|null) }} [opts]
+   * @param {ScoopColor[]} plop @param {{ character?: string|null, tip?: (TipName|null) }} [opts]
    * @returns {Customer}
    */
   _stageGhost(game, slot, order, plop, opts = {}) {
@@ -296,7 +297,7 @@ class TippingTutorial extends TutorialBase {
         // PHASE 4 — a tip, paused so it can be read (patience frozen for the beat);
         // the scoop is still ghosted (no catching yet) and delivered with patience on.
         w.freezePatience = true;
-        this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: TIP_COIN });
+        this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: PICKUP_TYPE.COIN });
         pl.frozen = true; pl.clearStack();
         break;
       case 10:
@@ -480,7 +481,7 @@ class TippingTutorial extends TutorialBase {
         } else {
           if (this._expired(this._c)) {                           // timed out → restage with the tip again
             this._remove(game, this._c);                          // clear the angry one before resurrecting
-            this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: TIP_COIN });
+            this._c = sh.spawnScripted(SLOT_TIP, [T_TIP], { value: GUIDE_VALUE, tip: PICKUP_TYPE.COIN });
             pl.frozen = true; pl.clearStack(); this._startPlops([T_TIP]); this._phase = 1; break;
           }
           if (pl.stack.length === 0 && !this._served(this._c)) {
@@ -576,7 +577,7 @@ export class TippingMode {
    * config (shorter gap → more tips). The MIX is paced: minor tips (heart + coin)
    * are always eligible, while the major timed power-ups are held back early in
    * the day, capped per day, and de-duplicated against what's already in play.
-   * @returns {PickupTypeName | 'coin' | null}
+   * @returns {TipName | null}
    */
   rollTip() {
     const g = this.world;
@@ -594,7 +595,7 @@ export class TippingMode {
 
     // Tutorial REPLAY (sandbox): only the coin tip can appear — the one token
     // unlocked when the tutorial was first cleared. No power-ups, no pacing.
-    if (g.tutorialSandbox) return g.challenges.isCoinUnlocked() ? TIP_COIN : null;
+    if (g.tutorialSandbox) return g.challenges.isCoinUnlocked() ? PICKUP_TYPE.COIN : null;
 
     const w = g.powerupWeights;
     /** @type {Record<string, number>} weight by power-up type (PICKUP order: heart, ⚡, ❄️, 🌈) */
@@ -608,12 +609,12 @@ export class TippingMode {
 
     // MINOR pool (always eligible once unlocked): the heart heal + the coin cash
     // tip. During the Day-0 tutorial nothing here is unlocked yet, so no tip.
-    /** @type {(PickupTypeName | typeof TIP_COIN)[]} */
+    /** @type {TipName[]} */
     const types = [];
     /** @type {number[]} */
     const weights = [];
     if (unlocked.includes(PICKUP_TYPE.HEART)) { types.push(PICKUP_TYPE.HEART); weights.push(weightByType[PICKUP_TYPE.HEART]); }
-    if (g.challenges.isCoinUnlocked()) { types.push(TIP_COIN); weights.push(TIP_COIN_WEIGHT); }
+    if (g.challenges.isCoinUnlocked()) { types.push(PICKUP_TYPE.COIN); weights.push(TIP_COIN_WEIGHT); }
 
     // MAJOR pool (the timed power-ups): only once the day is underway, only while
     // under the per-day budget, and only types that aren't already running or
@@ -636,18 +637,18 @@ export class TippingMode {
       if (r <= 0) { pick = types[i]; break; }
     }
     // Charge a major against the day budget so the big ones stay rationed.
-    if (pick !== TIP_COIN && pick !== PICKUP_TYPE.HEART) this._majorTipsToday += 1;
+    if (pick !== PICKUP_TYPE.COIN && pick !== PICKUP_TYPE.HEART) this._majorTipsToday += 1;
     return pick;
   }
 
   /**
    * Grant a customer's tip on order completion: coin = bonus points; a power-up
    * tip auto-fires (the shared engine runs the timed effect / heal).
-   * @param {PickupTypeName | 'coin'} tip @param {number} x @param {number} y
+   * @param {TipName} tip @param {number} x @param {number} y
    */
   grantTip(tip, x, y) {
     const g = this.world;
-    if (tip === TIP_COIN) {
+    if (tip === PICKUP_TYPE.COIN) {
       g.shop.addScore(TIP_COIN_POINTS);
       g.challenges.recordCoinCollected();
       g.bus.emit('coin', { x, y, points: TIP_COIN_POINTS });

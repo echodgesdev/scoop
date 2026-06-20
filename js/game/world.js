@@ -43,6 +43,7 @@ import { makeMode } from './modes/index.js';
 
 /** @typedef {import('../types.js').GameEventMap} GameEventMap */
 /** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
+/** @typedef {import('../types.js').TipName} TipName */
 /** @typedef {import('../types.js').Bounds} Bounds */
 /** @typedef {import('../engine/events.js').EventBus<GameEventMap>} Bus */
 /** @typedef {import('../engine/input.js').Input} Input */
@@ -398,7 +399,7 @@ export class World {
    * Shared order-completion handling: heal, recipe/challenge tracking, the serve
    * event, tip grant, the combo breaker, and the wave-progress event. Called by
    * every delivery mode.
-   * @param {{ gained?: number, colors?: import('../types.js').ScoopColor[], event?: string|null, tip?: (PickupTypeName|'coin'|null) }} result
+   * @param {{ gained?: number, colors?: import('../types.js').ScoopColor[], event?: string|null, tip?: (TipName|null) }} result
    * @param {import('../types.js').Customer} customer
    */
   _onOrderComplete(result, customer) {
