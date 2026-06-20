@@ -2241,8 +2241,13 @@ body.roundover-open #pauseBtn {
   gap: 6px;
   pointer-events: none;
   text-align: center;
+  opacity: 0;
+  transition: opacity 0.6s ease;            /* fade in */
 }
 #nightSky.hidden { display: none; }
+#nightSky.visible { opacity: 1; }
+/* The slow fade-out IS the round start — the round resumes underneath as it goes. */
+#nightSky.dissolving { opacity: 0; transition: opacity 1.4s ease; }
 .sky-week {
   font-size: 28px;
   font-weight: bold;
@@ -2264,23 +2269,16 @@ body.roundover-open #pauseBtn {
 #nightSky .challenge-count { color: #ffd166; }
 #nightSky .challenge-row.completed .challenge-title { color: #cfcfcf; }
 
-/* Round-start countdown (3·2·1·GO), moved off the canvas to the HUD. */
-#roundIntro {
-  position: absolute;
-  top: 40%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 15;
+/* Cross-fade the in-game HUD against the sky challenges: out while they're up, back
+   in as they dissolve into the round. */
+#hud { transition: opacity 0.8s ease; }
+body.sky-challenges #hud,
+body.sky-challenges #debugBtn,
+body.sky-challenges #fullscreenBtn,
+body.sky-challenges #pauseBtn {
+  opacity: 0;
   pointer-events: none;
-  font-family: 'Comic Sans MS', sans-serif;
-  font-weight: bold;
-  font-size: 60px;
-  color: #fff3c0;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 0, 0, 0.55);
 }
-#roundIntro.hidden { display: none; }
-#roundIntro.intro-num { font-size: 130px; }
-#roundIntro.intro-go { color: #8ef0a8; }
 
 /* Gated "Complete the Week" secondary row — an amber accent stripe so it reads as
    a bonus tier, and a slide-in the first time it's revealed (after the primary rows

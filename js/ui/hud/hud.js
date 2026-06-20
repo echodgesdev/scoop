@@ -111,9 +111,8 @@ export class Hud {
   hideWaveTransition() { this.roundOver.hide(); }
 
   // === Night sequence → NightSky ==============================================
-  /** @param {number} fraction night-cycle progress 0..1 */
-  setNightSky(fraction) { this.nightSky.showChallenges(fraction); }
-  hideNightSky() { this.nightSky.hideChallenges(); }
-  /** @param {string|null} label round-start countdown beat, or null to hide */
-  setRoundIntro(label) { this.nightSky.setCountdown(label); }
+  /** Show the week's challenges in the sky + fade the in-game HUD out. */
+  showNightSky() { this.nightSky.show(); }
+  /** Dissolve the challenges into the round + fade the in-game HUD back in. */
+  dissolveNightSky() { this.nightSky.dissolve(); }
 }

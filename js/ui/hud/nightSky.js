@@ -1,11 +1,12 @@
 // @ts-check
-// The between-round night-sequence HUD, moved off the canvas for consistency:
-//   1. the current week's challenges drift in the night sky, fading with the
-//      night sweep, and
-//   2. the round-start countdown (3·2·1·GO) afterward.
-// Driven per-frame by game.js during the night cycle + round intro. Pure DOM —
-// the challenge rows reuse the shared challengeRow builder.
+// The between-round sky beat: the current week's challenges drift into the night
+// sky, then dissolve away as the round begins. Showing them fades the in-game HUD
+// out; the dissolve fades it back in (the dissolve IS the round start — no
+// countdown). Driven by game.js at the night-cycle / fresh-start boundaries. Pure
+// DOM — challenge rows reuse the shared builder; the fades are CSS transitions.
 import { challengeListHtml } from './templates/challengeTemplate.js';
+
+const DISSOLVE_MS = 1500;   // must outlast the #nightSky.dissolving CSS fade-out
 
 export class NightSky {
   /** @param {{ challenges: import('../../game/challenges.js').Challenges }} opts */
@@ -13,52 +14,37 @@ export class NightSky {
     /** @type {import('../../game/challenges.js').Challenges} */
     this.challenges = challenges;
     this.skyEl = document.getElementById('nightSky');
-    this.countdownEl = document.getElementById('roundIntro');
-    this._skyShown = false;
+    /** @type {number} */
+    this._clearTimer = 0;
   }
 
-  /**
-   * Per-frame during the night cycle: render the week's challenges once, then fade
-   * by the night fraction — in over the first beat, hold, out over the last third.
-   * @param {number} fraction night-cycle progress 0..1
-   */
-  showChallenges(fraction) {
+  /** Render the current week's challenges, fade them in, and fade the in-game HUD out. */
+  show() {
     if (!this.skyEl) return;
-    if (!this._skyShown) {
-      this._skyShown = true;
-      const cur = this.challenges && this.challenges.getCurrentSet();
-      this.skyEl.innerHTML = cur
-        ? `<div class="sky-week">Week ${cur.index + 1}</div>` + challengeListHtml(cur)
-        : '';
-      this.skyEl.classList.remove('hidden');
-    }
-    const a = fraction < 0.15 ? fraction / 0.15
-      : fraction > 0.65 ? Math.max(0, (1 - fraction) / 0.35)
-      : 1;
-    this.skyEl.style.opacity = String(a);
+    clearTimeout(this._clearTimer);
+    const cur = this.challenges && this.challenges.getCurrentSet();
+    this.skyEl.innerHTML = cur
+      ? `<div class="sky-week">Week ${cur.index + 1}</div>` + challengeListHtml(cur)
+      : '';
+    document.body.classList.add('sky-challenges');   // fade the HUD out
+    this.skyEl.classList.remove('hidden', 'dissolving');
+    void this.skyEl.offsetWidth;                      // reflow so .visible fades in from 0
+    this.skyEl.classList.add('visible');
   }
 
-  hideChallenges() {
-    if (!this._skyShown) return;   // already hidden — avoid per-frame churn from the intro
-    this._skyShown = false;
-    if (this.skyEl) { this.skyEl.classList.add('hidden'); this.skyEl.innerHTML = ''; }
-  }
-
-  /**
-   * The round-start countdown beat, or null to hide. Big number for digits; a
-   * smaller green word for the "GO!" cue.
-   * @param {string|null} label
-   */
-  setCountdown(label) {
-    if (!this.countdownEl) return;
-    if (!label) {
-      this.countdownEl.classList.add('hidden');
-      this.countdownEl.textContent = '';
-      return;
-    }
-    this.countdownEl.textContent = label;
-    this.countdownEl.classList.toggle('intro-num', /^[0-9]$/.test(label));
-    this.countdownEl.classList.toggle('intro-go', label === 'GO!');
-    this.countdownEl.classList.remove('hidden');
+  /** Slowly dissolve the challenges (this IS the round start) and fade the HUD back in. */
+  dissolve() {
+    document.body.classList.remove('sky-challenges');  // HUD fades back in
+    if (!this.skyEl) return;
+    this.skyEl.classList.remove('visible');
+    this.skyEl.classList.add('dissolving');
+    clearTimeout(this._clearTimer);
+    this._clearTimer = /** @type {any} */ (setTimeout(() => {
+      if (this.skyEl) {
+        this.skyEl.classList.add('hidden');
+        this.skyEl.classList.remove('dissolving');
+        this.skyEl.innerHTML = '';
+      }
+    }, DISSOLVE_MS));
   }
 }
