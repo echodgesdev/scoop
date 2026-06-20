@@ -196,10 +196,6 @@ export class Game {
     this._dayHintShown = false;
     /** @type {string | null} */
     this._dayHintText = null;
-    // This run's tutorial mode, set in start(): whether the tutorial played, and
-    // whether it's a Settings REPLAY (sandbox). Read by the day-end transition.
-    this._playedTutorial = false;
-    this._replaySandbox = false;
     // Fixed-timestep loop (engine). Started in start(), stopped on game over.
     // Renders every animation frame; movers interpolate by the render alpha.
     this.loop = new Loop(FIXED_DT, MAX_FRAME);
@@ -266,13 +262,11 @@ export class Game {
     // Flow timing (game-owned, NOT presentation): the wave-end cashout schedule
     // and the game-over teardown react to the sim's events. The sim only DECIDES
     // (emits waveUp / gameOver); the coordinator runs the timed flow.
-    this.bus.on('waveUp', ({ wave }) => {
-      // The wave just completed is (wave - 1) since waves.onServed already
-      // incremented. Hold the HUD day number (it rolls over at night-end), let the
-      // banner read, then run the cashout, which opens the transition overlay.
+    this.bus.on('waveUp', () => {
+      // Hold the HUD day number (it rolls over at night-end), let the banner read,
+      // then run the cashout, which opens the transition overlay.
       this._dayRolling = true;
-      const completedWave = Math.max(1, (wave || 1) - 1);
-      setTimeout(() => this._runWaveCashout(completedWave), 700);
+      setTimeout(() => this._runWaveCashout(), 700);
     });
     this.bus.on('gameOver', () => this._endGame());
 
@@ -491,11 +485,8 @@ export class Game {
     // (The per-week day-count is anchored by Waves.reset → weekStartWave, so the
     // opening day reads as Day 1; nothing to set here.)
     // Sandbox flag lives on World (the tip roller reads it); set after reset so a
-    // prior run's value never leaks. Remember the run's tutorial mode for the
-    // day-end transition (first play → auto-advance to Set 2; replay → no change).
+    // prior run's value never leaks.
     this.world.tutorialSandbox = replaySandbox;
-    this._replaySandbox = replaySandbox;
-    this._playedTutorial = playWave0;
     this.tutorial = this.world.mode.makeTutorial();
 
     this.banner = null;
@@ -561,6 +552,8 @@ export class Game {
   _syncHud() {
     this.hud.setScore(this.world.shop.score);
     this.hud.setHealth(this.world.health / MAX_HEALTH);
+    // Feed the current day-in-week so the "Complete the Week" secondary challenge tracks.
+    this.world.challenges.setDayInWeek(this.world.waves.dayInWeek);
     // Deferred day rollover: while a finished day is "rolling over" (cashout →
     // transition → night sweep), HOLD the gauge so the per-week day number doesn't
     // change until the night lands. It resumes (showing the new day) at night-end.
@@ -719,9 +712,8 @@ export class Game {
    * each) → pop the active bubble for show (no points) → open the
    * wave-transition overlay. Reaches into World models — it's a scripted
    * presentation sequence, not part of the deterministic sim step.
-   * @param {number} completedWave
    */
-  _runWaveCashout(completedWave) {
+  _runWaveCashout() {
     if (!this.running) return;
     this.inCashout = true;
 
@@ -741,13 +733,13 @@ export class Game {
     }
     this._syncComboHud();
 
-    setTimeout(() => this._cashoutStack(completedWave), combo > 0 ? 500 : 150);
+    setTimeout(() => this._cashoutStack(), combo > 0 ? 500 : 150);
   }
 
   /** Cashout step 1: pop the tray stack top-to-bottom, then the active power-up. */
-  _cashoutStack(completedWave) {
+  _cashoutStack() {
     if (!this.running) { this.inCashout = false; return; }
-    if (this.world.player.stack.length === 0) { this._cashoutActive(completedWave); return; }
+    if (this.world.player.stack.length === 0) { this._cashoutActive(); return; }
     const idx = this.world.player.stack.length - 1;
     const pos = this.world.player.scoopPosition(idx);
     const color = this.world.player.stack[idx].color;
@@ -756,18 +748,18 @@ export class Game {
     // text (that was a vestigial reward; the score never meaningfully moved).
     this.effects.burst(pos.x, pos.y, [this.world.shop.hex(color), '#fff'], 14);
     this.sound.catch_();
-    setTimeout(() => this._cashoutStack(completedWave), 120);
+    setTimeout(() => this._cashoutStack(), 120);
   }
 
   /**
    * Cashout step 2: pop the active power-up bubble for show (no points), then
    * open the wave-transition overlay.
    */
-  _cashoutActive(completedWave) {
+  _cashoutActive() {
     if (!this.running) { this.inCashout = false; return; }
     const finish = () => {
       this.inCashout = false;
-      this._beginWaveTransition(completedWave);
+      this._beginWaveTransition();
     };
     if (this.world.activeBubble) {
       const pos = this.world.activeSlotPos();
@@ -870,9 +862,8 @@ export class Game {
    * cross-off animation for any earned challenges, optional fade-in of a
    * newly-unlocked set, then a countdown / Play button. Resumes when the
    * HUD calls back.
-   * @param {number} completedWave
    */
-  _beginWaveTransition(completedWave) {
+  _beginWaveTransition() {
     if (!this.running) return;
     this.inWaveTransition = true;
     // Effects are frozen during the transition (the loop doesn't update them),
@@ -880,31 +871,21 @@ export class Game {
     // motionless behind the overlay until the next wave resumes.
     this.effects.reset();
     // Snapshot the week so _endWaveTransition can detect a mid-run week advance
-    // (and then reset the day/difficulty for the new week).
+    // (and then reset the day/difficulty for the new week). The tier gating
+    // (primary → "Complete the Week" → section) is driven by the Challenges model,
+    // so the modal no longer needs a tutorial-mode flag or the day-in-week.
     const curSet = this.world.challenges.getCurrentSet();
     this._weekBefore = curSet ? curSet.index : Infinity;
-    const stats = this._dayStats();
-    // The Day-0 → Day-1 transition is the tutorial end: 'first' (real play) auto-
-    // advances to Set 2; 'replay' (sandbox) leaves challenges untouched. Any later
-    // day is a normal transition (null).
-    const tutMode = (this.world.waves.wave === 1 && this._playedTutorial)
-      ? (this._replaySandbox ? 'replay' : 'first')
-      : null;
     this.hud.showWaveTransition({
-      completedWave,
-      // The completed day's per-week position (1..7) drives the "Complete the Week" meter.
-      completedDayInWeek: this.world.waves.dayInWeekFor(completedWave),
-      weekDays: this.world.waves.weekDays,
       // Regulars to flip-reveal this day: the Day-0 tutorial's first starters,
       // then any mystery regular unlocked (served) today. The HUD plays them — and
-      // the challenge rewards — as a one-at-a-time coin-flip queue after cross-offs.
+      // the challenge rewards — as a one-at-a-time coin-flip carousel after cross-offs.
       reveals: [
         ...this.world.drainTutorialReveals(),
         ...this.world.regulars.drainPendingReveals()
       ],
       discoveries: this.world.drainPendingDiscoveries(),
-      stats,
-      tutorialMode: tutMode,
+      stats: this._dayStats(),
       onResume: () => this._endWaveTransition()
     });
   }

@@ -19,8 +19,8 @@
 // the rewards the carousel then flips) → advanceSet() when the set/week completes.
 
 import { RECIPE_BY_ID } from '../../game/recipes.js';
-import { challengeRow } from './templates/challengeTemplate.js';
-import { weekMeterHtml, rewardToCard, unlockCardHtml, scoreTableHtml } from './templates/roundOverTemplate.js';
+import { challengeRow, challengeListHtml } from './templates/challengeTemplate.js';
+import { rewardToCard, unlockCardHtml, scoreTableHtml } from './templates/roundOverTemplate.js';
 
 // Auto-advance dwell per unlock coin: the ~0.7s flip plus a beat to read it.
 const COIN_DWELL_MS = 1500;
@@ -90,15 +90,15 @@ export class RoundOver {
   // === Entry points ===========================================================
 
   /**
-   * @param {{ completedWave: number, completedDayInWeek?: number, weekDays?: number, reveals?: string[], discoveries?: string[], stats?: any, onResume: () => void, tutorialMode?: ('first'|'replay'|null) }} opts
+   * Reveals (regulars met) + discoveries flip in the unlock carousel; the tier
+   * gating (primary → secondary "Complete the Week" → section) is driven by the
+   * Challenges model, so completedDayInWeek/tutorialMode are no longer needed here.
+   * @param {{ reveals?: string[], discoveries?: string[], stats?: any, onResume: () => void }} opts
    */
-  showNextWave({ completedDayInWeek = 1, weekDays = 7, reveals = [], discoveries = [], stats = null, onResume, tutorialMode = null }) {
+  showNextWave({ reveals = [], discoveries = [], stats = null, onResume }) {
     if (!this.overlayEl || !this.challenges) { if (onResume) onResume(); return; }
     this._mode = 'nextwave';
     this._final = onResume || (() => {});
-    this._completedDayInWeek = completedDayInWeek;
-    this._weekDays = weekDays;
-    this._tutorialMode = tutorialMode;
     this._reveals = reveals || [];
     this._discoveries = discoveries || [];
     this._stats = stats;
@@ -113,9 +113,6 @@ export class RoundOver {
     if (!this.overlayEl) { if (onRestart) onRestart(); return; }
     this._mode = 'gameover';
     this._final = onRestart || (() => {});
-    this._completedDayInWeek = 1;
-    this._weekDays = 7;
-    this._tutorialMode = null;
     this._reveals = [];
     this._discoveries = [];
     this._stats = stats;
@@ -130,6 +127,7 @@ export class RoundOver {
     this._coins = [];
     this._coinIndex = 0;
     this._coinsRest = false;
+    this._preCommitPrimaryComplete = false;
     // Hide the in-game HUD buttons (debug / fit-to-screen / pause) behind the modal.
     document.body.classList.add('roundover-open');
     this.overlayEl.classList.remove('hidden');
@@ -174,22 +172,14 @@ export class RoundOver {
     this._showStage('challenges');
     this._setHint(false);
     const cur = this.challenges.getCurrentSet();
+    this._preCommitPrimaryComplete = !!(cur && cur.primaryComplete);
     if (this.titleEl) this.titleEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : 'All Weeks Complete';
     if (this.subtitleEl) this.subtitleEl.textContent = this._mode === 'gameover' ? 'Game Over' : 'Day Complete';
 
-    const earned = this.challenges.getEarnedNotCommitted();
-    const earnedIds = new Set(earned.map(c => c.id));
+    const earnedIds = new Set(this.challenges.getEarnedNotCommitted().map(c => c.id));
     if (this.challengesEl) {
       this.challengesEl.classList.remove('fading-out', 'fading-in');
-      this.challengesEl.innerHTML = cur
-        ? cur.challenges.map(ch => {
-            const row = challengeRow(ch);
-            // Mark freshly-earned rows so the stagger below knows which to strike.
-            return (!ch.completed && earnedIds.has(ch.id))
-              ? row.replace('class="challenge-row"', 'class="challenge-row earned-pending"')
-              : row;
-          }).join('')
-        : '';
+      this.challengesEl.innerHTML = challengeListHtml(cur, { earnedIds });
     }
     this._animateCrossOffs(() => this._challengesSettled());
   }
@@ -240,71 +230,54 @@ export class RoundOver {
     this._settled = true;
     this._crossoffFinalize = null;
 
-    // Commit now so saved state matches the screen — and capture the rewards the
-    // carousel will flip. (Idempotent: game.js commits again as a backstop.)
-    let rewards = [];
-    if (this.challenges) {
-      const result = this.challenges.commitEarned();
-      rewards = (result && result.rewards) || [];
-    }
+    // Commit (two-tier) so saved state matches the screen + capture the rewards the
+    // carousel flips. Idempotent — game.js commits again as a backstop.
+    let result = { rewards: [], primaryComplete: false, setComplete: false };
+    if (this.challenges) result = this.challenges.commitEarned() || result;
+
     const discoveryCards = this._discoveries.slice(0, 6).map(id => {
       const rec = RECIPE_BY_ID.get(id);
       return rec ? { kind: 'recipe', name: rec.name, colors: rec.colors } : null;
     }).filter(Boolean);
     this._coins = [
       ...this._reveals.map(name => ({ kind: 'regular', name })),
-      ...rewards.map(r => rewardToCard(r)).filter(Boolean),
+      ...(result.rewards || []).map(r => rewardToCard(r)).filter(Boolean),
       ...discoveryCards
     ];
 
-    this._maybeAdvanceSet();
+    if (result.setComplete) {
+      this._showSetComplete();          // week fully done → advance + "next up" banner
+    } else if (result.primaryComplete && !this._preCommitPrimaryComplete) {
+      this._revealSecondary();          // primary just cleared → reveal "Complete the Week"
+    }
     this._setHint(true);
   }
 
-  /**
-   * If the set/week is complete, fade the rows out and fade in the "Complete the
-   * Week" meter (or the next-week banner), advancing the set where appropriate.
-   * Mirrors the old _afterUnlocks branching.
-   */
-  _maybeAdvanceSet() {
+  /** Primary just cleared this commit — slide the "Complete the Week" secondary into the list. */
+  _revealSecondary() {
+    const cur = this.challenges.getCurrentSet();
+    if (!cur || !this.challengesEl) return;
+    const html = cur.secondary.map(ch => challengeRow(ch, 'challenge-secondary revealing')).join('');
+    this.challengesEl.insertAdjacentHTML('beforeend', html);
+  }
+
+  /** The week is fully done — advance to the next set and fade in its "next up" banner. */
+  _showSetComplete() {
     const el = this.challengesEl;
     if (!el || !this.challenges) return;
-    const swap = (html) => {
-      el.classList.add('fading-out');
-      this._timers.push(/** @type {any} */ (setTimeout(() => {
-        el.innerHTML = html;
-        el.classList.remove('fading-out');
-        el.classList.add('fading-in');
-      }, 300)));
-    };
-
-    const mode = this._tutorialMode;
-    if (mode === 'first') {
-      this.challenges.advanceSet();
-      const cur = this.challenges.getCurrentSet();
-      const rows = cur ? cur.challenges.map(ch => challengeRow(ch)).join('') : '';
-      const label = cur ? `Next up — Week ${cur.index + 1}: ${cur.name}` : 'All challenges complete!';
-      swap(`<div class="wt-new-label">${label}</div>${rows}`);
-      return;
-    }
-    if (mode === 'replay') return;
-
-    const days = this._completedDayInWeek, target = this._weekDays;
-    if (this.challenges.isCurrentSetComplete()) {
-      if (days >= target) {
-        const advanced = this.challenges.advanceSet();
-        const next = advanced ? this.challenges.getCurrentSet() : null;
-        if (next) {
-          const rows = next.challenges.map(ch => challengeRow(ch)).join('');
-          swap(`<div class="wt-new-label">🎉 Week complete!</div>`
-            + `<div class="wt-new-label">Next up — Week ${next.index + 1}: ${next.name}</div>${rows}`);
-        } else {
-          swap(`<div class="wt-new-label">🏆 All Weeks complete!</div>`);
-        }
-      } else {
-        swap(weekMeterHtml({ days, target }));
-      }
-    }
+    const advanced = this.challenges.advanceSet();
+    const next = advanced ? this.challenges.getCurrentSet() : null;
+    const body = next
+      ? `<div class="wt-new-label">🎉 Week complete!</div>`
+        + `<div class="wt-new-label">Next up — Week ${next.index + 1}: ${next.name}</div>`
+        + challengeListHtml(next)
+      : `<div class="wt-new-label">🏆 All Weeks complete!</div>`;
+    el.classList.add('fading-out');
+    this._timers.push(/** @type {any} */ (setTimeout(() => {
+      el.innerHTML = body;
+      el.classList.remove('fading-out');
+      el.classList.add('fading-in');
+    }, 300)));
   }
 
   // === Step 2: unlocks carousel ===============================================

@@ -71,19 +71,21 @@ function lerpColor(a, b, t) {
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 // Night cycle keyframes for the between-wave reset: dusk → midnight → pre-dawn.
-// The last frame leans toward the day cycle's Dawn so it blends into the next
-// wave's opening sky. `star` is the star-field opacity at that keyframe.
+// The last frame lands EXACTLY on the day cycle's Dawn (KEYFRAMES[0]) — identical
+// sky/floor, stars gone, moon faded — so the hand-off into the next day's opening
+// sky is seamless (no purple→orange pop). `star`/`moon` are the field + moon
+// opacities at each keyframe.
 const NIGHT_KEYFRAMES = [
-  { skyTop: '#241a44', skyBottom: '#7a3f48', floor: '#3a2b39', star: 0.25 }, // dusk
-  { skyTop: '#070a22', skyBottom: '#141d3e', floor: '#161d36', star: 1.00 }, // midnight
-  { skyTop: '#5a4f86', skyBottom: '#ffb487', floor: '#b78a5c', star: 0.10 }  // pre-dawn
+  { skyTop: '#241a44', skyBottom: '#7a3f48', floor: '#3a2b39', star: 0.25, moon: 1 }, // dusk
+  { skyTop: '#070a22', skyBottom: '#141d3e', floor: '#161d36', star: 1.00, moon: 1 }, // midnight
+  { skyTop: '#ff9b6b', skyBottom: '#ffd9b3', floor: '#e8b97a', star: 0,    moon: 0 }  // pre-dawn = Dawn
 ];
 
 /**
  * Sped-up night cycle for the between-wave reset (fraction 0..1). The crescent
  * moon arcs across like the sun does in the day cycle; the sky races through
  * dusk → midnight → pre-dawn and the star field fades in at the midpoint.
- * @returns {{ skyTop: string, skyBottom: string, floor: string, starAlpha: number, moonX: number, moonY: number, moonR: number }}
+ * @returns {{ skyTop: string, skyBottom: string, floor: string, starAlpha: number, moonAlpha: number, moonX: number, moonY: number, moonR: number }}
  */
 export function nightCycleState(fraction, bounds) {
   const t = Math.max(0, Math.min(1, fraction));
@@ -102,6 +104,7 @@ export function nightCycleState(fraction, bounds) {
     skyBottom: lerpColor(A.skyBottom, B.skyBottom, lt),
     floor:     lerpColor(A.floor, B.floor, lt),
     starAlpha: lerp(A.star, B.star, lt),
+    moonAlpha: lerp(A.moon, B.moon, lt),
     moonX: lerp(bounds.width * 0.12, bounds.width * 0.88, t),
     moonY: baseY - arcHeight * Math.sin(Math.PI * t),
     moonR: 40

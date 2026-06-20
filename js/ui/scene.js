@@ -173,25 +173,31 @@ function drawNightSky(ctx, bounds, state) {
     ctx.restore();
   }
 
-  // Moon glow.
-  const mr = state.moonR;
-  const halo = ctx.createRadialGradient(state.moonX, state.moonY, mr * 0.4, state.moonX, state.moonY, mr * 2.6);
-  halo.addColorStop(0, 'rgba(220, 226, 255, 0.40)');
-  halo.addColorStop(1, 'rgba(220, 226, 255, 0)');
-  ctx.fillStyle = halo;
-  ctx.beginPath();
-  ctx.arc(state.moonX, state.moonY, mr * 2.6, 0, Math.PI * 2);
-  ctx.fill();
+  // Moon (glow + crescent), fading out as the sky brightens toward dawn so it's
+  // gone by the seamless hand-off to the day sky.
+  if (state.moonAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = state.moonAlpha;
+    const mr = state.moonR;
+    const halo = ctx.createRadialGradient(state.moonX, state.moonY, mr * 0.4, state.moonX, state.moonY, mr * 2.6);
+    halo.addColorStop(0, 'rgba(220, 226, 255, 0.40)');
+    halo.addColorStop(1, 'rgba(220, 226, 255, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(state.moonX, state.moonY, mr * 2.6, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Crescent: pale disc, then carve it with a sky-colored disc offset up-right.
-  ctx.fillStyle = '#eef0dc';
-  ctx.beginPath();
-  ctx.arc(state.moonX, state.moonY, mr, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = state.skyTop;
-  ctx.beginPath();
-  ctx.arc(state.moonX + mr * 0.55, state.moonY - mr * 0.32, mr * 0.92, 0, Math.PI * 2);
-  ctx.fill();
+    // Crescent: pale disc, then carve it with a sky-colored disc offset up-right.
+    ctx.fillStyle = '#eef0dc';
+    ctx.beginPath();
+    ctx.arc(state.moonX, state.moonY, mr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = state.skyTop;
+    ctx.beginPath();
+    ctx.arc(state.moonX + mr * 0.55, state.moonY - mr * 0.32, mr * 0.92, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 /**

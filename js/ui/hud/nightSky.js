@@ -5,7 +5,7 @@
 //   2. the round-start countdown (3·2·1·GO) afterward.
 // Driven per-frame by game.js during the night cycle + round intro. Pure DOM —
 // the challenge rows reuse the shared challengeRow builder.
-import { challengeRow } from './templates/challengeTemplate.js';
+import { challengeListHtml } from './templates/challengeTemplate.js';
 
 export class NightSky {
   /** @param {{ challenges: import('../../game/challenges.js').Challenges }} opts */
@@ -28,8 +28,7 @@ export class NightSky {
       this._skyShown = true;
       const cur = this.challenges && this.challenges.getCurrentSet();
       this.skyEl.innerHTML = cur
-        ? `<div class="sky-week">Week ${cur.index + 1}</div>`
-          + cur.challenges.map(ch => challengeRow(ch)).join('')
+        ? `<div class="sky-week">Week ${cur.index + 1}</div>` + challengeListHtml(cur)
         : '';
       this.skyEl.classList.remove('hidden');
     }

@@ -36,21 +36,6 @@ export function scoreTableHtml(stats, extra = {}) {
 }
 
 /**
- * The "Complete the Week" meter, styled as a challenge row (icon + title +
- * progress bar + count) so it reads consistently with the challenges above it.
- */
-export function weekMeterHtml(wp) {
-  const pct = Math.round(Math.min(100, (wp.days / wp.target) * 100));
-  return `<div class="challenge-row">
-      <span class="challenge-icon">📅</span>
-      <div class="challenge-body">
-        <div class="challenge-title">Complete the Week</div>
-      </div>
-      <div class="challenge-count">${pct}%</div>
-    </div>`;
-}
-
-/**
  * Map a committed challenge Reward to an unlock-reveal card descriptor, or null
  * for reward types that don't get a coin (none today). Power-ups / coin / sections
  * flip an emoji coin; a regular flips their silhouette → face.

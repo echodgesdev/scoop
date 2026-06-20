@@ -2251,14 +2251,18 @@ body.roundover-open #pauseBtn {
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
   margin-bottom: 4px;
 }
-/* Dark-glass challenge rows so they read over the night gradient. */
+/* Frosted challenge rows that read over BOTH the night sky and the bright
+   day-start sky (the same #nightSky element serves both — at start and between
+   rounds), with a text-shadow so the titles hold up on a light backdrop. */
 #nightSky .challenge-row {
-  background: rgba(20, 16, 40, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(26, 20, 46, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.22);
 }
+#nightSky .sky-week,
+#nightSky .challenge-title { text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7); }
 #nightSky .challenge-title { color: #fff; }
 #nightSky .challenge-count { color: #ffd166; }
-#nightSky .challenge-row.completed .challenge-title { color: #bdbdbd; }
+#nightSky .challenge-row.completed .challenge-title { color: #cfcfcf; }
 
 /* Round-start countdown (3·2·1·GO), moved off the canvas to the HUD. */
 #roundIntro {
@@ -2277,3 +2281,13 @@ body.roundover-open #pauseBtn {
 #roundIntro.hidden { display: none; }
 #roundIntro.intro-num { font-size: 130px; }
 #roundIntro.intro-go { color: #8ef0a8; }
+
+/* Gated "Complete the Week" secondary row — an amber accent stripe so it reads as
+   a bonus tier, and a slide-in the first time it's revealed (after the primary rows
+   cross off). Shared by the round-over modal, the night sky, and the pause menu. */
+.challenge-row.challenge-secondary { box-shadow: inset 3px 0 0 rgba(255, 183, 3, 0.85); }
+.challenge-row.revealing { animation: ch-reveal 0.5s ease both; }
+@keyframes ch-reveal {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

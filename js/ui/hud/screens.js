@@ -6,7 +6,7 @@
 // #settingsBtn) re-wire themselves each call. Cross-concern buttons (open Journal)
 // fire injected callbacks. (Game over now routes through the round-over modal.)
 
-import { challengeRow } from './templates/challengeTemplate.js';
+import { challengeListHtml } from './templates/challengeTemplate.js';
 
 const BEST_KEY = 'scoop.best';
 
@@ -274,8 +274,7 @@ export class Screens {
     if (listEl) {
       const cur = this.challenges && this.challenges.getCurrentSet();
       listEl.innerHTML = cur
-        ? `<div class="wt-new-label">Week ${cur.index + 1}: ${cur.name}</div>`
-          + cur.challenges.map(ch => challengeRow(ch)).join('')
+        ? `<div class="wt-new-label">Week ${cur.index + 1}: ${cur.name}</div>` + challengeListHtml(cur)
         : '';
     }
     this.pauseOverlayEl.classList.remove('hidden');

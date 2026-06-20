@@ -7,29 +7,34 @@ import { GROUP } from './recipes.js';
 import { CHARACTER_BY_NAME } from './customers.js';
 
 const STORAGE_KEY = 'scoop.challenges';
+// Days in a week — the "Complete the Week" secondary challenge's target. Mirrors
+// Waves.weekDays; kept here as the challenge target (stable at 7).
+const WEEK_DAYS = 7;
 
 // === Master challenge sets ===================================================
-// Each set is 3 challenges. Completing all 3 unlocks the set's reward(s)
-// IMMEDIATELY (mid-run) — tip tokens, a "regular" customer, and/or recipe
-// SECTIONS — but the NEXT set's challenges stay hidden until the current run ends
-// (see commitEarned / advanceSet), so the player can clear at most one set per
-// life. Crucially, a set's goals only ever require features unlocked by EARLIER
-// sets (a set never asks you to use a power-up — or discover recipes from a
-// section — that it itself unlocks). Unlock ladder:
+// Each set is a "week" split into two TIERS:
+//   • primaryChallenges (3) — the week's goals. Completing them grants the
+//     primaryChallengeRewards (a tip token / power-up / regular) and REVEALS the
+//     secondary tier.
+//   • secondaryChallenges — always "Complete the Week" (play through the 7th day).
+//     Completing it grants the secondaryChallengeRewards (the recipe SECTION
+//     unlocks) and is what gates advancing to the next week's set.
+// So a set is fully complete (→ advance) only once primary AND "Complete the Week"
+// are both done. A set's goals only ever require features unlocked by EARLIER sets.
+// Unlock ladder:
 //   1 Coin + Daily Double + Yin&Yang · 2 Rainbow + Odd Couple ·
 //   3 Freddie + Three's Company · 4 Heart + Best Two of Three ·
 //   5 Harvey Green + Triple Threat · 6 Freeze · 7 Karen · 8 Speed · 9 Poop ·
 //   10 — (bragging rights; final cutscene TBD).
-// Recipe SECTIONS are challenge rewards again (Sets 1–5 dole out the six non-
-// tutorial sections; Junior Scoop is always unlocked). recipesForWave still
-// intersects with the day-pool, so a section appears once it's BOTH unlocked
-// AND wave-reached. The random regulars unlock via in-game encounters.
+// Recipe SECTIONS are secondary rewards (Sets 1–5 dole out the six non-tutorial
+// sections; Junior Scoop is always unlocked). recipesForWave still intersects with
+// the day-pool, so a section appears once it's BOTH unlocked AND wave-reached.
 
 /**
  * @typedef {object} Challenge
  * @property {string} id            stable id for persistence
  * @property {string} title         displayed text
- * @property {'discover_recipes'|'master_recipes'|'complete_section'|'serve_customers'|'serve_regular'|'use_powerup_wave'|'use_powerup_type'|'use_powerup_total'|'combo_reach'|'wave_reach'} type
+ * @property {'discover_recipes'|'master_recipes'|'complete_section'|'serve_customers'|'serve_regular'|'use_powerup_wave'|'use_powerup_type'|'use_powerup_total'|'combo_reach'|'wave_reach'|'complete_week'} type
  * @property {number} target        number to reach (where applicable)
  * @property {string} [param]       e.g. pickup type, regular name, or section id
  */
@@ -43,150 +48,162 @@ const STORAGE_KEY = 'scoop.challenges';
 /**
  * @typedef {object} ChallengeSet
  * @property {string} name
- * @property {Challenge[]} challenges
- * @property {Reward[]} rewards
+ * @property {Challenge[]} primaryChallenges
+ * @property {Challenge[]} secondaryChallenges
+ * @property {Reward[]} primaryChallengeRewards
+ * @property {Reward[]} secondaryChallengeRewards
  */
+
+/**
+ * The "Complete the Week" secondary, shared shape across every set.
+ * @param {number} n set number (1-based) @returns {Challenge}
+ */
+const weekGoal = (n) => ({ id: `s${n}-week`, type: 'complete_week', target: WEEK_DAYS, title: 'Complete the Week' });
 
 /** @type {ChallengeSet[]} */
 const SETS = [
   // Set 1 — the tutorial set: its three goals are guaranteed by finishing the
-  // 3-customer Day-0 tutorial. Clearing it unlocks Coin tips PLUS the first two
-  // recipe sections (Daily Double + Yin & Yang) — the tutorial-end celebration.
+  // 3-customer Day-0 tutorial. Primary clears Coin tips; finishing the week unlocks
+  // the first two recipe sections (Daily Double + Yin & Yang).
   {
     name: 'Getting Started',
-    challenges: [
+    primaryChallenges: [
       { id: 's1-1', type: 'discover_recipes', target: 3, title: 'Discover 3 flavors' },
       { id: 's1-2', type: 'serve_customers',  target: 3, title: 'Serve 3 customers' },
       { id: 's1-3', type: 'wave_reach',       target: 1, title: 'Reach Day 1' }
     ],
-    rewards: [
-      { type: 'unlock_coin',    value: PICKUP_TYPE.COIN },
+    secondaryChallenges: [weekGoal(1)],
+    primaryChallengeRewards: [
+      { type: 'unlock_coin', value: PICKUP_TYPE.COIN }
+    ],
+    secondaryChallengeRewards: [
       { type: 'unlock_section', value: GROUP.DAILY_DOUBLE },
       { type: 'unlock_section', value: GROUP.YIN_YANG }
     ]
   },
-  // Set 2 → Rainbow + Odd Couple. (Goals: only Coin available, so no power-up-use
-  // goal yet; discover-8 is reachable from the 3 sections Set 1 unlocked = 15.)
+  // Set 2 → Rainbow + Odd Couple.
   {
     name: 'Taste the Rainbow',
-    challenges: [
+    primaryChallenges: [
       { id: 's2-1', type: 'serve_customers',  target: 15, title: 'Serve 15 customers total' },
       { id: 's2-2', type: 'combo_reach',      target: 4,  title: 'Reach a 4× combo' },
       { id: 's2-3', type: 'discover_recipes', target: 8,  title: 'Discover 8 recipes total' }
     ],
-    rewards: [
-      { type: 'unlock_powerup', value: PICKUP_TYPE.RAINBOW },
-      { type: 'unlock_section', value: GROUP.ODD_COUPLE }
-    ]
+    secondaryChallenges: [weekGoal(2)],
+    primaryChallengeRewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.RAINBOW }],
+    secondaryChallengeRewards: [{ type: 'unlock_section', value: GROUP.ODD_COUPLE }]
   },
   // Set 3 → Freddie (character) + Three's Company. Rainbow is now available.
   {
     name: 'Making Regulars',
-    challenges: [
+    primaryChallenges: [
       { id: 's3-1', type: 'use_powerup_type', target: 2,  title: 'Use 2 🌈 Rainbow power-ups', param: PICKUP_TYPE.RAINBOW },
       { id: 's3-2', type: 'discover_recipes', target: 12, title: 'Discover 12 recipes total' },
       { id: 's3-3', type: 'wave_reach',       target: 3,  title: 'Reach Day 3' }
     ],
-    rewards: [
-      { type: 'unlock_regular', value: 'Freddie' },
-      { type: 'unlock_section', value: GROUP.THREES_COMPANY }
-    ]
+    secondaryChallenges: [weekGoal(3)],
+    primaryChallengeRewards: [{ type: 'unlock_regular', value: 'Freddie' }],
+    secondaryChallengeRewards: [{ type: 'unlock_section', value: GROUP.THREES_COMPANY }]
   },
   // Set 4 → Heart + Best Two of Three.
   {
     name: 'Heart on the Line',
-    challenges: [
+    primaryChallenges: [
       { id: 's4-1', type: 'combo_reach',      target: 5,  title: 'Reach a 5× combo' },
       { id: 's4-2', type: 'serve_customers',  target: 30, title: 'Serve 30 customers total' },
       { id: 's4-3', type: 'master_recipes',   target: 2,  title: 'Master 2 recipes (10/10)' }
     ],
-    rewards: [
-      { type: 'unlock_powerup', value: PICKUP_TYPE.HEART },
-      { type: 'unlock_section', value: GROUP.BEST_TWO_OF_THREE }
-    ]
+    secondaryChallenges: [weekGoal(4)],
+    primaryChallengeRewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.HEART }],
+    secondaryChallengeRewards: [{ type: 'unlock_section', value: GROUP.BEST_TWO_OF_THREE }]
   },
-  // Set 5 → Harvey Green (character) + Triple Threat (the last section). Heart
-  // now available to use; discover-18 is reachable from the 6 sections unlocked
-  // by Sets 1–4 (= 30 recipes).
+  // Set 5 → Harvey Green (character) + Triple Threat (the last section).
   {
     name: 'Local Legend',
-    challenges: [
+    primaryChallenges: [
       { id: 's5-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❤️ Heart power-ups', param: PICKUP_TYPE.HEART },
       { id: 's5-2', type: 'discover_recipes', target: 18, title: 'Discover 18 recipes total' },
       { id: 's5-3', type: 'wave_reach',       target: 4,  title: 'Reach Day 4' }
     ],
-    rewards: [
-      { type: 'unlock_regular', value: 'Harvey Green' },
-      { type: 'unlock_section', value: GROUP.TRIPLE_THREAT }
-    ]
+    secondaryChallenges: [weekGoal(5)],
+    primaryChallengeRewards: [{ type: 'unlock_regular', value: 'Harvey Green' }],
+    secondaryChallengeRewards: [{ type: 'unlock_section', value: GROUP.TRIPLE_THREAT }]
   },
-  // Set 6 → Freeze (Ice).
+  // Set 6 → Freeze (Ice). No section left to unlock — secondary is week-completion only.
   {
     name: 'Brain Freeze',
-    challenges: [
+    primaryChallenges: [
       { id: 's6-1', type: 'combo_reach',      target: 6,  title: 'Reach a 6× combo' },
       { id: 's6-2', type: 'master_recipes',   target: 4,  title: 'Master 4 recipes total' },
       { id: 's6-3', type: 'serve_customers',  target: 50, title: 'Serve 50 customers total' }
     ],
-    rewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.PAUSE }]
+    secondaryChallenges: [weekGoal(6)],
+    primaryChallengeRewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.PAUSE }],
+    secondaryChallengeRewards: []
   },
   // Set 7 → Karen (character). Freeze now available to use.
   {
     name: 'Speak to the Manager',
-    challenges: [
+    primaryChallenges: [
       { id: 's7-1', type: 'use_powerup_type', target: 3,  title: 'Use 3 ❄️ Freeze power-ups', param: PICKUP_TYPE.PAUSE },
       { id: 's7-2', type: 'discover_recipes', target: 25, title: 'Discover 25 recipes total' },
       { id: 's7-3', type: 'wave_reach',       target: 5,  title: 'Reach Day 5' }
     ],
-    rewards: [{ type: 'unlock_regular', value: 'Karen' }]
+    secondaryChallenges: [weekGoal(7)],
+    primaryChallengeRewards: [{ type: 'unlock_regular', value: 'Karen' }],
+    secondaryChallengeRewards: []
   },
   // Set 8 → Speed (Feather).
   {
     name: 'Quickstep',
-    challenges: [
+    primaryChallenges: [
       { id: 's8-1', type: 'combo_reach',      target: 7,  title: 'Reach a 7× combo (max!)' },
       { id: 's8-2', type: 'serve_regular',    target: 15, title: 'Serve Gerald 15 times', param: 'Gerald' },
       { id: 's8-3', type: 'master_recipes',   target: 6,  title: 'Master 6 recipes total' }
     ],
-    rewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.FEATHER }]
+    secondaryChallenges: [weekGoal(8)],
+    primaryChallengeRewards: [{ type: 'unlock_powerup', value: PICKUP_TYPE.FEATHER }],
+    secondaryChallengeRewards: []
   },
   // Set 9 → Poop (character). Speed now available to use.
   {
     name: 'The Whole Crew',
-    challenges: [
+    primaryChallenges: [
       { id: 's9-1', type: 'use_powerup_type', target: 5,  title: 'Use 5 ⚡ Speed power-ups', param: PICKUP_TYPE.FEATHER },
       { id: 's9-2', type: 'wave_reach',       target: 7,  title: 'Reach Day 7' },
       { id: 's9-3', type: 'discover_recipes', target: 35, title: 'Discover every recipe (35)' }
     ],
-    rewards: [{ type: 'unlock_regular', value: 'Poop' }]
+    secondaryChallenges: [weekGoal(9)],
+    primaryChallengeRewards: [{ type: 'unlock_regular', value: 'Poop' }],
+    secondaryChallengeRewards: []
   },
   // Set 10 — bragging rights. No feature reward yet (a final cutscene is TBD).
   {
     name: 'Top Scooper',
-    challenges: [
+    primaryChallenges: [
       { id: 's10-1', type: 'master_recipes',   target: 12, title: 'Master 12 recipes total' },
       { id: 's10-2', type: 'use_powerup_wave', target: 5, title: 'Use 5 power-ups in one day' },
       { id: 's10-3', type: 'serve_regular',    target: 25, title: 'Serve Annie 25 times', param: 'Annie' }
     ],
-    rewards: []
+    secondaryChallenges: [weekGoal(10)],
+    primaryChallengeRewards: [],
+    secondaryChallengeRewards: []
   }
 ];
 
 // Dev safety net for the one cross-reference with no compile-time link: regular
-// NAMES. Power-up values (PICKUP_TYPE) and section ids (GROUP) are now constants —
-// a typo in those is a reference error. Regular names are still hand-authored
-// strings that must match the customer roster (customers.js); a typo would
-// silently leave a reward ungrantable or a goal unreachable. The SETS table is
-// static, so this resolves every referenced name against the roster once at module
-// load and warns loudly (rather than throwing, so a stray typo can't white-screen
-// the game for a player).
+// NAMES. Power-up values (PICKUP_TYPE) and section ids (GROUP) are constants — a
+// typo there is a reference error. Regular names are hand-authored strings that
+// must match the customer roster (customers.js); a typo would silently leave a
+// reward ungrantable or a goal unreachable. Resolve every referenced name once at
+// module load and warn loudly (rather than throw, so a typo can't white-screen).
 for (const set of SETS) {
-  for (const r of set.rewards) {
+  for (const r of [...set.primaryChallengeRewards, ...set.secondaryChallengeRewards]) {
     if (r.type === 'unlock_regular' && !CHARACTER_BY_NAME.has(r.value)) {
       console.warn(`[challenges] unlock_regular reward references unknown regular "${r.value}"`);
     }
   }
-  for (const ch of set.challenges) {
+  for (const ch of [...set.primaryChallenges, ...set.secondaryChallenges]) {
     if (ch.type === 'serve_regular' && (!ch.param || !CHARACTER_BY_NAME.has(ch.param))) {
       console.warn(`[challenges] serve_regular goal "${ch.id}" references unknown regular "${ch.param}"`);
     }
@@ -207,18 +224,18 @@ export class Challenges {
     // commitEarned, and advanceSet is a no-op — so re-watching the tutorial can't
     // touch saved progress, grant rewards, or advance sets. Set by game.start().
     this.frozen = false;
-    // Per-wave runtime counter for "use X power-ups in one wave" — not
-    // persisted; resets on each wave-up event.
+    // Per-wave runtime counter for "use X power-ups in one wave" — not persisted.
     this.powerupsUsedThisWave = 0;
-    // Transient: which challenges have already fired their "earned" toast
-    // this session. Prevents double-firing when the same event re-checks.
+    // Current day within the week (1..WEEK_DAYS), pushed by Game each frame from
+    // Waves — the progress source for the "Complete the Week" secondary challenge.
+    this._dayInWeek = 1;
+    // Transient: challenges that already fired their "earned" toast this session.
     /** @type {Record<string, boolean>} */
     this._notifiedEarned = {};
     /**
-     * Fired when a challenge's requirement is met but not yet committed
-     * (so the HUD can show a "✓ <title>" toast at the bottom of the screen).
-     * The challenge stays in "earned" status until commitEarned() runs at
-     * wave-end or game-over.
+     * Fired when a challenge's requirement is newly met but not yet committed (so
+     * the HUD can show a "✓ <title>" toast). The challenge stays "earned" until
+     * commitEarned() runs at wave-end or game-over.
      * @type {(challenge: Challenge) => void}
      */
     this.onEarned = () => {};
@@ -229,8 +246,10 @@ export class Challenges {
       currentSet: 0,
       /** @type {Record<string, boolean>} */
       completed: {},
-      /** @type {Record<number, boolean>} sets whose rewards have been granted (so they fire once) */
-      rewardsClaimed: {},
+      /** @type {Record<number, boolean>} sets whose PRIMARY rewards have been granted */
+      primaryClaimed: {},
+      /** @type {Record<number, boolean>} sets whose SECONDARY rewards have been granted */
+      secondaryClaimed: {},
       stats: {
         discoveredCount: 0,
         masteredCount: 0,
@@ -241,14 +260,14 @@ export class Challenges {
         powerupsUsedTotal: 0,
         coinTipsCollected: 0,   // lifetime coin tips cashed (Journal coin gauge)
         maxCombo: 0,
-        // The campaign now opens on Wave 0 (the tutorial wave), so a fresh save
-        // starts below Wave 1 — reaching Wave 1 is a real first milestone.
+        // The campaign opens on Wave 0 (tutorial), so a fresh save starts below
+        // Wave 1 — reaching Wave 1 is a real first milestone.
         maxWave: 0
       },
       unlocks: {
         /** @type {Record<string, boolean>} */
         powerups: {},
-        /** @type {boolean} coin tips (Set 1 reward) */
+        /** @type {boolean} coin tips (Set 1 primary reward) */
         coin: false
       }
     };
@@ -257,7 +276,12 @@ export class Challenges {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-          // Shallow merge with defaults so newly-added fields work for old saves.
+          // Migration: the old single `rewardsClaimed[i]` granted a set's whole
+          // reward bundle at once. Map it to BOTH tiers claimed so nobody loses
+          // unlocks when the two-tier model lands.
+          const legacy = parsed.rewardsClaimed || {};
+          const primaryClaimed = { ...legacy, ...(parsed.primaryClaimed || {}) };
+          const secondaryClaimed = { ...legacy, ...(parsed.secondaryClaimed || {}) };
           return {
             ...defaults,
             ...parsed,
@@ -269,7 +293,8 @@ export class Challenges {
               coin: parsed.unlocks?.coin === true
             },
             completed: { ...(parsed.completed || {}) },
-            rewardsClaimed: { ...(parsed.rewardsClaimed || {}) }
+            primaryClaimed,
+            secondaryClaimed
           };
         }
       }
@@ -291,6 +316,7 @@ export class Challenges {
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     this.state = this._load();
     this.powerupsUsedThisWave = 0;
+    this._dayInWeek = 1;
     this._notifiedEarned = {};
   }
 
@@ -306,22 +332,22 @@ export class Challenges {
     return PICKUP_TYPES.filter(t => this.isPowerupUnlocked(t));
   }
 
-  /** Coin tips unlock from Set 1 (the tutorial); gated like the power-ups. */
+  /** Coin tips unlock from Set 1 primary; gated like the power-ups. */
   isCoinUnlocked() { return this.state.unlocks.coin === true; }
 
   /**
    * Recipe sections (group ids) the player has unlocked. Junior Scoop is always
-   * available (the tutorial singles); the other six are challenge rewards. DERIVED
-   * from which sets' rewards have been claimed, so it stays correct for old saves
-   * (where the section reward field didn't exist yet) without a migration step.
-   * Fed to Waves so a section only spawns once it's BOTH unlocked AND wave-reached.
+   * available; the other six are SECONDARY rewards. Derived from which sets'
+   * secondary rewards have been claimed, so it stays correct for old saves without
+   * a migration step. Fed to Waves so a section spawns once it's BOTH unlocked AND
+   * wave-reached.
    * @returns {Set<string>}
    */
   unlockedSections() {
     const out = new Set([GROUP.JUNIOR_SCOOP]);
     for (let i = 0; i < SETS.length; i++) {
-      if (!this.state.rewardsClaimed[i]) continue;
-      for (const r of SETS[i].rewards) {
+      if (!this.state.secondaryClaimed[i]) continue;
+      for (const r of SETS[i].secondaryChallengeRewards) {
         if (r.type === 'unlock_section') out.add(r.value);
       }
     }
@@ -330,8 +356,7 @@ export class Challenges {
 
   /**
    * True once the first challenge set (the Wave 0 tutorial goals) has been
-   * cleared — i.e. the player has advanced past Set 1. Used to skip the Wave 0
-   * tutorial on subsequent runs.
+   * cleared — used to skip the Wave 0 tutorial on subsequent runs.
    */
   firstSetCleared() {
     return this.state.currentSet >= 1;
@@ -363,9 +388,8 @@ export class Challenges {
   }
 
   /**
-   * A power-up was used (fired) — from a customer tip or the combo breaker, both
-   * routed through Game._firePower (the single call site). Feeds the
-   * use_powerup_type / _total / _wave challenges.
+   * A power-up was used (fired) — from a tip or the combo breaker, both routed
+   * through Game._firePower. Feeds the use_powerup_type / _total / _wave goals.
    * @param {PickupTypeName} type
    */
   recordPowerupUsed(type) {
@@ -405,6 +429,18 @@ export class Challenges {
     this._save();
   }
 
+  /**
+   * Push the current day-in-week (1..WEEK_DAYS) — the progress source for the
+   * "Complete the Week" secondary. Game calls this from Waves each frame; cheap +
+   * guarded so it only re-checks on an actual day change.
+   * @param {number} day
+   */
+  setDayInWeek(day) {
+    if (this.frozen || day === this._dayInWeek) return;
+    this._dayInWeek = day;
+    this._checkCompletions();
+  }
+
   /** Called when a wave ends so per-wave counters reset. */
   recordWaveEnded() {
     this.powerupsUsedThisWave = 0;
@@ -437,6 +473,7 @@ export class Challenges {
       case 'use_powerup_wave': return this.powerupsUsedThisWave;
       case 'combo_reach':      return s.maxCombo;
       case 'wave_reach':       return s.maxWave;
+      case 'complete_week':    return this._dayInWeek;
       case 'complete_section': {
         if (!ch.param) return 0;
         return this.recipes.getAll().filter(r => r.group === ch.param && r.mastered).length;
@@ -445,20 +482,30 @@ export class Challenges {
     }
   }
 
+  /** @param {Challenge} ch */
+  _isMet(ch) { return this._getProgress(ch) >= ch.target; }
+  /** @param {Challenge} ch */
+  _isDone(ch) { return this.state.completed[ch.id] === true; }
+
+  /** Every primary goal committed? (the reveal/advance gate). @param {ChallengeSet} set */
+  _primaryComplete(set) {
+    return set.primaryChallenges.every(ch => this._isDone(ch));
+  }
+
   /**
-   * Notify the HUD whenever a challenge's requirement is *newly* met. This does
-   * NOT advance the current set or set `completed` — that only happens at
-   * commitEarned() time (wave-end or game-over). The two-phase model means the
-   * player sees a toast as soon as a requirement is hit, but the cross-off
-   * animation and set-advancement wait for the natural pause between waves.
+   * Notify the HUD whenever a challenge's requirement is *newly* met. Does NOT
+   * commit or advance — that waits for commitEarned() at wave-end / game-over. The
+   * secondary tier only fires once the primary is complete (it stays gated).
    */
   _checkCompletions() {
     const set = SETS[this.state.currentSet];
     if (!set) return;
-    for (const ch of set.challenges) {
-      if (this.state.completed[ch.id]) continue;
-      if (this._notifiedEarned[ch.id]) continue;
-      if (this._getProgress(ch) >= ch.target) {
+    const list = this._primaryComplete(set)
+      ? [...set.primaryChallenges, ...set.secondaryChallenges]
+      : set.primaryChallenges;
+    for (const ch of list) {
+      if (this._isDone(ch) || this._notifiedEarned[ch.id]) continue;
+      if (this._isMet(ch)) {
         this._notifiedEarned[ch.id] = true;
         this.onEarned(ch);
       }
@@ -466,65 +513,75 @@ export class Challenges {
   }
 
   /**
-   * Earned-but-not-yet-committed challenges in the current set. Used by
-   * the wave-transition overlay to know which rows to physically cross
-   * off and by the game-over flow to commit just-met requirements.
+   * Earned-but-not-yet-committed challenges in the current set — the rows the
+   * round-over overlay physically crosses off. Secondary goals only count once the
+   * primary tier is complete (so "Complete the Week" can't cross off early).
    */
   getEarnedNotCommitted() {
     if (this.frozen) return [];
     const set = SETS[this.state.currentSet];
     if (!set) return [];
-    return set.challenges.filter(ch => !this.state.completed[ch.id] && this._getProgress(ch) >= ch.target);
+    const list = this._primaryComplete(set)
+      ? [...set.primaryChallenges, ...set.secondaryChallenges]
+      : set.primaryChallenges;
+    return list.filter(ch => !this._isDone(ch) && this._isMet(ch));
   }
 
-  /** Is every challenge in the current set complete? */
+  /** Is the whole current set complete (primary AND secondary)? Gates advancing. */
   isCurrentSetComplete() {
     const set = SETS[this.state.currentSet];
-    return !!set && set.challenges.every(c => this.state.completed[c.id]);
+    if (!set) return false;
+    return [...set.primaryChallenges, ...set.secondaryChallenges].every(c => this._isDone(c));
   }
 
-  // Week completion (challenges done + reaching the 7th day) is owned by the
-  // coordinator + Waves now — the day source is Waves.dayInWeek, not a counter here.
-
   /**
-   * Mark any earned challenges in the current set as completed and, the moment
-   * the set first becomes fully complete, GRANT its rewards (once). Does NOT
-   * advance to the next set — that waits for game-over (advanceSet), so a player
-   * clears at most one set per life. Called at day-end and game-over.
-   * @returns {{ committed: string[], rewards: Reward[], setComplete: boolean }}
+   * Commit earned challenges in the current set and grant the matching tier's
+   * rewards once. Primary first; the secondary tier only commits once the primary
+   * is complete. Does NOT advance the set (that waits for game-over / the
+   * coordinator). Called at day-end and game-over.
+   * @returns {{ committed: string[], rewards: Reward[], primaryComplete: boolean, setComplete: boolean }}
    */
   commitEarned() {
-    if (this.frozen) return { committed: [], rewards: [], setComplete: false };
+    if (this.frozen) return { committed: [], rewards: [], primaryComplete: false, setComplete: false };
     const idx = this.state.currentSet;
     const set = SETS[idx];
-    /** @type {string[]} */
-    const committed = [];
-    /** @type {Reward[]} */
-    const rewards = [];
+    /** @type {string[]} */ const committed = [];
+    /** @type {Reward[]} */ const rewards = [];
+    if (!set) {
+      this._notifiedEarned = {};
+      this._save();
+      return { committed, rewards, primaryComplete: false, setComplete: false };
+    }
 
-    if (set) {
-      for (const ch of set.challenges) {
-        if (this.state.completed[ch.id]) continue;
-        if (this._getProgress(ch) >= ch.target) {
-          this.state.completed[ch.id] = true;
-          committed.push(ch.id);
-        }
+    // Tier 1 — primary. Commit met goals, then grant the primary rewards once.
+    for (const ch of set.primaryChallenges) {
+      if (!this._isDone(ch) && this._isMet(ch)) { this.state.completed[ch.id] = true; committed.push(ch.id); }
+    }
+    if (this._primaryComplete(set) && !this.state.primaryClaimed[idx]) {
+      this.state.primaryClaimed[idx] = true;
+      for (const r of set.primaryChallengeRewards) { this._applyReward(r); rewards.push(r); }
+    }
+
+    // Tier 2 — secondary ("Complete the Week"). Only once the primary is complete.
+    if (this._primaryComplete(set)) {
+      for (const ch of set.secondaryChallenges) {
+        if (!this._isDone(ch) && this._isMet(ch)) { this.state.completed[ch.id] = true; committed.push(ch.id); }
       }
-      // Grant rewards exactly once, the first time the set is fully complete.
-      if (this.isCurrentSetComplete() && !this.state.rewardsClaimed[idx]) {
-        this.state.rewardsClaimed[idx] = true;
-        for (const r of set.rewards) { this._applyReward(r); rewards.push(r); }
+      if (set.secondaryChallenges.every(c => this._isDone(c)) && !this.state.secondaryClaimed[idx]) {
+        this.state.secondaryClaimed[idx] = true;
+        for (const r of set.secondaryChallengeRewards) { this._applyReward(r); rewards.push(r); }
       }
     }
 
     this._notifiedEarned = {};
     this._save();
-    return { committed, rewards, setComplete: this.isCurrentSetComplete() };
+    return { committed, rewards, primaryComplete: this._primaryComplete(set), setComplete: this.isCurrentSetComplete() };
   }
 
   /**
-   * Reveal the next set — called only at game-over, so finishing a set's goals
-   * mid-run doesn't surface the next set until this life ends. @returns {boolean} advanced
+   * Reveal the next set — called only at game-over (and mid-run by the coordinator
+   * when a week fully completes), so finishing a set mid-run doesn't surface the
+   * next set until appropriate. @returns {boolean} advanced
    */
   advanceSet() {
     if (this.frozen) return false;
@@ -546,11 +603,17 @@ export class Challenges {
 
   // === Read API for HUD =====================================================
 
+  /** @param {Challenge} ch decorate with live progress + completion */
+  _decorate(ch) {
+    return { ...ch, progress: Math.min(ch.target, this._getProgress(ch)), completed: this._isDone(ch) };
+  }
+
   /**
-   * The 3 challenges to show on the game-over screen, decorated with live
-   * progress + completion flags. Returns null when the player has cleared
-   * every set.
-   * @returns {{ name: string, index: number, challenges: Array<Challenge & { progress: number, completed: boolean }> } | null}
+   * The current set for the live displays (round-over modal, night sky, pause),
+   * split into primary + secondary tiers. `primaryComplete` tells the renderer
+   * whether to reveal the secondary ("Complete the Week"). Null once every set is
+   * cleared.
+   * @returns {{ name: string, index: number, primaryComplete: boolean, primary: Array<Challenge & { progress: number, completed: boolean }>, secondary: Array<Challenge & { progress: number, completed: boolean }> } | null}
    */
   getCurrentSet() {
     const set = SETS[this.state.currentSet];
@@ -558,15 +621,13 @@ export class Challenges {
     return {
       name: set.name,
       index: this.state.currentSet,
-      challenges: set.challenges.map(ch => ({
-        ...ch,
-        progress: Math.min(ch.target, this._getProgress(ch)),
-        completed: this.state.completed[ch.id] === true
-      }))
+      primaryComplete: this._primaryComplete(set),
+      primary: set.primaryChallenges.map(ch => this._decorate(ch)),
+      secondary: set.secondaryChallenges.map(ch => this._decorate(ch))
     };
   }
 
-  /** Master list for the challenges modal. */
+  /** Master list for the challenges journal modal (all tiers flattened per set). */
   getAllSets() {
     return SETS.map((set, i) => {
       const status = i < this.state.currentSet
@@ -576,12 +637,8 @@ export class Challenges {
         name: set.name,
         index: i,
         status,
-        rewards: set.rewards,
-        challenges: set.challenges.map(ch => ({
-          ...ch,
-          progress: Math.min(ch.target, this._getProgress(ch)),
-          completed: this.state.completed[ch.id] === true
-        }))
+        rewards: [...set.primaryChallengeRewards, ...set.secondaryChallengeRewards],
+        challenges: [...set.primaryChallenges, ...set.secondaryChallenges].map(ch => this._decorate(ch))
       };
     });
   }
