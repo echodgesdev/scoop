@@ -1,7 +1,7 @@
 // @ts-check
-import { PICKUP_TYPE, PICKUP_TYPES } from '../game/config.js';
-import { GROUPS, RECIPE_BY_ID } from '../game/recipes.js';
-import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME } from './powerupVisuals.js';
+import { PICKUP_TYPE, PICKUP_TYPES } from '../../game/config.js';
+import { GROUPS, RECIPE_BY_ID } from '../../game/recipes.js';
+import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME } from '../powerupVisuals.js';
 import { Toasts } from './toastUI.js';
 import {
   REGULAR_GAUGE_MAX, POWERUP_GAUGE_MAX, REGULAR_RING,
@@ -15,7 +15,7 @@ import {
 // before the next card cuts in.
 const UNLOCK_ITEM_MS = 1650;
 
-/** @typedef {import('../game/recipes.js').Recipes} Recipes */
+/** @typedef {import('../../game/recipes.js').Recipes} Recipes */
 
 const BEST_KEY = 'scoop.best';
 
@@ -59,11 +59,11 @@ export class Hud {
     this.pauseOverlayEl = pauseOverlayEl;
     /** @type {Recipes} */
     this.recipes = recipes;
-    /** @type {import('../game/challenges.js').Challenges} */
+    /** @type {import('../../game/challenges.js').Challenges} */
     this.challenges = challenges;
-    /** @type {import('../game/regulars.js').Regulars} */
+    /** @type {import('../../game/regulars.js').Regulars} */
     this.regulars = regulars;
-    /** @type {import('../engine/audio.js').Sound} */
+    /** @type {import('../../engine/audio.js').Sound} */
     this.sound = sound;
 
     // Mid-play toasts (challenge met / flavor discovered) — self-contained module.
@@ -488,7 +488,7 @@ export class Hud {
         : (id === PICKUP_TYPE.COIN ? this.challenges.isCoinUnlocked() : this.challenges.isPowerupUnlocked(id));
       const used = !this.challenges ? 0
         : (id === PICKUP_TYPE.COIN ? this.challenges.coinCollectedCount()
-          : this.challenges.powerupUsedCount(/** @type {import('../types.js').PickupTypeName} */ (id)));
+          : this.challenges.powerupUsedCount(/** @type {import('../../types.js').PickupTypeName} */ (id)));
       html = powerupDetailHtml(id, unlocked, used);
     } else if (kind === 'recipe' && this.recipes) {
       const r = this.recipes.getAll().find(x => x.id === id);

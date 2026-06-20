@@ -29,7 +29,7 @@ export function wireReactions(game) {
     game.sound.bad();
     game.haptics.error();
     game.effects.addShake(8);
-    game.hurt = 0.2;
+    game.effects.flashHurt(0.2);
   });
 
   // Order completed: confetti burst at the customer. No floating text — points
@@ -98,7 +98,6 @@ export function wireReactions(game) {
     game.sound.perfect();
     game.effects.addShake(12);
     game.effects.burst(x, y, ['#ffec5c', '#ff6fa3', '#7fe3c4', '#6a8cff', '#fff'], 36);
-    game.effects.popText(x, y - 46, '⚡ SUPERCHARGED!', { color: '#ffec5c', size: 30, life: 1.2 });
   });
 
   // Toss-top (upward gesture): launch a stretch-and-fade ghost of the popped
@@ -127,7 +126,7 @@ export function wireReactions(game) {
     game.haptics.expire();
     game.effects.addShake(12);
     game.hud.flashHealthDamage();
-    game.hurt = 0.35;
+    game.effects.flashHurt(0.35);
   });
 
   game.bus.on('phaseUp', () => {

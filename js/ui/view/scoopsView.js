@@ -1,8 +1,8 @@
 // @ts-check
-import { SCOOP_RADIUS, SCOOP_DISSOLVE_S } from '../game/config.js';
-import { drawFallingScoop, drawDissolveSprite } from './sprites.js';
+import { SCOOP_RADIUS, SCOOP_DISSOLVE_S } from '../../game/config.js';
+import { drawFallingScoop, drawDissolveSprite } from '../sprites/scoopRenderer.js';
 
-/** @typedef {import('../game/scoops.js').ScoopField} ScoopField */
+/** @typedef {import('../../game/scoops.js').ScoopField} ScoopField */
 
 /**
  * Draw the falling-scoop field. Live scoops draw plain; a missed scoop cross-

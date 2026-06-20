@@ -1,6 +1,6 @@
 // @ts-check
 import { CONE_HEIGHT } from './config.js';
-import { glowRoundRect } from '../view/glow.js';
+import { glowRoundRect } from '../ui/effects/glow.js';
 
 /** @typedef {import('../game.js').Game} Game */
 

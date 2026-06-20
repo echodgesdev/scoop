@@ -5,7 +5,14 @@
 
 const GRAVITY = 520;
 
-/** Particle bursts + screen shake + floating text + power-up swirls, drawn onto the game canvas. */
+// Damage flash: a full-screen red tint whose alpha rides the `hurt` timer (seeded
+// by reactions on damage, decays in update). HURT_REF_S is the timer value the max
+// tint maps to.
+const HURT_RGB       = '230, 57, 70';
+const HURT_MAX_ALPHA = 0.35;
+const HURT_REF_S     = 0.3;
+
+/** Particle bursts + screen shake + floating text + power-up swirls + damage flash, drawn onto the game canvas. */
 export class Effects {
   constructor() {
     /** @type {Particle[]} */
@@ -15,6 +22,7 @@ export class Effects {
     /** @type {Swirl[]} triangle shards that orbit + spiral out (power-up "got it" flourish) */
     this.swirls = [];
     this.shake = 0;
+    this.hurt = 0;
   }
 
   reset() {
@@ -22,6 +30,7 @@ export class Effects {
     this.texts = [];
     this.swirls = [];
     this.shake = 0;
+    this.hurt = 0;
   }
 
   /**
@@ -95,9 +104,28 @@ export class Effects {
     };
   }
 
+  /** Seed the damage flash (seconds it lasts; also drives the tint alpha). @param {number} seconds */
+  flashHurt(seconds) {
+    this.hurt = seconds;
+  }
+
+  /**
+   * Full-screen red damage tint, alpha riding the hurt timer. Screen-fixed: drawn
+   * inside the shake transform, so it counteracts the (ox, oy) offset to fill the
+   * viewport.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {{ width: number, height: number }} bounds @param {number} ox @param {number} oy
+   */
+  drawHurt(ctx, bounds, ox, oy) {
+    if (this.hurt <= 0) return;
+    ctx.fillStyle = `rgba(${HURT_RGB}, ${HURT_MAX_ALPHA * (this.hurt / HURT_REF_S)})`;
+    ctx.fillRect(-ox, -oy, bounds.width, bounds.height);
+  }
+
   /** @param {number} dt */
   update(dt) {
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt * 60);
+    if (this.hurt > 0) this.hurt = Math.max(0, this.hurt - dt);
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.vy += GRAVITY * dt;

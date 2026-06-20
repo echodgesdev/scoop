@@ -17,8 +17,6 @@
 const FRAME = 256;
 const COLS = 4;
 
-export const CONE_FRAME = Object.freeze({ REFERENCE: 0, FULL: 1, BACK: 2, FRONT: 3 });
-
 /** @type {import('../../types.js').SpriteSheetDef} */
 const CONE_SPRITE = {
   // Runtime path (relative to index.html) — used verbatim.

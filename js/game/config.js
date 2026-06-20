@@ -5,7 +5,7 @@
 import { GROUND_Y, CONE_EMBED_PX as _CONE_EMBED_PX } from './tuning.js';
 // The scoop sprite def is data (no rendering), so config reads it to derive the
 // scoop's collision size — single source of truth, set in the sprite editor.
-import SCOOP_SPRITE from '../view/sprites/scoopSprite.js';
+import SCOOP_SPRITE from '../ui/sprites/scoopSprite.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../types.js').PickupTypeName} PickupTypeName */

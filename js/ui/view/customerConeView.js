@@ -1,0 +1,74 @@
+// @ts-check
+// The customer's held mini-cone: a small cone beside the customer's face holding
+// the scoops they've been served so far. Each new scoop flies in along an arc
+// from where the player's cone-top scoop was at serve time, then squash-pops into
+// its slot. Pure presentation; customers.js calls drawHeldCone() once per customer
+// (Layer 2).
+import { drawScoop } from './playerView.js';
+import { drawConeUnderStack, CONE_FRAME } from '../sprites/coneRenderer.js';
+import { SCOOP_STATE } from '../sprites/scoopRenderer.js';
+import {
+  SCOOP_RADIUS,
+  MINI_SCOOP_RADIUS,
+  MINI_CONE_OFFSET_X,
+  MINI_CONE_H,
+  MINI_CONE_FACE_OFFSET_PX,
+  SERVED_FLIGHT_ARC
+} from '../../game/config.js';
+
+/** @typedef {import('../../types.js').Customer} Customer */
+
+/**
+ * Draw a customer's held mini-cone + its served-scoop stack. Stack grows upward
+ * as serveOne accepts; each new entry flies in along an arc from the serve source.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Customer} c
+ * @param {number} cx interpolated customer x (drawn position)
+ * @param {number} faceY face center (world; already includes the slide-in offset)
+ * @param {number} [alpha] render-interpolation fraction for in-flight scoops
+ */
+export function drawHeldCone(ctx, c, cx, faceY, alpha = 1) {
+  const served = c.order.served;
+  if (!served || served.length === 0) return;
+
+  const baseX = cx + MINI_CONE_OFFSET_X;
+  // Cone tip positioned MINI_CONE_FACE_OFFSET_PX below the face center, so the
+  // cone "hangs" at the customer's chin level regardless of how submerged they
+  // are. faceY already includes the slide-in offset.
+  const baseY = faceY + MINI_CONE_FACE_OFFSET_PX;
+
+  const spacing = MINI_SCOOP_RADIUS * 1.6;
+  const scale = MINI_SCOOP_RADIUS / SCOOP_RADIUS;
+
+  // The bottom scoop's resting center (i = 0 of the stack below). The layered cone
+  // sprite — the same one the player carries, scaled down — is seated under it so
+  // its bowl nests the scoops, with BACK behind the stack and FRONT over it.
+  const seatY = baseY - MINI_CONE_H - MINI_SCOOP_RADIUS * 0.2;
+  drawConeUnderStack(ctx, baseX, seatY, scale, CONE_FRAME.BACK);
+
+  for (let i = 0; i < served.length; i++) {
+    const s = served[i];
+    const slotX = baseX;
+    const slotY = baseY - MINI_CONE_H - i * spacing - MINI_SCOOP_RADIUS * 0.2;
+
+    // Ease-in-out from src to slot, with a sin-bump that arcs the path upward so
+    // the scoop reads as "tossed across". Flight progress is interpolated between
+    // sim steps (it's a fast 0.32s arc).
+    const st = s.prevT !== undefined ? s.prevT + (s.t - s.prevT) * alpha : s.t;
+    const t = Math.max(0, Math.min(1, st));
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const x = s.srcX + (slotX - s.srcX) * e;
+    const linearY = s.srcY + (slotY - s.srcY) * e;
+    const bump = Math.sin(t * Math.PI) * SERVED_FLIGHT_ARC;
+    const y = linearY - bump;
+
+    // Squash-pop on the last sliver of the flight, mimicking the player tray's
+    // land animation.
+    const squash = t > 0.85 ? 1 + 0.35 * (1 - (t - 0.85) / 0.15) : 1;
+
+    drawScoop(ctx, x, y, s.color, scale * squash, SCOOP_STATE.CONE);
+  }
+
+  // Cone FRONT — over the stack, so the bottom scoop nests into the bowl.
+  drawConeUnderStack(ctx, baseX, seatY, scale, CONE_FRAME.FRONT);
+}

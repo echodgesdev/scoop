@@ -1,5 +1,28 @@
 // @ts-check
 import { GROUND_Y } from '../game/config.js';
+import { dayCycleState, nightCycleState } from '../game/dayCycle.js';
+
+/** @typedef {import('../game.js').Game} Game */
+
+/**
+ * Paint the full background for the frame: the day sky + sun, or the between-wave
+ * night cycle (moon + fast sky), then sand and ocean on top. Drawn first each
+ * frame; the actors layer over the floor afterward.
+ * @param {CanvasRenderingContext2D} ctx @param {Game} game
+ */
+export function drawEnvironment(ctx, game) {
+  if (game.inNightCycle) {
+    const nightState = nightCycleState(game.nightT, game.bounds);
+    drawNightSky(ctx, game.bounds, nightState);
+    drawSand(ctx, game.bounds, nightState);
+    drawOcean(ctx, game.bounds, nightState, game.clock);
+  } else {
+    const dayState = dayCycleState(game.world.waves.waveFraction, game.bounds);
+    drawSkyAndSun(ctx, game.bounds, dayState);
+    drawSand(ctx, game.bounds, dayState);
+    drawOcean(ctx, game.bounds, dayState, game.clock);
+  }
+}
 
 // === Per-frame caches =========================================================
 // The day-cycle state only changes on serves (wave progress is discrete), so
@@ -30,7 +53,7 @@ let _haloCache = { key: '', grad: null };
  * colors actually read at the sand line. Sun is drawn before sand so it
  * rises from behind / sets into the floor.
  */
-export function drawSkyAndSun(ctx, bounds, state) {
+function drawSkyAndSun(ctx, bounds, state) {
   const groundY = GROUND_Y;
 
   ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
@@ -131,7 +154,7 @@ const STARS = [
  * crescent moon (drawn before sand so the moon can sit low behind the horizon).
  * @param {CanvasRenderingContext2D} ctx
  */
-export function drawNightSky(ctx, bounds, state) {
+function drawNightSky(ctx, bounds, state) {
   const groundY = GROUND_Y;
 
   ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
@@ -176,7 +199,7 @@ export function drawNightSky(ctx, bounds, state) {
  * sand covers the embedded bottoms — actors look like they're standing in
  * the floor rather than over it.
  */
-export function drawSand(ctx, bounds, state) {
+function drawSand(ctx, bounds, state) {
   const groundY = GROUND_Y;
   ctx.fillStyle = state.floor;
   ctx.fillRect(0, groundY, bounds.width, bounds.height - groundY);
@@ -234,7 +257,7 @@ let _waterCache = { key: '', grad: null };
  * @param {{ skyTop: string, skyBottom: string, floor: string }} state
  * @param {number} time  free-running seconds, drives the animation
  */
-export function drawOcean(ctx, bounds, state, time) {
+function drawOcean(ctx, bounds, state, time) {
   const W = bounds.width;
   const groundY = GROUND_Y;
   const band = bounds.height - groundY;           // sand-band height

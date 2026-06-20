@@ -14,7 +14,7 @@
 //   1 Default — neutral waiting face (a.k.a. "Start"; also the unlock reveal)
 //   2 Hungry · 3 Upset · 4 Angry · 5 Drool · 6 Frozen
 // This is the old 6-face layout shifted one column right (Empty took column 0),
-// so a face's column = its old index + 1. See FACE in view/stations.js.
+// so a face's column = its old index + 1 (see drawFace in ui/sprites/customerRenderer.js).
 //
 // Faces don't collide (they're tap-targeted by lane x, not by a body), so every
 // frame's `body` is null — the sheet's 115px circles go unused by the game.

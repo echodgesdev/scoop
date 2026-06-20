@@ -5,14 +5,14 @@
 //   game/   — simulation + rules + data: world.js (the sim), player, scoops,
 //             shop, waves, powerups, recipes, challenges, day cycle, modes,
 //             config, tuning
-//   view/   — rendering: renderer.js (the frame), playerView, scoopsView, scene,
-//             stations, effects, HUD
+//   ui/     — rendering: renderer.js (the frame), playerView, scoopsView, scene,
+//             customers, effects, HUD
 //   reactions.js — domain events → sound/haptics/effects/HUD glue
 // Dataflow is one-way: input → World.step(dt) → events → presentation. This file
 // owns the glue only: it builds the actors, drives the Loop with
 // _stepping/_step/_frame, routes input, runs the wave-flow state machine
 // (start → cashout → transition → night cycle), and pulls World state to the HUD
-// each frame. The sim (game/world.js), drawing (view/renderer.js), and reactions
+// each frame. The sim (game/world.js), drawing (ui/renderer.js), and reactions
 // (reactions.js) are delegated.
 import {
   MAX_HEALTH,
@@ -20,15 +20,15 @@ import {
   SPAWN_DEMAND_BIAS,
   CONE_Y
 } from './game/config.js';
-import { Stations } from './view/stations.js';
-import { Hud } from './view/hud.js';
+import { Customers } from './ui/customers.js';
+import { Hud } from './ui/hud/hud.js';
 import { Input } from './engine/input.js';
 import { Sound } from './engine/audio.js';
 import { Haptics } from './engine/haptics.js';
-import { Effects } from './view/effects.js';
+import { Effects } from './ui/effects/effects.js';
 import { DebugPanel } from './debug.js';
-import { drawFrame } from './view/renderer.js';
-import { PICKUP_RING_COLOR } from './view/powerupVisuals.js';
+import { drawFrame } from './ui/renderer.js';
+import { PICKUP_RING_COLOR } from './ui/powerupVisuals.js';
 import { wireReactions } from './reactions.js';
 import { EventBus } from './engine/events.js';
 import { responsiveDims, fitRect } from './engine/viewport.js';
@@ -151,7 +151,7 @@ export class Game {
     this.effects = new Effects();
     // Customer view (faces + speech bubbles). Pure presentation; the renderer
     // draws through it and reads its groundY for the miss line.
-    this.stations = new Stations();
+    this.customers = new Customers();
 
     // Presentation tutorial, built from the active mode. Rebuilt each start().
     this.tutorial = this.world.mode.makeTutorial();
@@ -186,7 +186,6 @@ export class Game {
     this.inGameOver = false;
     /** @type {{ text: string, t: number } | null} */
     this.banner = null;
-    this.hurt = 0;
     this.running = false;
     this.paused = false;
     // Whether the tutorial "day meter" callout is currently shown + its current
@@ -300,7 +299,7 @@ export class Game {
     this.canvas.width = this.bounds.width;
     this.canvas.height = this.bounds.height;
     this.world.player.reposition(this.bounds.width / 2, CONE_Y);
-    this.stations.layout(this.bounds);
+    this.customers.layout(this.bounds);
     this.world.shop.layout(this.bounds.width);
     this._resize();
     // Paint the ambient scene once so the title overlay sits over the dawn
@@ -447,7 +446,7 @@ export class Game {
       this.canvas.width = d.width;
       this.canvas.height = d.height;
       this.world.player.reposition(this.bounds.width / 2, CONE_Y);
-      this.stations.layout(this.bounds);
+      this.customers.layout(this.bounds);
       this.world.shop.layout(this.bounds.width);
       // Reassigning canvas.width wipes the backing store to transparent, and
       // the next rAF paint may be a frame away — long enough to flash the dark
@@ -470,7 +469,7 @@ export class Game {
     this.sound.resume();
     this.hud.hideOverlay();
     this.effects.reset();
-    this.stations.layout(this.bounds);
+    this.customers.layout(this.bounds);
     // A tutorial REPLAY from Settings (How to Play after the tutorial's already
     // been cleared) is a SANDBOX: freeze challenge progress and restrict tips to
     // coins. A genuine first play (Set 1 not cleared yet) is the real thing.
@@ -497,7 +496,6 @@ export class Game {
     this.tutorial = this.world.mode.makeTutorial();
 
     this.banner = null;
-    this.hurt = 0;
     this.running = true;
     this.inWaveTransition = false;
     this.inCashout = false;
@@ -615,10 +613,9 @@ export class Game {
     if (frame > 0) this.fps = this.fps * 0.9 + (1 / frame) * 0.1;
     this.clock += frame;
 
-    // Presentation timers decay on the variable step (they're game-owned, not
-    // part of the deterministic sim): the "DAY N!" banner and the hurt flash.
+    // The "DAY N!" banner decays on the variable step (game-owned, not part of
+    // the deterministic sim). The hurt flash is now an Effects timer.
     if (this.banner && (this.banner.t -= frame) <= 0) this.banner = null;
-    if (this.hurt > 0) this.hurt = Math.max(0, this.hurt - frame);
 
     // Between-wave night cycle: a fast sunset→midnight→dawn sweep (moon arcs
     // across) that plays after the overlay is dismissed; when it lands the

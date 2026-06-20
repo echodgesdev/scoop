@@ -1,14 +1,14 @@
 // @ts-check
 // Scoop RENDER binding. The sprite definitions (data + collision bodies) live in
-// ./sprites/; this file builds a generic SpriteSheet from each and exposes the
+// this same folder; this file builds a generic SpriteSheet from each and exposes the
 // scoop draw helpers + maps. Two sheets: the base scoops (resting states +
 // default-speed fall, 70px cells) and the oversized fast-fall scoops (taller
 // cells, one frame per speed tier). The generic SpriteSheet handles both.
 import { SpriteSheet } from './spriteSheet.js';
-import SCOOP_SPRITE from './sprites/scoopSprite.js';
-import SCOOP_FAST_SPRITE from './sprites/scoopFastSprite.js';
+import SCOOP_SPRITE from './scoopSprite.js';
+import SCOOP_FAST_SPRITE from './scoopFastSprite.js';
 
-/** @typedef {import('../types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../../types.js').ScoopColor} ScoopColor */
 
 // Sheet columns, left→right (shared layout for both sheets).
 const FLAVOR_COL = { choco: 0, pink: 1, mint: 2, vanilla: 3, blueberry: 4, rainbow: 5 };

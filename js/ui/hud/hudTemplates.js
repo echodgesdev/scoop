@@ -5,11 +5,11 @@
 // to render. Keeping the string-building here is what lets hud.js read as a
 // coordinator instead of a 1300-line god-file.
 
-import { COLORS, PICKUP_TYPE } from '../game/config.js';
-import { RECIPE_TARGET, RECIPE_BY_ID, GROUP_BY_ID } from '../game/recipes.js';
-import CUSTOMER_SPRITE from './sprites/customerSprite.js';
-import { HUD_SCOOP_COL } from './sprites/hudScoopSprite.js';
-import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from './powerupVisuals.js';
+import { COLORS, PICKUP_TYPE } from '../../game/config.js';
+import { RECIPE_TARGET, RECIPE_BY_ID, GROUP_BY_ID } from '../../game/recipes.js';
+import CUSTOMER_SPRITE from '../sprites/customerSprite.js';
+import { HUD_SCOOP_COL } from '../sprites/hudScoopRenderer.js';
+import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from '../powerupVisuals.js';
 
 // Regulars: faces are cropped from the shared sprite sheet via CSS background-
 // position — the row is the regular's sheet row (animation index), the column the

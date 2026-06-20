@@ -1,18 +1,16 @@
 // @ts-check
 import {
   CONE_WIDTH,
-  CONE_HEIGHT,
   SCOOP_RADIUS,
   HANDOFF_DURATION_S
-} from '../game/config.js';
-import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../game/player.js';
-import { SCOOP_STATE, drawScoopSprite } from './sprites.js';
-import { SpriteSheet } from './spriteSheet.js';
-import CONE_SPRITE, { CONE_FRAME } from './sprites/coneSprite.js';
-import { glowCircle } from './glow.js';
+} from '../../game/config.js';
+import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../../game/player.js';
+import { SCOOP_STATE, drawScoopSprite } from '../sprites/scoopRenderer.js';
+import { drawPlayerCone, CONE_FRAME } from '../sprites/coneRenderer.js';
+import { glowCircle } from '../effects/glow.js';
 
-/** @typedef {import('../types.js').ScoopColor} ScoopColor */
-/** @typedef {import('../game/player.js').Player} Player */
+/** @typedef {import('../../types.js').ScoopColor} ScoopColor */
+/** @typedef {import('../../game/player.js').Player} Player */
 
 // View-only slosh-trail shape: each scoop up the stack samples the cone's lean
 // from a few ticks earlier (SLOSH_LAG) and scales it by a sideways natural-log
@@ -20,50 +18,6 @@ import { glowCircle } from './glow.js';
 // top — so the column reads as one graceful swoosh trailing behind.
 const SLOSH_LAG = 2.4;  // ticks of extra delay per scoop above the bottom
 const SLOSH_ARC = 6;    // log-arc curvature (higher = sharper bow near the top)
-
-// === Cone sprite (layered) ==================================================
-// A back layer + a front layer the scoop stack draws between. The sheet art is
-// already colorized, so the renderer just blits it — no per-frame recolor.
-// CONE_SPRITE_W is the on-screen art width and CONE_SPRITE_DY nudges it
-// vertically so the bowl meets the bottom scoop — tune these two if the cone
-// reads too big/small or the scoops don't nest right.
-const coneSheet = new SpriteSheet(CONE_SPRITE);
-const CONE_FRAME_PX = CONE_SPRITE.frame.width;        // 256
-const CONE_SPRITE_W = 168;                            // on-screen cone width (px)
-const CONE_SPRITE_DY = -14;                           // sprite-center offset from player.y
-
-// Bowl seat: how far BELOW the bottom scoop's center the cone-sprite center sits
-// (at scoopScale 1). Derived from the player layout above — CONE_SPRITE_DY +
-// CONE_HEIGHT/2 + the bottom scoop's 0.2r nudge (see scoopPosition) — so any
-// caller can seat a cone of any size under a stack and nest scoops exactly like
-// the player's cone. See drawConeUnderStack (used for the customers' mini-cones).
-const CONE_BOWL_SEAT = CONE_HEIGHT / 2 + CONE_SPRITE_DY + SCOOP_RADIUS * 0.2;
-
-/**
- * Blit one cone-sheet frame (BACK or FRONT) as a square of side `w` centered at
- * (cx, cy). The sheet art is already colorized. @returns {boolean} whether it drew.
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} cx @param {number} cy @param {number} w @param {number} frame
- */
-function drawConeFrame(ctx, cx, cy, w, frame) {
-  if (!coneSheet.ready) return false;
-  const F = CONE_FRAME_PX;
-  ctx.drawImage(coneSheet.img, frame * F, 0, F, F, cx - w / 2, cy - w / 2, w, w);
-  return true;
-}
-
-/**
- * Draw one cone layer sized + positioned to seat a scoop stack whose bottom
- * scoop is centered at (scoopX, scoopY) and drawn at `scoopScale` (1 = the
- * player's full-size scoop). Shared by the player's cone and the customers' held
- * mini-cones so both nest scoops identically. @returns {boolean} whether it drew.
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} scoopX @param {number} scoopY bottom-scoop center (world)
- * @param {number} scoopScale @param {number} frame one of CONE_FRAME
- */
-export function drawConeUnderStack(ctx, scoopX, scoopY, scoopScale, frame) {
-  return drawConeFrame(ctx, scoopX, scoopY + CONE_BOWL_SEAT * scoopScale, CONE_SPRITE_W * scoopScale, frame);
-}
 
 /**
  * Draw the cone + its tray. Reads the Player model's position, stack, slosh
@@ -94,9 +48,7 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
   if (player.flash > 0) {
     glowCircle(ctx, player.x, player.y, CONE_WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
   }
-  const coneCx = player.x;
-  const coneCy = player.y + CONE_SPRITE_DY;
-  drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.BACK);
+  drawPlayerCone(ctx, player.x, player.y, CONE_FRAME.BACK);
 
   const stack = player.stack;
   for (let i = 0; i < stack.length; i++) {
@@ -143,7 +95,7 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
   }
 
   // Cone FRONT — over the scoops, so the bottom scoop nests into the bowl.
-  drawConeFrame(ctx, coneCx, coneCy, CONE_SPRITE_W, CONE_FRAME.FRONT);
+  drawPlayerCone(ctx, player.x, player.y, CONE_FRAME.FRONT);
   ctx.restore();
 
   // Launched-scoop ghosts (committed toss): each rises, stretches tall, and fades
@@ -167,7 +119,7 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
 
 /**
  * One scoop: the sheet sprite for its flavor + state. Shared by the tray, the
- * customer mini-cones (stations), the falling field, and anywhere a scoop renders.
+ * customer mini-cones (customers), the falling field, and anywhere a scoop renders.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x @param {number} y
  * @param {ScoopColor | 'rainbow'} colorKey

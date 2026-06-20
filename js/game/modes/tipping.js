@@ -2,7 +2,7 @@
 import { PICKUP_TYPE, PICKUP_TO_POWER, CUSTOMER_FACE_OFFSET_PX, pickWeighted } from '../config.js';
 import { STATE, REACH } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
-import { drawScoop } from '../../view/playerView.js';
+import { drawScoop } from '../../ui/view/playerView.js';
 
 /** @typedef {import('../../game.js').Game} Game */
 /** @typedef {import('../world.js').World} World */

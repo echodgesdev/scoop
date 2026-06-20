@@ -11,8 +11,8 @@
 // is the contract between art and physics), so art resolution/padding can change
 // without moving anything else.
 
-/** @typedef {import('../types.js').SpriteSheetDef} SpriteSheetDef */
-/** @typedef {import('../types.js').SpriteFrame} SpriteFrame */
+/** @typedef {import('../../types.js').SpriteSheetDef} SpriteSheetDef */
+/** @typedef {import('../../types.js').SpriteFrame} SpriteFrame */
 
 export class SpriteSheet {
   /** @param {SpriteSheetDef} def */
