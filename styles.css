@@ -644,9 +644,8 @@ body.menu-visible #hud {
   color: #333;
   border: 2px solid #888;
 }
-/* Title screen: Play is the dominant CTA above the quieter Journal/Settings.
-   Scoped off .gameover-buttons so the game-over grid keeps its compact sizing. */
-.menu-buttons:not(.gameover-buttons) #startBtn {
+/* Title screen: Play is the dominant CTA above the quieter Journal/Settings. */
+.menu-buttons #startBtn {
   font-size: 22px;
   padding: 14px 24px;
   min-width: 240px;
@@ -1383,200 +1382,9 @@ button.flash {
   margin-bottom: 8px;
 }
 
-.challenge-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 8px;
-  margin-bottom: 4px;
-  font-size: 13px;
-}
-.challenge-row.completed {
-  background: rgba(6, 214, 160, 0.25);
-}
-.challenge-row.completed .challenge-title {
-  text-decoration: line-through;
-  color: #5a5a5a;
-}
-.challenge-check {
-  color: #06d6a0;
-  font-weight: bold;
-  font-size: 16px;
-}
-.challenge-title {
-  flex: 1;
-  font-weight: bold;
-}
-.challenge-progress {
-  position: relative;
-  width: 90px;
-  height: 16px;
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-}
-.challenge-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #06d6a0, #43aa8b);
-  border-radius: 8px;
-  transition: width 0.3s ease;
-}
-.challenge-progress-text {
-  position: absolute;
-  inset: 0;
-  text-align: center;
-  font-size: 10px;
-  line-height: 16px;
-  font-weight: bold;
-  color: #222;
-}
-
-/* Inline challenges block on the game-over screen */
-.gameover-challenges {
-  margin: 12px auto;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.55);
-  border-radius: 10px;
-  max-width: 480px;
-  text-align: left;
-}
-.gameover-challenges h3 {
-  margin: 0 0 8px 0;
-  text-align: center;
-  color: #6a4a2a;
-}
-.challenges-inline .challenge-row {
-  background: rgba(255, 255, 255, 0.85);
-}
-
 /* =========================================================================
-   Game-over card — single panel containing stats + active challenges.
-   No dramatic title; the overlay's appearance is the "you died" signal.
-   ========================================================================= */
-.gameover-card {
-  background: linear-gradient(180deg, #fff8d6 0%, #fff3c0 100%);
-  border: 4px solid #b85;
-  border-radius: 16px;
-  padding: 22px 26px;
-  max-width: 540px;
-  width: 92%;
-  margin: 0 auto;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
-  color: #3a2a1a;
-}
-
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  align-items: stretch;
-  text-align: center;
-}
-.stats-row .stat {
-  padding: 10px 6px;
-  background: rgba(255, 255, 255, 0.55);
-  border-radius: 10px;
-}
-.stat-label {
-  font-size: 12px;
-  font-weight: bold;
-  color: #8a6a4a;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-.stat-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #3a2a1a;
-  line-height: 1.1;
-  margin-top: 4px;
-}
-.record-pill {
-  display: inline-block;
-  font-size: 11px;
-  background: #ffb703;
-  color: #fff;
-  padding: 2px 8px;
-  border-radius: 8px;
-  vertical-align: middle;
-  margin-left: 4px;
-  letter-spacing: 1px;
-}
-.best-line {
-  text-align: center;
-  font-size: 14px;
-  color: #6a4a2a;
-  margin-top: 10px;
-}
-.best-line strong {
-  color: #c1121f;
-  font-size: 16px;
-}
-
-.card-divider {
-  height: 1px;
-  background: rgba(0, 0, 0, 0.15);
-  margin: 14px -8px;
-}
-
-.gameover-challenges-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.set-tag {
-  background: #ffb703;
-  color: #fff;
-  font-weight: bold;
-  font-size: 11px;
-  letter-spacing: 1px;
-  padding: 3px 9px;
-  border-radius: 8px;
-}
-.set-tag-name {
-  font-weight: bold;
-  color: #6a4a2a;
-  font-size: 14px;
-}
-.gameover-challenges-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-/* Three-up button row: Journal (left) | Play Again (centre, primary) | Settings (right). */
-.menu-buttons.gameover-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1.5fr 1fr;
-  gap: 10px;
-  max-width: 540px;
-  margin: 14px auto 0;
-  flex-direction: row;       /* override the column default from .menu-buttons */
-  align-items: stretch;
-}
-.menu-buttons.gameover-buttons button {
-  min-width: 0;              /* allow grid to shrink the buttons */
-  font-size: 16px;
-  padding: 12px 8px;
-}
-.menu-buttons.gameover-buttons #startBtn {
-  font-size: 20px;
-}
-/* Journal | Play Again (dominant) | Home fill the three columns; ⚙️ Settings sits
-   on its own full-width row beneath. */
-.menu-buttons.gameover-buttons .gameover-settings-btn {
-  grid-column: 1 / -1;
-  justify-self: center;
-  padding: 10px 28px;
-}
-
-/* =========================================================================
-   Polished challenge rows — used in the game-over card AND the master modal.
-   Icon | title + progress bar | count.
+   Polished challenge rows — used across the round-over modal, pause menu,
+   challenges journal tab, and night sky. Icon | title | percentage count.
    ========================================================================= */
 .challenge-row {
   display: grid;
@@ -1615,22 +1423,6 @@ button.flash {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.challenge-row .challenge-progress {
-  position: relative;
-  width: 100%;
-  height: 6px;
-  background: rgba(0, 0, 0, 0.12);
-  border-radius: 3px;
-  overflow: hidden;
-  border: none;
-}
-.challenge-row .challenge-progress-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #06d6a0, #43aa8b);
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-.challenge-row .challenge-progress-text { display: none; } /* old layout — count moved out */
 .challenge-count {
   font-size: 12px;
   font-weight: bold;
@@ -1972,31 +1764,12 @@ button.flash {
   margin-bottom: 4px;
 }
 
-/* "Finish your run to unlock the next set" nudge shown once a set is cleared
-   (the next set stays hidden until the game ends). */
-.wt-finish-note {
-  text-align: center;
-  color: #ffd166;
-  font-size: 12px;
-  line-height: 1.4;
-  padding: 4px 12px;
-  opacity: 0.95;
-}
+/* Cross-off animation — two beats per earned row:
+   1. Checkmark pops in with fanfare (scale-bounce + glow).
+   2. Line-through fades onto the title text. */
 
-/* Cross-off animation — three beats per earned row:
-   1. Progress bar slides from 0% to 100%.
-   2. Checkmark pops in with fanfare (scale-bounce + glow).
-   3. Progress bar fades out; line-through fades onto the title text. */
-
-/* The progress bar's width is driven inline by JS (set to 0% in
-   _animateCrossOffs, then to 100% to trigger the fill). Add the transition
-   here so the fill is animated. */
-.challenge-row.earned-pending .challenge-progress-bar {
-  transition: width 0.5s ease-out;
-}
-
-/* Beat 2: checkmark pops in. The count cell is the target — its text was
-   swapped from "3/3" to "✓" right before this class is added. */
+/* Beat 1: checkmark pops in. The count cell is the target — its text was
+   swapped from the % to "✓" right before this class is added. */
 .challenge-row.check-pop .challenge-count {
   animation: cc-check-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   color: #06d6a0;
@@ -2014,52 +1787,12 @@ button.flash {
    itself can't animate cleanly so we lean on color + opacity for the
    "fade in" feel — once the title turns grey and the line shows, the
    transition reads as a soft strike. */
-.challenge-row.struck-fade .challenge-progress {
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
 .challenge-row.struck-fade .challenge-title {
   color: #888;
   text-decoration: line-through;
   text-decoration-color: rgba(193, 18, 31, 0.85);
   text-decoration-thickness: 2px;
   transition: color 0.4s ease;
-}
-
-.wt-rewards {
-  margin: 14px 0 6px 0;
-  padding: 10px 14px;
-  background: rgba(255, 215, 0, 0.25);
-  border-radius: 10px;
-  border: 2px solid #ffb703;
-  animation: wt-rewards-pop 0.5s ease both;
-}
-.wt-rewards.hidden { display: none; }
-@keyframes wt-rewards-pop {
-  from { opacity: 0; transform: scale(0.85); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.wt-rewards-title {
-  font-weight: bold;
-  font-size: 13px;
-  color: #6a4a2a;
-  letter-spacing: 1px;
-  margin-bottom: 4px;
-}
-.wt-reward-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-}
-.wt-reward {
-  background: #fff;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-weight: bold;
-  font-size: 13px;
-  color: #3a2a1a;
-  border: 1px solid #b85;
 }
 
 .wt-buttons {
@@ -2076,25 +1809,6 @@ button.flash {
 /* 🏠 Home sits on its own full-width row beneath the main buttons (pause menu only). */
 .wt-buttons .wt-home-btn { grid-column: 1 / -1; justify-self: center; padding: 10px 28px; }
 
-/* End-of-day stat card (Score / Combo Today / Longest Combo / Favorite). */
-.wt-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-  margin: 10px 0 4px;
-}
-.wt-stats:empty { display: none; }
-.wt-stat {
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 10px;
-  padding: 7px 4px;
-  text-align: center;
-}
-.wt-stat-value { font-weight: bold; font-size: 16px; color: #8a4a2a; line-height: 1.15; word-break: break-word; }
-.wt-stat-label {
-  font-size: 10px; font-weight: bold; color: #9a7a52;
-  text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px;
-}
 .wt-buttons button {
   font-family: inherit;
   font-size: 15px;
@@ -2239,8 +1953,7 @@ body.menu-visible #pauseBtn {
 .regulars-modal,
 .powerups-modal,
 .settings-modal,
-.wave-transition-modal,
-.gameover-card {
+.wave-transition-modal {
   position: relative;
   overflow: hidden;             /* clips the awning to the rounded corners */
   padding-top: 46px;            /* clear the awning strip */
@@ -2261,8 +1974,7 @@ body.menu-visible #pauseBtn {
 .regulars-modal::before,
 .powerups-modal::before,
 .settings-modal::before,
-.wave-transition-modal::before,
-.gameover-card::before {
+.wave-transition-modal::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
@@ -2513,3 +2225,55 @@ body.roundover-open #pauseBtn {
   opacity: 0;
   pointer-events: none;
 }
+
+/* === Night-sequence HUD (between rounds) =================================== */
+/* The week's challenges drift in the upper sky during the night sweep; game.js
+   drives the opacity per frame, so no CSS transition here. */
+#nightSky {
+  position: absolute;
+  top: 9%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, 88%);
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  text-align: center;
+}
+#nightSky.hidden { display: none; }
+.sky-week {
+  font-size: 28px;
+  font-weight: bold;
+  color: #fff3c0;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  margin-bottom: 4px;
+}
+/* Dark-glass challenge rows so they read over the night gradient. */
+#nightSky .challenge-row {
+  background: rgba(20, 16, 40, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+#nightSky .challenge-title { color: #fff; }
+#nightSky .challenge-count { color: #ffd166; }
+#nightSky .challenge-row.completed .challenge-title { color: #bdbdbd; }
+
+/* Round-start countdown (3·2·1·GO), moved off the canvas to the HUD. */
+#roundIntro {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15;
+  pointer-events: none;
+  font-family: 'Comic Sans MS', sans-serif;
+  font-weight: bold;
+  font-size: 60px;
+  color: #fff3c0;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 0, 0, 0.55);
+}
+#roundIntro.hidden { display: none; }
+#roundIntro.intro-num { font-size: 130px; }
+#roundIntro.intro-go { color: #8ef0a8; }

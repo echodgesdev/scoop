@@ -51,11 +51,10 @@ const MAX_FRAME = 0.25;
 // Between-wave reset beat: a sped-up night cycle (sunset→midnight→dawn, crescent
 // moon arcing across) that plays after the cashout and before the wave overlay.
 const NIGHT_CYCLE_S = 2.8;   // slightly slower: room for the day-start beat (cone recenters, day # rolls over)
-// Round-start intro beats (seconds): an optional "Week N" title (day 1 of a week),
-// then a 3·2·1·START! countdown. The sim is frozen for the whole intro.
-const ROUND_INTRO_WEEK_S = 1.3;
+// Round-start countdown beats (seconds): a 3·2·1·GO! countdown (the week is
+// announced in the night sky beforehand). The sim is frozen for the whole intro.
 const ROUND_INTRO_BEAT_S = 0.65;   // each of "3", "2", "1"
-const ROUND_INTRO_START_S = 0.75;  // "START!"
+const ROUND_INTRO_START_S = 0.75;  // "GO!"
 
 export class Game {
   constructor() {
@@ -176,8 +175,6 @@ export class Game {
     // sweep) and on the first campaign day; skipped during the scripted tutorial.
     this.inRoundIntro = false;
     this.roundIntroT = 0;
-    /** @type {string | null} week title shown before the countdown (day 1 only) */
-    this.roundIntroWeekTitle = null;
     // Dedicated "Esc" pause menu — separate from the debug-panel pause.
     this.inPauseMenu = false;
     // Set once the game-over panel is up. Stepping is dead, but effects keep
@@ -622,13 +619,14 @@ export class Game {
     // freeze lifts and the next wave resumes.
     if (this.inNightCycle) {
       this.nightT += frame / NIGHT_CYCLE_S;
+      this.hud.setNightSky(this.nightT);   // the week's challenges drift + fade in the sky
       if (this.nightT >= 1) {
         this.nightT = 1;
         this.inNightCycle = false;
+        this.hud.hideNightSky();
         // Night sweep done — release the gauge hold so the new day's number shows,
         // and reset the per-day power-up counter (after the transition committed the
-        // finished day's challenges). The day-start beat (Week title + countdown) is
-        // kicked off here.
+        // finished day's challenges). The day-start countdown is kicked off here.
         this._dayRolling = false;
         this.world.challenges.recordWaveEnded();
         this.world.shop.resetDayCombo();
@@ -636,10 +634,14 @@ export class Game {
       }
     }
 
-    // Round-start intro countdown (frozen sim): advance and release at START.
+    // Round-start countdown (frozen sim) — drawn in the HUD now, not the canvas.
     if (this.inRoundIntro) {
       this.roundIntroT += frame;
-      if (this.roundIntroT >= this._roundIntroDuration()) this.inRoundIntro = false;
+      this.hud.setRoundIntro(this.roundIntroLabel());
+      if (this.roundIntroT >= this._roundIntroDuration()) {
+        this.inRoundIntro = false;
+        this.hud.setRoundIntro(null);
+      }
     }
     // Visual-only systems run variable-step — including during the cashout /
     // night-cycle freezes, so particle pops keep animating while play is paused,
@@ -806,28 +808,23 @@ export class Game {
     if (this.tutorial.active) { this.inRoundIntro = false; return; }
     this.inRoundIntro = true;
     this.roundIntroT = 0;
-    const set = this.world.challenges.getCurrentSet();
-    this.roundIntroWeekTitle = (this.world.waves.dayInWeek === 1 && set)
-      ? `Week ${set.index + 1}` : null;
   }
 
   _roundIntroDuration() {
-    const titleS = this.roundIntroWeekTitle ? ROUND_INTRO_WEEK_S : 0;
-    return titleS + ROUND_INTRO_BEAT_S * 3 + ROUND_INTRO_START_S;
+    return ROUND_INTRO_BEAT_S * 3 + ROUND_INTRO_START_S;
   }
 
-  /** The current big intro text ("Week N" / "3" / "2" / "1" / "START!"), or null. */
+  /**
+   * The current countdown beat ("3" / "2" / "1" / "GO!"), or null. The week is
+   * announced in the night sky beforehand, so the intro is just the countdown.
+   */
   roundIntroLabel() {
     if (!this.inRoundIntro) return null;
-    let t = this.roundIntroT;
-    if (this.roundIntroWeekTitle) {
-      if (t < ROUND_INTRO_WEEK_S) return this.roundIntroWeekTitle;
-      t -= ROUND_INTRO_WEEK_S;
-    }
+    const t = this.roundIntroT;
     if (t < ROUND_INTRO_BEAT_S) return '3';
     if (t < ROUND_INTRO_BEAT_S * 2) return '2';
     if (t < ROUND_INTRO_BEAT_S * 3) return '1';
-    return 'START!';
+    return 'GO!';
   }
 
   /**

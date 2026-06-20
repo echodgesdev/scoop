@@ -3,7 +3,7 @@
 // collection (recipes / regulars / power-ups) renders itself as: a gauge ring
 // wrapping a face, optionally wrapped in a tappable button, optionally filled
 // with a stack of recipe scoops. Pure presentational string builders (no `this`,
-// no element access, no game state); collectionTemplate.js / waveTransitionTemplate.js
+// no element access, no game state); collectionTemplate.js / roundOverTemplate.js
 // compose these into the higher-level grid coins, detail popups, and unlock reveals.
 
 import { HUD_SCOOP_COL } from '../../sprites/hudScoopRenderer.js';

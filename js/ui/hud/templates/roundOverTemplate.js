@@ -1,8 +1,8 @@
 // @ts-check
-// Wave-transition (between-day) card markup: the end-of-day stats grid, the
-// "Complete the Week" meter, and the unlock-reveal flip coins (a committed
-// challenge reward mapped to a card, then rendered as a back→front flip). Pure
-// string builders, driven by roundOver.js.
+// Round-over modal card markup: the end-of-round score table, the "Complete the
+// Week" meter, and the unlock-reveal flip coins (a committed challenge reward
+// mapped to a card, then rendered as a back→front flip). Pure string builders,
+// driven by roundOver.js.
 //
 // The reveals show collection items, so the regular-face crop + recipe ring come
 // from collectionTemplate and the recipe scoops from coinTemplate — no redefining.

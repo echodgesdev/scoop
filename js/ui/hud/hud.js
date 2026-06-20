@@ -15,6 +15,7 @@ import { Toasts } from './toastUI.js';
 import { LiveHud } from './liveHud.js';
 import { Journal } from './journal.js';
 import { RoundOver } from './roundOver.js';
+import { NightSky } from './nightSky.js';
 import { Screens } from './screens.js';
 
 export class Hud {
@@ -42,6 +43,9 @@ export class Hud {
       onShowJournal: () => this.journal.show(),
       onHome
     });
+
+    // The between-round night sequence: challenges in the sky + the countdown.
+    this.nightSky = new NightSky({ challenges });
 
     // Title / game-over / settings / pause overlays + all menu-button wiring.
     // Reset is wrapped to also re-render the open Journal panels so a wipe shows
@@ -105,4 +109,11 @@ export class Hud {
   /** @param {Parameters<RoundOver['showNextWave']>[0]} opts */
   showWaveTransition(opts) { this.roundOver.showNextWave(opts); }
   hideWaveTransition() { this.roundOver.hide(); }
+
+  // === Night sequence → NightSky ==============================================
+  /** @param {number} fraction night-cycle progress 0..1 */
+  setNightSky(fraction) { this.nightSky.showChallenges(fraction); }
+  hideNightSky() { this.nightSky.hideChallenges(); }
+  /** @param {string|null} label round-start countdown beat, or null to hide */
+  setRoundIntro(label) { this.nightSky.setCountdown(label); }
 }

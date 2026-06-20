@@ -20,7 +20,7 @@
 
 import { RECIPE_BY_ID } from '../../game/recipes.js';
 import { challengeRow } from './templates/challengeTemplate.js';
-import { weekMeterHtml, rewardToCard, unlockCardHtml, scoreTableHtml } from './templates/waveTransitionTemplate.js';
+import { weekMeterHtml, rewardToCard, unlockCardHtml, scoreTableHtml } from './templates/roundOverTemplate.js';
 
 // Auto-advance dwell per unlock coin: the ~0.7s flip plus a beat to read it.
 const COIN_DWELL_MS = 1500;
@@ -52,6 +52,7 @@ export class RoundOver {
     this.carouselEl = q('.ro-carousel');
     this.scoreStageEl = q('.ro-score');
     this.hintEl = q('.ro-hint');
+    this.journalBtnEl = q('.wt-journal-btn');
 
     // Sequence state (reset per open).
     this._mode = 'nextwave';      // 'nextwave' | 'gameover'
@@ -138,6 +139,7 @@ export class RoundOver {
   hide() {
     this._clearTimers();
     document.body.classList.remove('roundover-open');
+    if (this.journalBtnEl) this.journalBtnEl.classList.remove('flash');
     if (this.overlayEl) this.overlayEl.classList.add('hidden');
   }
 
@@ -313,6 +315,8 @@ export class RoundOver {
     this._showStage('carousel');
     this._setHint(false);
     if (this.subtitleEl) this.subtitleEl.textContent = 'Unlocked!';
+    // Pulse the Journal button as a CTA while coins are flipping in.
+    if (this.journalBtnEl) this.journalBtnEl.classList.add('flash');
     if (this.carouselEl) {
       this.carouselEl.innerHTML = this._coins.map(c => `<div class="ro-coin">${unlockCardHtml(/** @type {any} */ (c))}</div>`).join('');
     }
@@ -383,6 +387,7 @@ export class RoundOver {
     this._step = 'score';
     this._showStage('score');
     this._setHint(false);
+    if (this.journalBtnEl) this.journalBtnEl.classList.remove('flash');
     if (this.subtitleEl) this.subtitleEl.textContent = this._mode === 'gameover' ? 'Final Score' : 'Day Complete';
 
     let html = scoreTableHtml(this._stats, this._scoreExtra);

@@ -4,7 +4,7 @@ import { drawField as drawScoopField } from './view/scoopsView.js';
 import { drawPlayer } from './view/playerView.js';
 import { drawActivePowerup } from './view/activePowerupView.js';
 import { drawHitboxes, drawFps } from './view/debugView.js';
-import { drawBanner, drawRoundIntro, drawPauseOverlay } from './view/overlayView.js';
+import { drawBanner, drawPauseOverlay } from './view/overlayView.js';
 
 /** @typedef {import('../game.js').Game} Game */
 
@@ -51,7 +51,6 @@ export function drawFrame(ctx, game, alpha = 1) {
   // Screen-text overlays + flashes — all still inside the shake transform, so each
   // counteracts the (x, y) offset to stay screen-fixed.
   drawBanner(ctx, game, x, y);
-  drawRoundIntro(ctx, game, x, y);
   game.effects.drawHurt(ctx, game.bounds, x, y);
   drawPauseOverlay(ctx, game, x, y);
 
