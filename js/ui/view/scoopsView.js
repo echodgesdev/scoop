@@ -23,17 +23,21 @@ export function drawField(ctx, field, rainbow = false, alpha = 1) {
       drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color, s.speedMult);
       continue;
     }
-    // Missed: the scoop puffs away into the sand. It fades out as it sinks, while a
-    // translucent outline swells outward and fades to nothing over it — a soft
-    // poof that grows and dissipates rather than a hard sprite swap.
+    // Missed: the scoop pops away into the sand. It fades out as it sinks, while a
+    // translucent outline swells slightly then collapses back down — a slow "pop"
+    // that fades to nothing rather than a hard sprite swap.
     const p = Math.min(1, s.dissolve / SCOOP_DISSOLVE_S);
     ctx.save();
     ctx.globalAlpha = 1 - p;                       // scoop fades out
     drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color);
     ctx.restore();
     ctx.save();
-    ctx.globalAlpha = 0.6 * Math.sin(p * Math.PI); // outline swells in then fades away
-    const grow = 1 + 0.9 * p;                      // expand outward from the center
+    ctx.globalAlpha = 0.4 * Math.sin(p * Math.PI); // outline fades in then out, max 0.4
+    // Pop: a slight overshoot early, then tween down to a small collapse.
+    const PEAK = 0.25;
+    const grow = p < PEAK
+      ? 1 + 0.2 * (p / PEAK)                        // swell slightly up
+      : 1.2 - 1.0 * ((p - PEAK) / (1 - PEAK));      // collapse down
     ctx.translate(s.x, y);
     ctx.scale(grow, grow);
     ctx.translate(-s.x, -y);
