@@ -66,6 +66,9 @@
  * @property {number} timer
  * @property {number} waitT
  * @property {number} [rejectT]    transient "wrong scoop" shake timer (seconds); drives the rejection buzz + angry-face flash
+ * @property {number} [coyote]     coyote grace accrued (seconds) while held at the patience floor with their scoop in reach
+ * @property {boolean} [coyoteActive]  currently paused at the patience floor (the grace timer is running)
+ * @property {boolean} [coyoteSpent]  the one-time coyote grace has been used (so they won't wait forever)
  * @property {'happy'|'angry'|null} mood
  * @property {Order} order
  * @property {string|null} character  roster key / sprite-sheet row name of the assigned regular (see game/customers.js); null only if the roster is exhausted

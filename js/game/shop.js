@@ -24,6 +24,16 @@ export const REACH  = 120;   // how close the cone must be to serve a customer
 const RESPAWN_DELAY = 0.35;  // beat before a freed slot is repopulated
 const REJECT_SHAKE_S = 0.4;  // how long a customer buzzes "no!" after a wrong-scoop delivery
 
+// Coyote time: when the cone is parked at a customer holding a scoop they want, JUST
+// before their patience would tip into "angry" the bar PAUSES at a floor (they keep
+// drooling) for a short grace instead of crossing the line. When the grace runs out
+// patience simply resumes — so they cross into angry for real. One-time per customer:
+// once it's been used they don't get another (leaving + returning, or re-catching
+// their flavor, won't refresh it). The floor sits just above the angry threshold (see
+// ANGRY_FRAC in customerRenderer) so they read as drooling, not angry, during the hold.
+const COYOTE_FLOOR_FRAC = 0.18;  // patience the bar pauses at during the grace
+const COYOTE_GRACE      = 1.0;   // seconds the bar holds at the floor before patience resumes
+
 export const STATE = Object.freeze({
   ARRIVING: 'arriving',
   DELAY:    'delay',
@@ -155,7 +165,7 @@ export class Shop {
     const c = {
       id: this._id++, slot, x, prevX: x, targetX: x,
       yOff: ARRIVE_OFFSET, prevYOff: ARRIVE_OFFSET,
-      state: STATE.ARRIVING, timer: 0, waitT: 0, rejectT: 0, mood: null, order,
+      state: STATE.ARRIVING, timer: 0, waitT: 0, rejectT: 0, coyote: 0, coyoteActive: false, coyoteSpent: false, mood: null, order,
       character: character || this._pickCharacter(),
       tip
     };
@@ -263,6 +273,9 @@ export class Shop {
       timer: 0,
       waitT: 0,
       rejectT: 0,                        // transient "wrong scoop" rejection buzz
+      coyote: 0,                         // coyote grace accrued at the patience floor
+      coyoteActive: false,               // currently paused at the floor?
+      coyoteSpent: false,                // one-time grace used?
       mood: null,
       order,
       character: this._pickCharacter(),  // which regular this is (selection waterfall)
@@ -282,10 +295,12 @@ export class Shop {
    * Advance animations, patience, and combo decay; reconcile customer count
    * against the current phase.
    * @param {number} dt
-   * @param {{ patienceOn?: boolean }} [opts]
+   * @param {{ patienceOn?: boolean, coyoteCustomer?: Customer|null }} [opts]
+   *   coyoteCustomer = the in-reach customer whose order the cone's top scoop matches
+   *   (the coordinator resolves it from the cone); gets coyote grace as patience nears 0.
    * @returns {{ expired: number, comboLost: boolean }}
    */
-  update(dt, { patienceOn = true } = {}) {
+  update(dt, { patienceOn = true, coyoteCustomer = null } = {}) {
     const sx = SLIDE_X_SPEED * dt;
     const sy = SLIDE_Y_SPEED * dt;
     let expired = 0;
@@ -334,11 +349,31 @@ export class Shop {
         case STATE.WAITING:
           c.waitT += dt;
           if (patienceOn) {
-            c.order.timeLeft -= dt;
-            if (c.order.timeLeft <= 0) {
-              expired += 1;
-              c.state = STATE.LEAVING;
-              c.mood = 'angry';
+            const dur = c.order.duration;
+            const floor = COYOTE_FLOOR_FRAC * dur;
+            const here = c === coyoteCustomer;   // in reach with a scoop they want
+            if (c.coyoteActive) {
+              // Paused at the floor (drooling) while the one-time grace burns. Release
+              // when it runs out OR they walk away / lose the scoop — then patience
+              // resumes from the floor and they cross into angry for real.
+              c.coyote = (c.coyote || 0) + dt;
+              if (c.coyote >= COYOTE_GRACE || !here) c.coyoteActive = false;
+              else c.order.timeLeft = floor;       // hold (no drain)
+            } else if (here && !c.coyoteSpent && c.order.timeLeft <= floor) {
+              // Reached them with their scoop right as patience hits the floor (or while
+              // they're already angry) — snap the bar UP to the floor so they're back to
+              // the drool face, and start the one-time grace.
+              c.coyoteActive = true;
+              c.coyoteSpent = true;
+              c.coyote = 0;
+              c.order.timeLeft = floor;
+            } else {
+              c.order.timeLeft -= dt;
+              if (c.order.timeLeft <= 0) {
+                expired += 1;
+                c.state = STATE.LEAVING;
+                c.mood = 'angry';
+              }
             }
           }
           break;
@@ -478,6 +513,7 @@ export class Shop {
     }
 
     c.order.colors.splice(matchIdx, 1);
+    c.coyoteActive = false;   // a serve resolves the hold (don't yank patience back to the floor)
 
     if (c.order.colors.length > 0) {
       // Partial — buy patience back so long orders don't expire mid-service.

@@ -297,7 +297,12 @@ export class World {
     // Patience is frozen only while the scripted tutorial asks for it (its guided
     // steps); it runs for real otherwise — including the tutorial's final stretch.
     const patienceOn = this.flags.patternTimer && !this.powerups.pauseActive && !this.freezePatience;
-    const { expired, comboLost } = this.shop.update(dt, { patienceOn });
+    // Coyote time: the customer the cone is standing at, IF the top tray scoop matches
+    // their order, gets a patience-floor grace instead of expiring (see shop.update).
+    const reachIdx = this.shop.customerAt(this.player.x);
+    const coyoteCustomer = (reachIdx >= 0 && this.shop.canServe(reachIdx, this.player.colors(), this.powerups.rainbowActive))
+      ? this.shop.list[reachIdx] : null;
+    const { expired, comboLost } = this.shop.update(dt, { patienceOn, coyoteCustomer });
     if (expired > 0) this.onExpire(expired);
     if (comboLost) this.bus.emit('comboLost', /** @type {any} */ ({}));
   }

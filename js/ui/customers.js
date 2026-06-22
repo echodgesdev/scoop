@@ -46,8 +46,9 @@ export class Customers {
       const servable = waiting && canServe(i);
       const active = waiting && i === activeIndex;
       const patience = c.order.timeLeft / c.order.duration;
-      // Shake while angry (only WAITING + unservable), ramping in as patience hits 0.
-      const anger = (waiting && !servable && !pausePatience)
+      // Shake once past the angry threshold (any WAITING customer, even one whose scoop
+      // you're holding — anger supersedes drool now), ramping in as patience hits 0.
+      const anger = (waiting && !pausePatience)
         ? Math.max(0, Math.min(1, (ANGRY_AT - patience) / ANGRY_AT)) : 0;
       // A wrong-scoop delivery buzzes "no!" at full amplitude — even if they're not
       // yet impatient (or are frozen) — for instant "that's not my order" feedback.

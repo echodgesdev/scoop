@@ -26,21 +26,28 @@ const FACE_SCALE = FACE_SIZE / (FACE_CELL_FILL * CUSTOMER_SPRITE.frame.height);
 const FACE = Object.freeze({ EMPTY: 0, DEFAULT: 1, HUNGRY: 2, UPSET: 3, ANGRY: 4, DROOL: 5, FROZEN: 6 });
 const faceSheet = new SpriteSheet(CUSTOMER_SPRITE);
 
+// Patience fraction at/below which a WAITING customer reads as ANGRY — and angry now
+// SUPERSEDES the drool face, so a customer you've kept waiting too long is mad even if
+// you're holding their scoop. Keep in step with ANGRY_AT in ui/customers.js (the shake)
+// and below COYOTE_FLOOR_FRAC in game/shop.js (the coyote pauses just above this line).
+const ANGRY_FRAC = 0.15;
+
 /**
- * The customer's face COLUMN (see FACE) for its state + patience. As patience
- * drains the sequence is Hungry → Default → Upset → Angry, with Drool while
- * servable and Frozen while the pause power-up holds it.
+ * The customer's face COLUMN (see FACE) for its state + patience. As patience drains
+ * the sequence is Hungry → Default → Upset → Angry; Drool shows while servable BUT
+ * only above the angry threshold (past it, anger wins); Frozen while the pause
+ * power-up holds it.
  */
 function faceFor(customer, patience, servable, pausePatience) {
   if (customer.state === STATE.LEAVING) return customer.mood === 'happy' ? FACE.HUNGRY : FACE.ANGRY;
   if (customer.state !== STATE.WAITING) return FACE.DEFAULT;  // arriving / delay
   if (customer.rejectT && customer.rejectT > 0) return FACE.ANGRY;  // just got the wrong scoop
   if (pausePatience) return FACE.FROZEN;                       // frozen power-up / debug
+  if (patience <= ANGRY_FRAC) return FACE.ANGRY;               // too long — angry beats drool
   if (servable) return FACE.DROOL;
   if (patience > 0.6) return FACE.HUNGRY;
   if (patience > 0.35) return FACE.DEFAULT;
-  if (patience > 0.15) return FACE.UPSET;
-  return FACE.ANGRY;
+  return FACE.UPSET;                                           // ANGRY_FRAC < patience <= 0.35
 }
 
 /**
