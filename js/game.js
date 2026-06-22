@@ -56,6 +56,9 @@ const NIGHT_CYCLE_S = 2.8;   // slightly slower: room for the day-start beat (co
 // before they dissolve into the round. Between rounds the night sweep covers this.
 const INTRO_HOLD_S = 2.2;
 
+// Waffle-cone debris palette for the game-over fracture (tan / caramel / cream chunks).
+const CONE_SHARD_COLORS = ['#e8b06a', '#d99a4e', '#c98a3c', '#fff4d6'];
+
 export class Game {
   constructor() {
     // Kick the bundled font (styles.css @font-face) loading immediately so canvas
@@ -165,6 +168,10 @@ export class Game {
     this.inNightCycle = false;
     this.nightT = 0;
     this._nightDuration = NIGHT_CYCLE_S;
+    // Game-over DEATH sequence: a scripted teardown (pop the tray + field, fracture
+    // the cone, walk the angry customers off) that plays with the loop ALIVE but the
+    // sim frozen, just before the game-over menu. See _beginDeath.
+    this.inDeath = false;
     // True from the moment a day completes (waveUp) until the night sweep lands —
     // while set, the HUD gauge HOLDS the finished day (full) instead of rolling the
     // day number over early. Cleared at night-cycle completion. See _syncHud.
@@ -261,7 +268,7 @@ export class Game {
       this._dayRolling = true;
       setTimeout(() => this._runWaveCashout(), 700);
     });
-    this.bus.on('gameOver', () => this._endGame());
+    this.bus.on('gameOver', () => this._beginDeath());
 
     // Window resize only re-letterboxes the (unchanged) virtual canvas; the
     // backing store is fixed per aspect. Fullscreen is just a bigger viewport.
@@ -387,7 +394,7 @@ export class Game {
    */
   _togglePause() {
     if (!this.running) return;
-    if (this.inNightCycle || this.inRoundIntro) return;   // not during the sky beat
+    if (this.inNightCycle || this.inRoundIntro || this.inDeath) return;   // not during the sky beat / death
     if (this.inPauseMenu) {
       this.inPauseMenu = false;
       this.hud.hidePauseMenu();
@@ -408,6 +415,7 @@ export class Game {
     this.loop.stop();
     this.inCashout = false;
     this.inNightCycle = false;
+    this.inDeath = false;
     this.inPauseMenu = false;
     this.inGameOver = false;
     this._dayHintShown = false;
@@ -489,6 +497,7 @@ export class Game {
     this.inCashout = false;
     this.inNightCycle = false;
     this.inGameOver = false;
+    this.inDeath = false;
     this.nightT = 0;
     this._nightDuration = NIGHT_CYCLE_S;
     this._dayRolling = false;
@@ -591,7 +600,7 @@ export class Game {
    */
   _stepping() {
     return this.running && !this.paused &&
-      !this.inPauseMenu && !this.inCashout && !this.inNightCycle && !this.inRoundIntro;
+      !this.inPauseMenu && !this.inCashout && !this.inNightCycle && !this.inRoundIntro && !this.inDeath;
   }
 
   /**
@@ -638,9 +647,13 @@ export class Game {
       }
     }
     // Visual-only systems run variable-step — including during the cashout /
-    // night-cycle freezes, so particle pops keep animating while play is paused,
-    // and during game over so the death shake gently tapers out under the panel.
-    if (this._stepping() || this.inCashout || this.inNightCycle || this.inGameOver) this.effects.update(frame);
+    // night-cycle / death-sequence freezes, so particle pops keep animating while
+    // play is paused, and during game over so the death shake tapers out.
+    if (this._stepping() || this.inCashout || this.inNightCycle || this.inDeath || this.inGameOver) this.effects.update(frame);
+
+    // During the death sequence the sim is frozen, so drive the customer slide-off
+    // animation directly — angry customers walk off one by one (see _deathCustomersLeave).
+    if (this.inDeath) this.world.shop.animateExit(frame);
 
     // Numeric HUD is a per-frame PULL from sim state. Then advance the
     // presentation-only tutorial overlay + its DOM callout.
@@ -661,19 +674,19 @@ export class Game {
 
   /** The upward gesture (swipe up / Space): the mode tosses the top scoop. */
   _pop() {
-    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.world.player.frozen) return;
+    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.inDeath || this.world.player.frozen) return;
     this.world.pop();
   }
 
   /** A too-short up-flick: no toss, just squash the top scoop back as feedback. */
   _tossCancel() {
-    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.world.player.frozen) return;
+    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.inDeath || this.world.player.frozen) return;
     if (this.world.player.stack.length === 0) return;
     this.world.player.bumpToss();
   }
 
   _deliver() {
-    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.world.player.frozen) return;
+    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.inDeath || this.world.player.frozen) return;
     const index = this.world.shop.customerAt(this.world.player.x);
     if (index < 0) {
       this.sound.bad();
@@ -860,18 +873,95 @@ export class Game {
     });
   }
 
+  /**
+   * Game over. Instead of freezing instantly, play a scripted teardown with the loop
+   * still ALIVE (the sim frozen via inDeath): first the tray scoops pop, then — all
+   * overlapping — the falling scoops pop, the customers storm off angry, and the cone
+   * fractures; the menu (_endGame) raises once the last customer has left. Guarded
+   * against re-entry.
+   */
+  _beginDeath() {
+    if (this.inDeath || this.inGameOver) return;
+    this.inDeath = true;
+    this._dayHintShown = false;
+    this.hud.setDayHint(false);
+    this.sound.gameOver();
+    this.haptics.gameOver();
+    this.effects.addShake(9);
+    // A beat to register the loss, then start popping the cone's tray.
+    setTimeout(() => this._deathPopStack(), 360);
+  }
+
+  /** Death step 2: pop the scoops sitting on the cone, top to bottom. */
+  _deathPopStack() {
+    if (!this.inDeath) return;
+    const stack = this.world.player.stack;
+    if (stack.length === 0) { this._deathTeardown(); return; }
+    const idx = stack.length - 1;
+    const pos = this.world.player.scoopPosition(idx);
+    const color = stack[idx].color;
+    this.world.player.popTop();
+    this.effects.burst(pos.x, pos.y, [this.world.shop.hex(color), '#fff'], 14);
+    this.sound.catch_();
+    setTimeout(() => this._deathPopStack(), 120);
+  }
+
+  /**
+   * Death steps 3–5, OVERLAPPING: pop the falling scoops, start the customers
+   * storming off right away, and fracture the cone a beat later — so the crowd is
+   * already leaving while the sky clears and the cone explodes. The customer walk-off
+   * is the long pole and raises the menu when it finishes (_deathCustomersLeave).
+   */
+  _deathTeardown() {
+    if (!this.inDeath) return;
+    this._clearFieldFx();                                // pop the scoops still in the air
+    this._deathCustomersLeave();                         // customers begin leaving now
+    setTimeout(() => this._deathFractureCone(), 220);    // cone explodes mid-exodus
+  }
+
+  /** The cone fractures into tumbling waffle chunks and is gone (plays mid-exodus). */
+  _deathFractureCone() {
+    if (!this.inDeath) return;
+    const p = this.world.player;
+    this.effects.fracture(p.x, p.y, CONE_SHARD_COLORS, 20);
+    this.effects.burst(p.x, p.y, [...CONE_SHARD_COLORS, '#fff'], 12);
+    this.effects.addShake(13);
+    p.fractured = true;          // the view stops drawing the cone from here
+    this.sound.bad();
+  }
+
+  /**
+   * Death step 5: the remaining customers lose patience and storm off, one by one —
+   * each goes angry (shaking) for a beat, then slides away (animated by shop.animateExit
+   * in _frame). When the last has gone, raise the game-over menu (step 6).
+   */
+  _deathCustomersLeave() {
+    if (!this.inDeath) return;
+    const shop = this.world.shop;
+    const remaining = shop.activeCustomers();
+    if (remaining.length === 0) { setTimeout(() => this._endGame(), 350); return; }
+    const STAGGER = 300, ANGER_HOLD = 520, SLIDE = 760;
+    remaining.forEach((c, i) => {
+      const t0 = i * STAGGER;
+      setTimeout(() => { if (this.inDeath) { shop.angerCustomer(c); this.sound.bad(); } }, t0);
+      setTimeout(() => { if (this.inDeath) shop.sendOff(c); }, t0 + ANGER_HOLD);
+    });
+    const total = (remaining.length - 1) * STAGGER + ANGER_HOLD + SLIDE + 200;
+    setTimeout(() => this._endGame(), total);
+  }
+
+  /** The death sequence finished — freeze the loop and raise the game-over menu. */
   _endGame() {
     this.running = false;
     this.loop.stop();
-    // Reset flow state in case the player died mid-cashout/night (shouldn't
-    // happen, but defensive).
+    // The death sequence ran with the loop alive; now end it.
+    this.inDeath = false;
     this.inCashout = false;
     this.inNightCycle = false;
     this.inGameOver = true;
     this._dayHintShown = false;
     this.hud.setDayHint(false);
-    this.sound.gameOver();
-    this.haptics.gameOver();
+    // (sound.gameOver / haptics fired at the START of the sequence, in _beginDeath.)
     // Challenges commit INSIDE the game-over recap (so the cross-off animation +
     // reward coins play there); we just hand it the final run's pending reveals /
     // discoveries to flip alongside them. Draining here means they don't linger as a

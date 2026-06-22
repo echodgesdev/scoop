@@ -216,6 +216,7 @@ export class World {
     this.player.reposition(this.bounds.width / 2, CONE_Y);
     this.player.clearStack();
     this.player.frozen = false;
+    this.player.fractured = false;
     this.field.reset();
     this.powerups.reset();
     this.shop.layout(this.bounds.width);

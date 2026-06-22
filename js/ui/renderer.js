@@ -31,7 +31,9 @@ export function drawFrame(ctx, game, alpha = 1) {
 
   drawScoopField(ctx, world.field, rainbow, alpha);
   drawPlayer(ctx, world.player, rainbow, alpha);
-  const pausePatience = world.powerups.pauseActive || !game.flags.patternTimer;
+  // During the death sequence we force-anger the customers, so ignore freeze /
+  // patience-off here — they should read angry (and shake), not frozen.
+  const pausePatience = !game.inDeath && (world.powerups.pauseActive || !game.flags.patternTimer);
   game.customers.draw(ctx, world.shop.list, {
     activeIndex:    world.shop.customerAt(world.player.x),
     canServe:       i => world.shop.canServe(i, world.player.colors(), rainbow),

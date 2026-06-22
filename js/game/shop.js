@@ -22,6 +22,7 @@ const SLIDE_X_SPEED = 640;   // horizontal reposition speed when lanes shift
 const BUBBLE_DELAY  = 0.5;   // beat before the speech bubble pops after arriving
 export const REACH  = 120;   // how close the cone must be to serve a customer
 const RESPAWN_DELAY = 0.35;  // beat before a freed slot is repopulated
+const REJECT_SHAKE_S = 0.4;  // how long a customer buzzes "no!" after a wrong-scoop delivery
 
 export const STATE = Object.freeze({
   ARRIVING: 'arriving',
@@ -154,7 +155,7 @@ export class Shop {
     const c = {
       id: this._id++, slot, x, prevX: x, targetX: x,
       yOff: ARRIVE_OFFSET, prevYOff: ARRIVE_OFFSET,
-      state: STATE.ARRIVING, timer: 0, waitT: 0, mood: null, order,
+      state: STATE.ARRIVING, timer: 0, waitT: 0, rejectT: 0, mood: null, order,
       character: character || this._pickCharacter(),
       tip
     };
@@ -261,6 +262,7 @@ export class Shop {
       state: STATE.ARRIVING,
       timer: 0,
       waitT: 0,
+      rejectT: 0,                        // transient "wrong scoop" rejection buzz
       mood: null,
       order,
       character: this._pickCharacter(),  // which regular this is (selection waterfall)
@@ -306,6 +308,8 @@ export class Shop {
       c.prevX = c.x;
       c.prevYOff = c.yOff;
       c.x = approach(c.x, c.targetX, sx);
+      // Decay the transient "wrong scoop" rejection buzz.
+      if (c.rejectT && c.rejectT > 0) c.rejectT = Math.max(0, c.rejectT - dt);
 
       // Tick each in-flight served scoop toward 1; landed scoops stop at 1.
       for (const s of c.order.served) {
@@ -467,7 +471,11 @@ export class Shop {
     let matchIdx;
     if (rainbow) matchIdx = c.order.colors.length > 0 ? 0 : -1;
     else matchIdx = c.order.colors.indexOf(topColor);
-    if (matchIdx < 0) return { accepted: false, complete: false };
+    if (matchIdx < 0) {
+      // Wrong scoop — buzz the customer "no!" (shake + angry-face flash) as feedback.
+      c.rejectT = REJECT_SHAKE_S;
+      return { accepted: false, complete: false };
+    }
 
     c.order.colors.splice(matchIdx, 1);
 
@@ -505,5 +513,51 @@ export class Shop {
     this.respawnTimer = RESPAWN_DELAY;
 
     return { gained, colors, event, tip };
+  }
+
+  // === Forced exit (game-over death sequence) ================================
+  // The death sequence freezes the sim, so these let the coordinator anger the
+  // remaining customers and walk them off one by one with their slides still
+  // animating (the normal update() doesn't run while frozen).
+
+  /** Customers still on the board (not already leaving). */
+  activeCustomers() {
+    return this.customers.filter(c => c.state !== STATE.LEAVING);
+  }
+
+  /** Drain a customer's patience NOW so their face goes angry (and starts shaking). */
+  angerCustomer(c) {
+    if (c) c.order.timeLeft = 0;
+  }
+
+  /** Send a customer storming off the board, angry. */
+  sendOff(c) {
+    if (c && c.state !== STATE.LEAVING) { c.state = STATE.LEAVING; c.mood = 'angry'; }
+  }
+
+  /**
+   * Advance ONLY the customer slide animations — used while the sim is frozen during
+   * the death sequence, so leaving customers still walk off-screen (and get culled
+   * when they land). No patience, spawning, combo, or wave reconcile.
+   * @param {number} dt
+   */
+  animateExit(dt) {
+    const sx = SLIDE_X_SPEED * dt;
+    const sy = SLIDE_Y_SPEED * dt;
+    /** @type {Customer[]} */
+    const finished = [];
+    for (const c of this.customers) {
+      c.prevX = c.x;
+      c.prevYOff = c.yOff;
+      c.x = approach(c.x, c.targetX, sx);
+      if (c.state === STATE.LEAVING) {
+        c.yOff = approach(c.yOff, ARRIVE_OFFSET, sy);
+        if (c.yOff === ARRIVE_OFFSET) finished.push(c);
+      }
+    }
+    for (const c of finished) {
+      const idx = this.customers.indexOf(c);
+      if (idx >= 0) this.customers.splice(idx, 1);
+    }
   }
 }

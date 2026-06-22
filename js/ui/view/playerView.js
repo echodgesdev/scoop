@@ -28,6 +28,9 @@ const SLOSH_ARC = 6;    // log-arc curvature (higher = sharper bow near the top)
  * @param {number} [alpha] render-interpolation fraction (previous→current x)
  */
 export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
+  // Cone fractured on game over — it's gone (the debris lives in Effects), so draw
+  // nothing: no cone, no tray, no toss ghosts.
+  if (player.fractured) return;
   // One translate moves the cone and every scoop riding it together:
   // 1. render interpolation — everything here is positioned off player.x, so
   //    shifting by (drawX − x) draws the whole assembly at the interpolated x;
@@ -35,7 +38,7 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
   //    by the end of HANDOFF_DURATION_S (the coordinated "reach").
   ctx.save();
   let tx = player.drawX(alpha) - player.x;
-  let ty = 0;
+  let ty = player.hoverY;   // idle bob (0 while moving) — floats the whole assembly
   if (player.handoffT < HANDOFF_DURATION_S) {
     const p = player.handoffT / HANDOFF_DURATION_S;
     const ease = Math.sin(p * Math.PI);

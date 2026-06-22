@@ -65,6 +65,7 @@
  * @property {CustomerState} state
  * @property {number} timer
  * @property {number} waitT
+ * @property {number} [rejectT]    transient "wrong scoop" shake timer (seconds); drives the rejection buzz + angry-face flash
  * @property {'happy'|'angry'|null} mood
  * @property {Order} order
  * @property {string|null} character  roster key / sprite-sheet row name of the assigned regular (see game/customers.js); null only if the roster is exhausted

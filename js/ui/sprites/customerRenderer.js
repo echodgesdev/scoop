@@ -34,6 +34,7 @@ const faceSheet = new SpriteSheet(CUSTOMER_SPRITE);
 function faceFor(customer, patience, servable, pausePatience) {
   if (customer.state === STATE.LEAVING) return customer.mood === 'happy' ? FACE.HUNGRY : FACE.ANGRY;
   if (customer.state !== STATE.WAITING) return FACE.DEFAULT;  // arriving / delay
+  if (customer.rejectT && customer.rejectT > 0) return FACE.ANGRY;  // just got the wrong scoop
   if (pausePatience) return FACE.FROZEN;                       // frozen power-up / debug
   if (servable) return FACE.DROOL;
   if (patience > 0.6) return FACE.HUNGRY;

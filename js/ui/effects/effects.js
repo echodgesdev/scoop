@@ -2,6 +2,7 @@
 /** @typedef {{ x: number, y: number, vx: number, vy: number, life: number, maxLife: number, r: number, color: string }} Particle */
 /** @typedef {{ x: number, y: number, vy: number, text: string, color: string, size: number, life: number, maxLife: number }} FloatText */
 /** @typedef {{ cx: number, cy: number, angle: number, radius: number, angVel: number, radVel: number, rot: number, spin: number, size: number, color: string, life: number, maxLife: number }} Swirl */
+/** @typedef {{ x: number, y: number, vx: number, vy: number, rot: number, spin: number, size: number, color: string, life: number, maxLife: number }} Shard */
 
 const GRAVITY = 520;
 
@@ -21,6 +22,8 @@ export class Effects {
     this.texts = [];
     /** @type {Swirl[]} triangle shards that orbit + spiral out (power-up "got it" flourish) */
     this.swirls = [];
+    /** @type {Shard[]} chunky debris flung outward with gravity + spin (the cone fracturing) */
+    this.shards = [];
     this.shake = 0;
     this.hurt = 0;
   }
@@ -29,6 +32,7 @@ export class Effects {
     this.particles = [];
     this.texts = [];
     this.swirls = [];
+    this.shards = [];
     this.shake = 0;
     this.hurt = 0;
   }
@@ -86,6 +90,32 @@ export class Effects {
         spin: (Math.random() * 2 - 1) * 12,
         size: 6 + Math.random() * 5,
         color: colors[i % colors.length],
+        life, maxLife: life
+      });
+    }
+  }
+
+  /**
+   * Chunky angular debris — the cone fracturing on death. Bigger than burst
+   * particles, flung outward with an upward bias, tumbling (spin) and falling under
+   * gravity as they fade.
+   * @param {number} x @param {number} y
+   * @param {string[]} colors palette each chunk's color is picked from
+   * @param {number} [count]
+   */
+  fracture(x, y, colors, count = 18) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 120 + Math.random() * 260;
+      const life = 0.9 + Math.random() * 0.5;
+      this.shards.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 180,   // upward bias so they pop up, then fall
+        rot: Math.random() * Math.PI * 2,
+        spin: (Math.random() * 2 - 1) * 14,
+        size: 7 + Math.random() * 11,
+        color: colors[Math.floor(Math.random() * colors.length)],
         life, maxLife: life
       });
     }
@@ -149,6 +179,15 @@ export class Effects {
       s.life -= dt;
       if (s.life <= 0) this.swirls.splice(i, 1);
     }
+    for (let i = this.shards.length - 1; i >= 0; i--) {
+      const s = this.shards[i];
+      s.vy += GRAVITY * dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      s.rot += s.spin * dt;
+      s.life -= dt;
+      if (s.life <= 0) this.shards.splice(i, 1);
+    }
   }
 
   /** @param {CanvasRenderingContext2D} ctx */
@@ -174,6 +213,22 @@ export class Effects {
       ctx.moveTo(0, -s.size);
       ctx.lineTo(s.size * 0.86, s.size * 0.5);
       ctx.lineTo(-s.size * 0.86, s.size * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    for (const s of this.shards) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, s.life / s.maxLife));
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.rot);
+      ctx.fillStyle = s.color;
+      // A jagged waffle chunk (irregular quad) so it reads as cone debris, not a dot.
+      ctx.beginPath();
+      ctx.moveTo(0, -s.size);
+      ctx.lineTo(s.size * 0.9, -s.size * 0.1);
+      ctx.lineTo(s.size * 0.5, s.size * 0.9);
+      ctx.lineTo(-s.size * 0.8, s.size * 0.4);
       ctx.closePath();
       ctx.fill();
       ctx.restore();

@@ -42,6 +42,14 @@ const SLOSH_STIFF = 70;     // spring follow strength (lower = looser / less sti
 const SLOSH_DAMP  = 0.84;   // velocity kept per tick (higher = floatier / wobblier)
 export const SLOSH_HIST = 48;  // lean-history ring buffer length (ticks)
 
+// Idle hover — NOT physics. When the cone isn't being driven left/right it gently
+// bobs up and down. The amplitude eases IN while idle and OUT while moving (so there's
+// no snap), the phase runs continuously, and the view reads the resulting hoverY.
+const HOVER_PX       = 5;    // bob height (px, peak)
+const HOVER_SPEED    = 3.4;  // rad/s — bob frequency (~0.5 Hz)
+const HOVER_EASE     = 6;    // amplitude ease rate (per second)
+const HOVER_MOVE_EPS = 6;    // px/s of real movement below which the cone counts as idle
+
 /**
  * The cone the player drives. PURE MODEL: state, movement, and tray queries —
  * no rendering. The drawing lives in view/playerView.js, which reads this
@@ -77,6 +85,10 @@ export class Player {
     // it when control is handed over.
     this.frozen = false;
 
+    // Presentation-only: when the cone fractures on game over, the view stops
+    // drawing it (the debris lives in Effects). Cleared on reset.
+    this.fractured = false;
+
     // Toss feedback (presentation; see TOSS_* above). `tossed` holds launched-
     // scoop ghosts (each stores its launch point + age; the view derives the
     // rise/stretch/fade). `tossBump` counts down a squash-back bounce on the top
@@ -84,6 +96,12 @@ export class Player {
     /** @type {{ color: ScoopColor, x: number, y: number, t: number }[]} */
     this.tossed = [];
     this.tossBump = 0;
+
+    // Idle hover (presentation; see HOVER_* above). hoverY is the vertical bob the
+    // view adds to the cone; it eases in when the cone stops and out when it moves.
+    this.hoverT = 0;
+    this.hoverAmp = 0;
+    this.hoverY = 0;
   }
 
   /**
@@ -114,6 +132,9 @@ export class Player {
     this.sloshV = 0;
     this._sloshHist.fill(0);
     this._sloshHead = 0;
+    this.hoverT = 0;
+    this.hoverAmp = 0;
+    this.hoverY = 0;
   }
 
   /**
@@ -130,6 +151,19 @@ export class Player {
     // Record this tick's lean so the view can read an older value for higher scoops.
     this._sloshHead = (this._sloshHead + 1) % SLOSH_HIST;
     this._sloshHist[this._sloshHead] = this.slosh;
+  }
+
+  /**
+   * Idle hover: the cone gently bobs while it isn't being driven left/right. The
+   * amplitude eases in (idle) / out (moving or frozen) so there's no snap; the phase
+   * runs continuously. The view reads hoverY.
+   * @param {number} dt @param {number} vx the cone's real per-frame velocity
+   */
+  _tickHover(dt, vx) {
+    const idle = !this.frozen && Math.abs(vx) < HOVER_MOVE_EPS;
+    this.hoverT += dt * HOVER_SPEED;
+    this.hoverAmp += ((idle ? 1 : 0) - this.hoverAmp) * Math.min(1, dt * HOVER_EASE);
+    this.hoverY = -Math.sin(this.hoverT) * HOVER_PX * this.hoverAmp;
   }
 
   /**
@@ -158,6 +192,7 @@ export class Player {
     const movedVx = dt > 0 ? (this.x - this._prevX) / dt : 0;
     this._prevX = this.x;
     this._tickSlosh(dt, movedVx);
+    this._tickHover(dt, movedVx);
 
     if (this.frozen) {
       // Tutorial freeze: passive timers above still ran; just don't move.
