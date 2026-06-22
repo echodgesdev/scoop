@@ -13,14 +13,15 @@ import { RECIPE_TARGET, RECIPE_BY_ID, GROUP_BY_ID } from '../../../game/recipes.
 import CUSTOMER_SPRITE from '../../sprites/customerSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from '../../powerupVisuals.js';
 import { coinVisual, coinHtml, coinScoops } from './coinTemplate.js';
+import { challengeRow } from './challengeTemplate.js';
 
 /**
  * The journal's coin kinds. Doubles as the `data-kind` on each coin button (which
  * drives the tap-a-coin detail popup) and the key selecting the per-kind mapper in
  * coinGrid below.
- * @type {Readonly<{ REGULAR: 'regular', POWERUP: 'powerup', RECIPE: 'recipe' }>}
+ * @type {Readonly<{ REGULAR: 'regular', POWERUP: 'powerup', RECIPE: 'recipe', CHALLENGE: 'challenge' }>}
  */
-export const COIN_KIND = Object.freeze({ REGULAR: 'regular', POWERUP: 'powerup', RECIPE: 'recipe' });
+export const COIN_KIND = Object.freeze({ REGULAR: 'regular', POWERUP: 'powerup', RECIPE: 'recipe', CHALLENGE: 'challenge' });
 
 // Regulars: faces are cropped from the shared sprite sheet via CSS background-
 // position — the row is the regular's sheet row (animation index), the column the
@@ -38,6 +39,7 @@ const POWERUP_GAUGE_MAX = 100;
 // Ring-gauge fill colors per collection (power-ups use their own token color).
 const REGULAR_RING = '#06d6a0';
 export const RECIPE_RING = '#ffb703';
+const CHALLENGE_RING = '#ff6fa3';
 
 /**
  * CSS background-position locating a regular's face on the customer sheet: the
@@ -101,18 +103,37 @@ function recipeCoinProps(r) {
   };
 }
 
+/**
+ * One challenge-set coin's props: a medal that lights up once the whole set is
+ * cleared, ring = goals done / total. Locked (no name) until the set completes —
+ * tapping it shows the set's challenges (checked off), never crossed out.
+ * @param {{ name: string, index: number, status: string, complete: boolean, challenges: Array<{ completed: boolean }> }} set
+ */
+function challengeCoinProps(set) {
+  const total = set.challenges.length;
+  const done = set.challenges.filter(c => c.completed).length;
+  return {
+    kind: COIN_KIND.CHALLENGE, id: String(set.index),
+    inner: `<span class="jcoin-emoji">${set.complete ? '🏅' : '🎯'}</span>`,
+    ring: CHALLENGE_RING, pct: total ? Math.min(100, (done / total) * 100) : 0,
+    name: set.complete ? set.name : '???',
+    locked: !set.complete
+  };
+}
+
 /** kind → the mapper turning one of that collection's items into a coin descriptor. */
 const COIN_PROPS = {
   [COIN_KIND.REGULAR]: regularCoinProps,
   [COIN_KIND.POWERUP]: powerupCoinProps,
-  [COIN_KIND.RECIPE]: recipeCoinProps
+  [COIN_KIND.RECIPE]: recipeCoinProps,
+  [COIN_KIND.CHALLENGE]: challengeCoinProps
 };
 
 /**
  * A `jcoin-grid` of one collection's coins. `kind` selects the per-item mapper, so
  * callers pass data + a COIN_KIND — no rendering functions cross the boundary.
  * Each item becomes a tappable coin via coinHtml.
- * @param {'regular'|'powerup'|'recipe'} kind @param {any[]} items @returns {string}
+ * @param {'regular'|'powerup'|'recipe'|'challenge'} kind @param {any[]} items @returns {string}
  */
 export function coinGrid(kind, items) {
   const props = COIN_PROPS[kind];
@@ -175,4 +196,28 @@ export function recipeDetailHtml(r) {
   return `<div class="jdetail-coin">${visual}</div><div class="jdetail-name">${r.name}${r.mastered ? ' ⭐' : ''}</div>
       <div class="jdetail-blurb">${group ? group.name : ''}</div>
       <div class="jdetail-line">Completed ${r.count} / ${RECIPE_TARGET}${r.mastered ? ' · Mastered!' : ''}</div>`;
+}
+
+/**
+ * Challenge-set detail: the set's medal + the goals it needs, completed ones checked
+ * (never crossed out). Fully-locked future sets stay hidden behind a teaser so the
+ * player isn't spoiled. No "unlocks" line — the reward reveals when the set clears.
+ * @param {{ name: string, index: number, status: string, complete: boolean, challenges: any[] }} set
+ */
+export function challengeSetDetailHtml(set) {
+  const total = set.challenges.length;
+  const done = set.challenges.filter(c => c.completed).length;
+  const visual = coinVisual({
+    inner: `<span class="jcoin-emoji">${set.complete ? '🏅' : '🎯'}</span>`,
+    ring: CHALLENGE_RING, pct: total ? Math.min(100, (done / total) * 100) : 0
+  });
+  if (set.status === 'locked') {
+    return `<div class="jdetail-coin locked">${visual}</div><div class="jdetail-name">???</div>
+        <div class="jdetail-line locked-hint">🔒 Clear Week ${set.index} to reveal these challenges</div>`;
+  }
+  const rows = set.challenges.map(ch => challengeRow(ch)).join('');
+  const title = set.complete ? set.name : `Week ${set.index + 1}: ${set.name}`;
+  return `<div class="jdetail-coin${set.complete ? '' : ' locked'}">${visual}</div>
+      <div class="jdetail-name">${title}</div>
+      <div class="jdetail-challenges">${rows}</div>`;
 }

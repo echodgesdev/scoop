@@ -9,9 +9,8 @@ import { PICKUP_TYPE, PICKUP_TYPES } from '../../game/config.js';
 import { GROUPS } from '../../game/recipes.js';
 import {
   coinGrid, COIN_KIND,
-  regularDetailHtml, powerupDetailHtml, recipeDetailHtml
+  regularDetailHtml, powerupDetailHtml, recipeDetailHtml, challengeSetDetailHtml
 } from './templates/collectionTemplate.js';
-import { challengeRow, rewardLabel } from './templates/challengeTemplate.js';
 
 /** @typedef {import('../../game/recipes.js').Recipes} Recipes */
 
@@ -124,43 +123,16 @@ export class Journal {
   }
 
   /**
-   * Master-list view: every set rendered as a section, with the player's
-   * current set highlighted and future sets greyed out. Each challenge
-   * shows a progress bar so the player can see what's tracking.
+   * Collection grid: one coin per challenge set. A set's coin stays locked (no name)
+   * until every goal in it is cleared, then lights up as a medal. Tapping a coin shows
+   * that set's challenges, completed ones checked off (the detail popup). No "unlocks"
+   * line — the set's reward stays a surprise until it's earned.
    */
   _renderChallenges() {
     if (!this.challenges || !this.challengesOverlayEl) return;
     const listEl = this.challengesOverlayEl.querySelector('.challenges-list');
     if (!listEl) return;
-
-    const sets = this.challenges.getAllSets();
-    const html = [];
-    for (const set of sets) {
-      const headerCls = `challenge-set ${set.status}`;
-      const badge =
-        set.status === 'completed' ? '<span class="set-badge done">Completed</span>'
-        : set.status === 'current' ? '<span class="set-badge current">This Week</span>'
-        : '<span class="set-badge locked">Locked</span>';
-      html.push(`<div class="${headerCls}">
-        <div class="challenge-set-header">
-          <span class="set-name">Week ${set.index + 1}: ${set.name}</span>
-          ${badge}
-        </div>`);
-      // Rewards summary
-      if (set.rewards.length > 0) {
-        const rewardsText = set.rewards.map(r => rewardLabel(r)).join(', ');
-        html.push(`<div class="challenge-set-rewards">Unlocks: ${rewardsText}</div>`);
-      }
-      // Challenges in this set — hide details for fully-locked future sets
-      // so the player doesn't get spoiled on what's coming.
-      if (set.status === 'locked') {
-        html.push(`<div class="challenge-row locked"><div class="challenge-title">???</div></div>`);
-      } else {
-        for (const ch of set.challenges) html.push(challengeRow(ch));
-      }
-      html.push(`</div>`);
-    }
-    listEl.innerHTML = html.join('');
+    listEl.innerHTML = coinGrid(COIN_KIND.CHALLENGE, this.challenges.getAllSets());
   }
 
   /**
@@ -253,6 +225,9 @@ export class Journal {
     } else if (kind === COIN_KIND.RECIPE && this.recipes) {
       const r = this.recipes.getAll().find(x => x.id === id);
       if (r) html = recipeDetailHtml(r);
+    } else if (kind === COIN_KIND.CHALLENGE && this.challenges) {
+      const set = this.challenges.getAllSets().find(s => String(s.index) === id);
+      if (set) html = challengeSetDetailHtml(set);
     }
     if (!html) return;
     const body = this.journalDetailEl.querySelector('.journal-detail-body');

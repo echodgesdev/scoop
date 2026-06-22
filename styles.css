@@ -1300,42 +1300,29 @@ button.flash {
 /* Bump the gap so the 20px scoops read inside the larger reveal coin. */
 .wt-reveal-scoops .jcoin-scoops { gap: 4px; }
 
-.challenge-set {
-  background: rgba(255, 255, 255, 0.55);
-  border-radius: 10px;
-  padding: 12px 14px;
-  margin-bottom: 12px;
-  border: 2px solid transparent;
-}
-.challenge-set.completed { opacity: 0.6; }
-.challenge-set.current   { border-color: #ffb703; background: rgba(255, 215, 0, 0.2); }
-.challenge-set.locked    { opacity: 0.45; font-style: italic; }
-
-.challenge-set-header {
+/* The challenge-coin detail popup lists the set's goals (checked, not crossed). */
+.jdetail-challenges {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 4px;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  width: 100%;
+  max-width: 320px;
 }
-.set-name {
-  font-weight: bold;
-  color: #6a4a2a;
-}
-.set-badge {
-  font-size: 11px;
-  font-weight: bold;
-  padding: 2px 8px;
-  border-radius: 8px;
-}
-.set-badge.done    { background: #06d6a0; color: #fff; }
-.set-badge.current { background: #ffb703; color: #fff; }
-.set-badge.locked  { background: #999;    color: #fff; }
 
-.challenge-set-rewards {
-  font-size: 12px;
-  color: #8a6a4a;
-  margin-bottom: 8px;
+/* "Finish your run to unlock new challenges" — shown under the list once the set is
+   complete (night sky + pause). Reads as a soft amber prompt, not another row. */
+.challenge-done-note {
+  margin-top: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #ffe27a;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  animation: ch-done-pulse 1.8s ease-in-out infinite;
 }
+@keyframes ch-done-pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 
 /* =========================================================================
    Polished challenge rows — used across the round-over modal, pause menu,
@@ -2212,6 +2199,22 @@ body.roundover-open #pauseBtn {
 #nightSky .challenge-count { color: #ffd166; }
 #nightSky .challenge-row.completed .challenge-title { color: #cfcfcf; }
 
+/* Coins earned that day flip in below the challenges between rounds (reusing the
+   unlock-flip, which auto-flips on render). Centered, wrapping row; labels lightened
+   to read against the night sky. */
+.sky-coins {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 18px;
+  margin-top: 12px;
+}
+.sky-coins .wt-reveal-label {
+  color: #fff;
+  font-size: 13px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
 /* Cross-fade the in-game HUD against the sky challenges: out while they're up, back
    in as they dissolve into the round. */
 #hud { transition: opacity 0.8s ease; }
@@ -2221,16 +2224,6 @@ body.sky-challenges #fullscreenBtn,
 body.sky-challenges #pauseBtn {
   opacity: 0;
   pointer-events: none;
-}
-
-/* Gated "Complete the Week" secondary row — an amber accent stripe so it reads as
-   a bonus tier, and a slide-in the first time it's revealed (after the primary rows
-   cross off). Shared by the round-over modal, the night sky, and the pause menu. */
-.challenge-row.challenge-secondary { box-shadow: inset 3px 0 0 rgba(255, 183, 3, 0.85); }
-.challenge-row.revealing { animation: ch-reveal 0.5s ease both; }
-@keyframes ch-reveal {
-  from { opacity: 0; transform: translateY(-10px); }
-  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* === Home page (title screen) ============================================= */

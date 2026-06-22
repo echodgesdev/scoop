@@ -97,22 +97,27 @@ export class Hud {
    * @param {() => void} onRestart
    * @param {{ unlocked: string[], mastered: string[] }} [recipeEvents]
    */
-  showGameOver(stats, onRestart, recipeEvents) {
+  /**
+   * @param {any} stats @param {() => void} onRestart
+   * @param {{ unlocked: string[], mastered: string[] }} recipeEvents
+   * @param {{ reveals?: string[], discoveries?: string[] }} [recap] final-run coins to flip
+   */
+  showGameOver(stats, onRestart, recipeEvents, recap = {}) {
     const { isRecord, best } = this.screens.recordScore(stats.score);
-    this.roundOver.showGameOver({ stats, onRestart, recipeEvents, isRecord, best });
+    this.roundOver.showGameOver({ stats, onRestart, recipeEvents, isRecord, best, ...recap });
   }
   /** @param {{ onResume: () => void }} opts */
   showPauseMenu(opts) { this.screens.showPauseMenu(opts); }
   hidePauseMenu() { this.screens.hidePauseMenu(); }
 
-  // === Round-over modal → RoundOver ===========================================
-  /** @param {Parameters<RoundOver['showNextWave']>[0]} opts */
-  showWaveTransition(opts) { this.roundOver.showNextWave(opts); }
-  hideWaveTransition() { this.roundOver.hide(); }
-
   // === Night sequence → NightSky ==============================================
-  /** Show the week's challenges in the sky + fade the in-game HUD out. */
-  showNightSky() { this.nightSky.show(); }
+  /**
+   * Show the current set's challenges in the sky + fade the in-game HUD out. Between
+   * days, `recap` carries the coins (reveals / rewards / discoveries) to flip in;
+   * the fresh-start intro passes nothing.
+   * @param {Parameters<NightSky['show']>[0]} [recap]
+   */
+  showNightSky(recap) { this.nightSky.show(recap); }
   /** Dissolve the challenges into the round + fade the in-game HUD back in. */
   dissolveNightSky() { this.nightSky.dissolve(); }
 }

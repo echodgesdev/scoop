@@ -1,25 +1,22 @@
 // @ts-check
-// The full-screen "round over" modal — used by BOTH the between-day transition and
-// game over (they're identical except the primary button + what it does). It plays
-// a tap-gated SEQUENCE so the recap isn't a wall of information all at once:
+// The full-screen end-of-RUN modal (game over). The between-day beat no longer uses
+// it — that plays in the night sky. It runs a tap-gated SEQUENCE so the recap isn't a
+// wall of information all at once:
 //
-//   1. Challenges — the week's set; any newly-earned rows cross off with checkmarks.
-//      If the set is now complete, the rows fade out and the "Complete the Week"
-//      meter (or the next-week banner) fades in.
-//   2. Unlocks — anything unlocked today flips in as coins in a CAROUSEL (current
-//      coin large + centered, neighbours smaller / translucent), one tap per coin.
-//   3. Score — the end-of-round card as a table.
+//   1. Challenges — the current week's set; any newly-earned rows cross off with checks.
+//   2. New Challenges — ONLY if the set was cleared this run: advance to the next set
+//      and fade its challenges in (the next set surfaces on death, never mid-run).
+//   3. Unlocks — anything unlocked this run flips in as coins in a CAROUSEL (current
+//      coin large + centered, neighbours smaller / translucent), auto-cycled.
+//   4. Score — the end-of-run card as a table ("tap to try again").
 //
 // Tapping the stage skips the current animation / advances to the next beat; a
-// "tap to continue" hint marks each rest point. Home / Journal / the primary button
-// live in a fixed bottom bar. No countdown lives here — for next-wave the get-ready
-// beat is the night sky → HUD (driven by game.js); game over just waits for input.
-//
-// Commit/advance semantics match the old flow: cross-offs → commitEarned() (captures
-// the rewards the carousel then flips) → advanceSet() when the set/week completes.
+// "tap to continue" hint marks each rest point. Home / Journal live in a fixed bottom
+// bar. Commit happens at the cross-off; the set only ADVANCES on the new-challenges
+// screen, so finishing a set's goals mid-run never reveals the next set until death.
 
 import { RECIPE_BY_ID } from '../../game/recipes.js';
-import { challengeRow, challengeListHtml } from './templates/challengeTemplate.js';
+import { challengeListHtml } from './templates/challengeTemplate.js';
 import { rewardToCard, unlockCardHtml, scoreTableHtml } from './templates/roundOverTemplate.js';
 
 // Auto-advance dwell per unlock coin: the ~0.7s flip plus a beat to read it.
@@ -55,7 +52,6 @@ export class RoundOver {
     this.journalBtnEl = q('.wt-journal-btn');
 
     // Sequence state (reset per open).
-    this._mode = 'nextwave';      // 'nextwave' | 'gameover'
     /** @type {() => void} */
     this._final = () => {};
     /** @type {number[]} */
@@ -79,42 +75,22 @@ export class RoundOver {
     const journal = this.overlayEl.querySelector('.wt-journal-btn');
     if (journal) journal.addEventListener('click', () => this.onShowJournal());
     const home = this.overlayEl.querySelector('.wt-home-btn');
-    if (home) home.addEventListener('click', () => {
-      // Game over already ended the run — no confirm. Mid-run, confirm the quit.
-      if (this._mode === 'gameover' || window.confirm('Quit this run and return to the title? Your current score will be lost.')) {
-        this.onHome();
-      }
-    });
+    // Game over has already ended the run, so Home just navigates — no confirm.
+    if (home) home.addEventListener('click', () => this.onHome());
   }
 
   // === Entry points ===========================================================
 
   /**
-   * Reveals (regulars met) + discoveries flip in the unlock carousel; the tier
-   * gating (primary → secondary "Complete the Week" → section) is driven by the
-   * Challenges model, so completedDayInWeek/tutorialMode are no longer needed here.
-   * @param {{ reveals?: string[], discoveries?: string[], stats?: any, onResume: () => void }} opts
+   * @param {{ stats: any, onRestart: () => void, recipeEvents?: { unlocked: string[], mastered: string[] }, isRecord?: boolean, best?: number, reveals?: string[], discoveries?: string[] }} opts
+   *   reveals (regulars met) + discoveries (recipes made) are the final run's earnings —
+   *   they flip in as coins after the challenges, alongside any set reward just granted.
    */
-  showNextWave({ reveals = [], discoveries = [], stats = null, onResume }) {
-    if (!this.overlayEl || !this.challenges) { if (onResume) onResume(); return; }
-    this._mode = 'nextwave';
-    this._final = onResume || (() => {});
+  showGameOver({ stats, onRestart, recipeEvents = { unlocked: [], mastered: [] }, isRecord = false, best = 0, reveals = [], discoveries = [] }) {
+    if (!this.overlayEl) { if (onRestart) onRestart(); return; }
+    this._final = onRestart || (() => {});
     this._reveals = reveals || [];
     this._discoveries = discoveries || [];
-    this._stats = stats;
-    this._scoreExtra = {};
-    this._open();
-  }
-
-  /**
-   * @param {{ stats: any, onRestart: () => void, recipeEvents?: { unlocked: string[], mastered: string[] }, isRecord?: boolean, best?: number }} opts
-   */
-  showGameOver({ stats, onRestart, recipeEvents = { unlocked: [], mastered: [] }, isRecord = false, best = 0 }) {
-    if (!this.overlayEl) { if (onRestart) onRestart(); return; }
-    this._mode = 'gameover';
-    this._final = onRestart || (() => {});
-    this._reveals = [];
-    this._discoveries = [];
     this._stats = stats;
     this._scoreExtra = { isRecord, best, recipeEvents };
     this._open();
@@ -127,7 +103,7 @@ export class RoundOver {
     this._coins = [];
     this._coinIndex = 0;
     this._coinsRest = false;
-    this._preCommitPrimaryComplete = false;
+    this._setCleared = false;
     // Hide the in-game HUD buttons (debug / fit-to-screen / pause) behind the modal.
     document.body.classList.add('roundover-open');
     this.overlayEl.classList.remove('hidden');
@@ -154,8 +130,13 @@ export class RoundOver {
         finalize();
         this._challengesSettled();
       } else if (this._settled) {
-        this._goUnlocks();
+        // Cleared the whole set this run → reveal the next set on its own screen
+        // first; otherwise straight to the unlock coins.
+        if (this._setCleared) this._goNewChallenges();
+        else this._goUnlocks();
       }
+    } else if (this._step === 'newchallenges') {
+      this._goUnlocks();
     } else if (this._step === 'unlocks') {
       this._tapUnlocks();
     } else if (this._step === 'score') {
@@ -172,14 +153,13 @@ export class RoundOver {
     this._showStage('challenges');
     this._setHint(false);
     const cur = this.challenges.getCurrentSet();
-    this._preCommitPrimaryComplete = !!(cur && cur.primaryComplete);
     if (this.titleEl) this.titleEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : 'All Weeks Complete';
-    if (this.subtitleEl) this.subtitleEl.textContent = this._mode === 'gameover' ? 'Game Over' : 'Day Complete';
+    if (this.subtitleEl) this.subtitleEl.textContent = 'Game Over';
 
     const earnedIds = new Set(this.challenges.getEarnedNotCommitted().map(c => c.id));
     if (this.challengesEl) {
       this.challengesEl.classList.remove('fading-out', 'fading-in');
-      this.challengesEl.innerHTML = challengeListHtml(cur, { earnedIds });
+      this.challengesEl.innerHTML = challengeListHtml(cur, { earnedIds, doneNote: false });
     }
     this._animateCrossOffs(() => this._challengesSettled());
   }
@@ -224,16 +204,18 @@ export class RoundOver {
     this._timers.push(/** @type {any} */ (setTimeout(() => { this._crossoffFinalize = null; done(); }, total)));
   }
 
-  /** Cross-offs are done (or skipped). Commit, build the unlock queue, show set-complete. */
+  /** Cross-offs are done (or skipped). Commit, flag a cleared set, build the coin queue. */
   _challengesSettled() {
     if (this._settled) return;
     this._settled = true;
     this._crossoffFinalize = null;
 
-    // Commit (two-tier) so saved state matches the screen + capture the rewards the
-    // carousel flips. Idempotent — game.js commits again as a backstop.
-    let result = { rewards: [], primaryComplete: false, setComplete: false };
+    // Commit now (game.js no longer pre-commits on death, so the cross-off can show
+    // first) — this captures any set reward to flip in the coins. Idempotent. Advancing
+    // to the next set waits for the dedicated "new challenges" screen (a tap away).
+    let result = { rewards: [], setComplete: false };
     if (this.challenges) result = this.challenges.commitEarned() || result;
+    this._setCleared = !!result.setComplete;
 
     const discoveryCards = this._discoveries.slice(0, 6).map(id => {
       const rec = RECIPE_BY_ID.get(id);
@@ -244,40 +226,31 @@ export class RoundOver {
       ...(result.rewards || []).map(r => rewardToCard(r)).filter(Boolean),
       ...discoveryCards
     ];
-
-    if (result.setComplete) {
-      this._showSetComplete();          // week fully done → advance + "next up" banner
-    } else if (result.primaryComplete && !this._preCommitPrimaryComplete) {
-      this._revealSecondary();          // primary just cleared → reveal "Complete the Week"
-    }
     this._setHint(true);
   }
 
-  /** Primary just cleared this commit — slide the "Complete the Week" secondary into the list. */
-  _revealSecondary() {
-    const cur = this.challenges.getCurrentSet();
-    if (!cur || !this.challengesEl) return;
-    const html = cur.secondary.map(ch => challengeRow(ch, 'challenge-secondary revealing')).join('');
-    this.challengesEl.insertAdjacentHTML('beforeend', html);
-  }
-
-  /** The week is fully done — advance to the next set and fade in its "next up" banner. */
-  _showSetComplete() {
-    const el = this.challengesEl;
-    if (!el || !this.challenges) return;
+  /**
+   * Game over only: the player cleared the current set this run, so reveal the next
+   * set on its own screen — advance, then fade its challenges in. The next set only
+   * surfaces here (on death), never mid-run. A tap moves on to the unlock coins.
+   */
+  _goNewChallenges() {
+    this._step = 'newchallenges';
+    this._showStage('challenges');
+    this._setHint(false);
     const advanced = this.challenges.advanceSet();
     const next = advanced ? this.challenges.getCurrentSet() : null;
-    const body = next
-      ? `<div class="wt-new-label">🎉 Week complete!</div>`
-        + `<div class="wt-new-label">Next up — Week ${next.index + 1}: ${next.name}</div>`
-        + challengeListHtml(next)
-      : `<div class="wt-new-label">🏆 All Weeks complete!</div>`;
-    el.classList.add('fading-out');
-    this._timers.push(/** @type {any} */ (setTimeout(() => {
-      el.innerHTML = body;
-      el.classList.remove('fading-out');
-      el.classList.add('fading-in');
-    }, 300)));
+    if (this.titleEl) this.titleEl.textContent = next ? `Week ${next.index + 1}: ${next.name}` : 'All Weeks Complete';
+    if (this.subtitleEl) this.subtitleEl.textContent = next ? '✨ New Challenges' : '🏆 All Weeks Complete!';
+    if (this.challengesEl) {
+      this.challengesEl.classList.remove('fading-out', 'fading-in');
+      this.challengesEl.innerHTML = next
+        ? challengeListHtml(next, { doneNote: false })
+        : `<div class="wt-new-label">🏆 You've cleared every week — bragging rights unlocked!</div>`;
+      void this.challengesEl.offsetWidth;       // reflow so the fade-in plays
+      this.challengesEl.classList.add('fading-in');
+    }
+    this._setHint(true);
   }
 
   // === Step 2: unlocks carousel ===============================================
@@ -361,7 +334,7 @@ export class RoundOver {
     this._showStage('score');
     this._setHint(false);
     if (this.journalBtnEl) this.journalBtnEl.classList.remove('flash');
-    if (this.subtitleEl) this.subtitleEl.textContent = this._mode === 'gameover' ? 'Final Score' : 'Day Complete';
+    if (this.subtitleEl) this.subtitleEl.textContent = 'Final Score';
 
     let html = scoreTableHtml(this._stats, this._scoreExtra);
     const ev = this._scoreExtra && this._scoreExtra.recipeEvents;
@@ -372,8 +345,8 @@ export class RoundOver {
       html = cel.join('') + html;
     }
     if (this.scoreStageEl) this.scoreStageEl.innerHTML = html;
-    // The score card is the finish: tapping the stage starts the next round / restarts.
-    this._setHint(true, this._mode === 'gameover' ? 'tap to try again' : 'tap to continue');
+    // The score card is the finish: tapping the stage restarts the run.
+    this._setHint(true, 'tap to try again');
   }
 
   // === Helpers ================================================================

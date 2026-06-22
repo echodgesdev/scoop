@@ -25,10 +25,11 @@ import { recipesForWave, ALL_RECIPES, GROUP } from './recipes.js';
 // ends. Count-based (not the phase arithmetic the campaign waves use).
 const WAVE0_GOAL = 11;
 
-// A week is this many days. The per-week DAY (1..WEEK_DAYS) drives difficulty and
-// the recipe-complexity ramp, so both reset every week; the absolute `wave` keeps
-// climbing for sim continuity. Keep in step with WEEK_DAYS in challenges.js.
-const WEEK_DAYS = 7;
+// The difficulty ramp (recipe pool, order-size mix, spawn/patience) climbs with the
+// day and then CAPS here: Day 1 is easiest, Day 7 the hardest, and every day past 7
+// holds at Day 7's level. The day NUMBER still counts up forever for display — only
+// the difficulty key is clamped. A real long-tail curve past Day 7 comes later.
+const DIFFICULTY_DAY = 7;
 
 // Always-available order used only if the section/wave pool somehow resolves
 // empty (Junior Scoop is never gated, so this should never fire). Pulled from the
@@ -71,7 +72,7 @@ export class Waves {
     // Declared here (not just in reset) so checkJs infers plain `number` rather
     // than `number | undefined` — reset() is called below but TS doesn't trace it.
     this.wave = 0;            // 0 = the tutorial wave; campaign proper is 1+ (absolute, climbs)
-    this.weekStartWave = 0;   // absolute `wave` the current week began at — dayInWeek = wave − this
+    this._dayAnchor = -1;     // day = wave − anchor; fixed at reset so the day number climbs forever
     this.phase = 1;           // 1-based, 1..PHASES_PER_WAVE
     this.servedInPhase = 0;
     this.completedPhases = 0; // 0..PHASES_PER_WAVE — phases cleared this wave
@@ -85,7 +86,7 @@ export class Waves {
   /** @param {number} [startWave] 0 = tutorial wave; 1 = skip straight to the campaign. */
   reset(startWave = 0) {
     this.wave = startWave;       // 0 = the tutorial wave; campaign proper is 1+
-    this.weekStartWave = startWave - 1;  // so the opening day reads as dayInWeek 1
+    this._dayAnchor = startWave - 1;  // day = wave − anchor; fixed for the whole run (no weekly reset)
     this.phase = 1;              // 1-based, 1..PHASES_PER_WAVE
     this.servedInPhase = 0;
     this.completedPhases = 0;    // 0..PHASES_PER_WAVE — phases cleared this wave
@@ -116,29 +117,21 @@ export class Waves {
   get isCelebrating()  { return this.celebrating > 0; }
 
   /**
-   * Per-week day (1..WEEK_DAYS). Difficulty (tuning) and the recipe-complexity
-   * ramp key off this rather than the absolute `wave`, so both restart each week.
-   * The tutorial (wave 0) reads as Day 1.
+   * The day number shown on the gauge — counts UP forever (no weekly reset, no
+   * cap). The tutorial (wave 0) reads as Day 1.
    */
-  get dayInWeek() {
-    return Math.max(1, Math.min(WEEK_DAYS, this.wave - this.weekStartWave));
-  }
-
-  /** Days in a week (the meter denominator). */
-  get weekDays() { return WEEK_DAYS; }
-
-  /** Per-week day (1..WEEK_DAYS) for an arbitrary absolute wave (e.g. a completed day). */
-  dayInWeekFor(absWave) {
-    return Math.max(1, Math.min(WEEK_DAYS, absWave - this.weekStartWave));
+  get day() {
+    return Math.max(1, this.wave - this._dayAnchor);
   }
 
   /**
-   * Re-anchor the week to the current day so dayInWeek reads 1 again and the
-   * difficulty/recipe ramp restarts from the easiest. Called by the coordinator
-   * once a Week is completed (challenges done + the 7th day reached).
+   * The day whose difficulty the campaign plays at: the real day, capped at
+   * DIFFICULTY_DAY. So Day 1 is easiest and the ramp tops out at Day 7, holding there
+   * for every later day (no weekly reset). Drives tuning() and the recipe-complexity
+   * ramp in pickOrder().
    */
-  startNewWeek() {
-    this.weekStartWave = this.wave - 1;
+  get difficultyDay() {
+    return Math.min(this.day, DIFFICULTY_DAY);
   }
 
   /**
@@ -249,7 +242,7 @@ export class Waves {
    */
   pickOrder() {
     const wave = this.wave;          // absolute — only the tutorial (wave 0) special-cases
-    const day = this.dayInWeek;      // per-week day — drives the complexity ramp (resets weekly)
+    const day = this.difficultyDay;  // real day, capped at Day 7 (drives complexity ramp)
     const unlocked = this.getUnlockedSections() || undefined;
     let pool = recipesForWave(day, unlocked);
     // Wave 0: never hand out a color the player has already served, so each of
@@ -310,8 +303,8 @@ export class Waves {
    * @returns {Tuning}
    */
   tuning(escalate = true) {
-    // Ramp keys off the per-week day, so difficulty resets to easiest each week.
-    const s = escalate ? Math.min(1, (this.dayInWeek - 1) / WAVE_RAMP) : 0;
+    // Ramp keys off the (capped) difficulty day, so it climbs to Day 7 then holds.
+    const s = escalate ? Math.min(1, (this.difficultyDay - 1) / WAVE_RAMP) : 0;
     return {
       spawnInterval: lerp(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, s),
       fallMult:      lerp(1, FALL_SPEED_MULT_END, s),

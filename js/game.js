@@ -155,16 +155,15 @@ export class Game {
     this.tutorial = this.world.mode.makeTutorial();
 
     // === Game-flow state machine + frame state (coordinator-owned) ============
-    // Gameplay is paused while the between-wave overlay is animating cross-offs /
-    // showing the countdown. See _beginWaveTransition.
-    this.inWaveTransition = false;
     // Wave-end cashout animation (combo bank + stack pops). Stepping is frozen
     // while this runs, but effects keep updating so the particles animate.
     this.inCashout = false;
-    // Between-wave night-cycle reset (runs after the wave overlay is dismissed,
-    // right before the next wave). nightT drives the fast sky sweep + moon arc.
+    // Between-day night-cycle reset (runs straight after the cashout — no modal).
+    // The sky shows the recap over it; nightT drives the fast sweep + moon arc, and
+    // _nightDuration stretches it to fit any coins flipping in.
     this.inNightCycle = false;
     this.nightT = 0;
+    this._nightDuration = NIGHT_CYCLE_S;
     // True from the moment a day completes (waveUp) until the night sweep lands —
     // while set, the HUD gauge HOLDS the finished day (full) instead of rolling the
     // day number over early. Cleared at night-cycle completion. See _syncHud.
@@ -381,13 +380,13 @@ export class Game {
   }
 
   /**
-   * Esc: toggle the pause menu. Suppressed during the wave-transition flow
-   * (don't let two pause overlays stack) and while the game isn't running
-   * (Esc on the start / game-over screen would be confusing).
+   * Esc: toggle the pause menu. Suppressed during the between-day sky beat (night
+   * cycle / round intro) and while the game isn't running (Esc on the start /
+   * game-over screen would be confusing).
    */
   _togglePause() {
     if (!this.running) return;
-    if (this.inWaveTransition) return;
+    if (this.inNightCycle || this.inRoundIntro) return;   // not during the sky beat
     if (this.inPauseMenu) {
       this.inPauseMenu = false;
       this.hud.hidePauseMenu();
@@ -406,7 +405,6 @@ export class Game {
   _goHome() {
     this.running = false;
     this.loop.stop();
-    this.inWaveTransition = false;
     this.inCashout = false;
     this.inNightCycle = false;
     this.inPauseMenu = false;
@@ -465,9 +463,12 @@ export class Game {
     // coins. A genuine first play (Set 1 not cleared yet) is the real thing.
     const replaySandbox = forceTutorial && this.world.challenges.firstSetCleared();
     this.world.challenges.setFrozen(replaySandbox);
-    // Weeks now advance MID-RUN when a Week is completed (all challenges done AND
-    // the 7th day reached — handled by the coordinator + Waves), so there's no
-    // longer a "reveal the next set at game start" step here.
+    // Catch-up: the next set normally reveals at game over, but a player can clear a
+    // set's goals and then quit (Home / close the tab) without dying. Roll forward
+    // here so a fresh game always opens on un-cleared challenges — and so clearing the
+    // tutorial set then quitting still graduates past the tutorial. No-op during a
+    // frozen tutorial replay (advanceSet guards on `frozen`).
+    if (this.world.challenges.isCurrentSetComplete()) this.world.challenges.advanceSet();
     // Day 0 (the tutorial) only plays until the first challenge set is cleared —
     // after that we jump straight to Day 1. "How to Play" and the debug "force
     // tutorial" flag override and replay it.
@@ -475,8 +476,8 @@ export class Game {
     // Reset the simulation (models + progression-session counters). The mode is
     // rebuilt inside, so re-derive the presentation tutorial from it afterward.
     this.world.reset(playWave0);
-    // (The per-week day-count is anchored by Waves.reset → weekStartWave, so the
-    // opening day reads as Day 1; nothing to set here.)
+    // (The day count is anchored by Waves.reset so the opening day reads as Day 1
+    // and then climbs forever — no weekly reset; nothing to set here.)
     // Sandbox flag lives on World (the tip roller reads it); set after reset so a
     // prior run's value never leaks.
     this.world.tutorialSandbox = replaySandbox;
@@ -484,11 +485,11 @@ export class Game {
 
     this.banner = null;
     this.running = true;
-    this.inWaveTransition = false;
     this.inCashout = false;
     this.inNightCycle = false;
     this.inGameOver = false;
     this.nightT = 0;
+    this._nightDuration = NIGHT_CYCLE_S;
     this._dayRolling = false;
     this.inRoundIntro = false;
 
@@ -545,13 +546,14 @@ export class Game {
   _syncHud() {
     this.hud.setScore(this.world.shop.score);
     this.hud.setHealth(this.world.health / MAX_HEALTH);
-    // Feed the current day-in-week so the "Complete the Week" secondary challenge tracks.
-    this.world.challenges.setDayInWeek(this.world.waves.dayInWeek);
-    // Deferred day rollover: while a finished day is "rolling over" (cashout →
-    // transition → night sweep), HOLD the gauge so the per-week day number doesn't
-    // change until the night lands. It resumes (showing the new day) at night-end.
+    // Feed the current day so the (dormant) "Complete the Week" goal can track if
+    // it's ever reinstated. Harmless no-op otherwise.
+    this.world.challenges.setDayInWeek(this.world.waves.day);
+    // Deferred day rollover: while a finished day is "rolling over" (cashout → night
+    // sweep), HOLD the gauge so the day number doesn't tick over until the night
+    // lands. It resumes (showing the new day) at night-end.
     if (!this._dayRolling) {
-      this.hud.setGauge(this.world.waves.dayInWeek, this.world.waves.waveFraction);
+      this.hud.setGauge(this.world.waves.day, this.world.waves.waveFraction);
     }
     this._syncComboHud();
   }
@@ -587,7 +589,7 @@ export class Game {
    * cashout, and the night-cycle all freeze it.
    */
   _stepping() {
-    return this.running && !this.paused && !this.inWaveTransition &&
+    return this.running && !this.paused &&
       !this.inPauseMenu && !this.inCashout && !this.inNightCycle && !this.inRoundIntro;
   }
 
@@ -611,7 +613,7 @@ export class Game {
     // across) that plays after the overlay is dismissed; when it lands the
     // freeze lifts and the next wave resumes.
     if (this.inNightCycle) {
-      this.nightT += frame / NIGHT_CYCLE_S;
+      this.nightT += frame / (this._nightDuration || NIGHT_CYCLE_S);
       if (this.nightT >= 1) {
         this.nightT = 1;
         this.inNightCycle = false;
@@ -658,19 +660,19 @@ export class Game {
 
   /** The upward gesture (swipe up / Space): the mode tosses the top scoop. */
   _pop() {
-    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.world.player.frozen) return;
+    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.world.player.frozen) return;
     this.world.pop();
   }
 
   /** A too-short up-flick: no toss, just squash the top scoop back as feedback. */
   _tossCancel() {
-    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.world.player.frozen) return;
+    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.world.player.frozen) return;
     if (this.world.player.stack.length === 0) return;
     this.world.player.bumpToss();
   }
 
   _deliver() {
-    if (!this.running || this.paused || this.inWaveTransition || this.inCashout || this.world.player.frozen) return;
+    if (!this.running || this.paused || this.inNightCycle || this.inCashout || this.world.player.frozen) return;
     const index = this.world.shop.customerAt(this.world.player.x);
     if (index < 0) {
       this.sound.bad();
@@ -744,7 +746,7 @@ export class Game {
     if (!this.running) { this.inCashout = false; return; }
     const finish = () => {
       this.inCashout = false;
-      this._beginWaveTransition();
+      this._beginNightHandoff();
     };
     if (this.world.activeBubble) {
       const pos = this.world.activeSlotPos();
@@ -772,23 +774,29 @@ export class Game {
   }
 
   /**
-   * Between-wave reset: the night-cycle sweep that plays AFTER the wave overlay
-   * is dismissed (countdown done / Play pressed), right before the next wave
-   * resumes. _frame advances nightT and lifts the freeze when it lands;
-   * endCelebration() makes the next wave open at dawn rather than the previous
-   * sunset.
+   * Between-day reset: the night-cycle sweep (sunset → midnight → dawn) that plays
+   * straight after the cashout — no modal. The sky shows the recap (checked-off
+   * challenges + the day's earned coins) over it, then dissolves into the next day.
+   * _frame advances nightT and lifts the freeze when it lands; endCelebration() makes
+   * the next day open at dawn. The sweep stretches with the coin count so each flips
+   * and reads before the dissolve.
+   * @param {{ reveals?: string[], rewards?: any[], discoveries?: string[] } | null} [recap]
    */
-  _runNightCycle() {
+  _runNightCycle(recap = null) {
     if (!this.running) return;
     this.world.waves.endCelebration();
     // Reset the cone to center for the fresh day — it snaps back during the night
     // sweep so every day opens from the middle.
     this.world.player.reposition(this.bounds.width / 2, CONE_Y);
+    const coinCount = recap
+      ? (recap.reveals?.length || 0) + (recap.rewards?.length || 0) + (recap.discoveries?.length || 0)
+      : 0;
+    this._nightDuration = NIGHT_CYCLE_S + Math.min(coinCount, 6) * 0.7;
     this.nightT = 0;
     this.inNightCycle = true;
-    // The week's challenges drift into the sky and the in-game HUD fades out; they
-    // dissolve back into the round (HUD fades in) when the sweep lands.
-    this.hud.showNightSky();
+    // The day's challenges (checked) + earned coins drift into the sky and the in-game
+    // HUD fades out; they dissolve back into the round (HUD fades in) when the sweep lands.
+    this.hud.showNightSky(recap);
   }
 
   /**
@@ -822,59 +830,35 @@ export class Game {
   }
 
   /**
-   * Pauses gameplay and asks the HUD to run the between-wave overlay:
-   * cross-off animation for any earned challenges, optional fade-in of a
-   * newly-unlocked set, then a countdown / Play button. Resumes when the
-   * HUD calls back.
+   * Between-day handoff — NO modal (the old wave-transition screen tested as
+   * distracting). Commit the day's earned challenges (granting any set reward once),
+   * then run the night cycle, handing it the coins to flip in the sky: regulars met,
+   * the set reward just granted, and recipes discovered today. The sky shows the
+   * checked-off challenges + those coins as the day resets into the next. The next
+   * SET only ever reveals on death (game over), never here — so finishing a set's
+   * goals mid-run doesn't surface the next set until the run ends.
    */
-  _beginWaveTransition() {
+  _beginNightHandoff() {
     if (!this.running) return;
-    this.inWaveTransition = true;
-    // Effects are frozen during the transition (the loop doesn't update them),
-    // so flush any in-flight pop-text / bursts now — otherwise they'd hang
-    // motionless behind the overlay until the next wave resumes.
+    // Effects are frozen during the night sweep (the loop doesn't update them), so
+    // flush any in-flight pop-text / bursts now — otherwise they'd hang motionless.
     this.effects.reset();
-    // Snapshot the week so _endWaveTransition can detect a mid-run week advance
-    // (and then reset the day/difficulty for the new week). The tier gating
-    // (primary → "Complete the Week" → section) is driven by the Challenges model,
-    // so the modal no longer needs a tutorial-mode flag or the day-in-week.
-    const curSet = this.world.challenges.getCurrentSet();
-    this._weekBefore = curSet ? curSet.index : Infinity;
-    this.hud.showWaveTransition({
-      // Regulars to flip-reveal this day: the Day-0 tutorial's first starters,
-      // then any mystery regular unlocked (served) today. The HUD plays them — and
-      // the challenge rewards — as a one-at-a-time coin-flip carousel after cross-offs.
+    const result = this.world.challenges.commitEarned();
+    this._runNightCycle({
       reveals: [
         ...this.world.drainTutorialReveals(),
         ...this.world.regulars.drainPendingReveals()
       ],
-      discoveries: this.world.drainPendingDiscoveries(),
-      stats: this._dayStats(),
-      onResume: () => this._endWaveTransition()
+      rewards: result.rewards || [],
+      discoveries: this.world.drainPendingDiscoveries()
     });
-  }
-
-  _endWaveTransition() {
-    // The countdown expired or the player hit Play — commit any earned
-    // challenges, close the overlay, then run the night-cycle reset, which
-    // hands off to the next wave when it finishes.
-    this.world.challenges.commitEarned();
-    // If the week advanced during the transition (challenges done + 7th day, or the
-    // tutorial graduating), restart the week: day # → 1 and difficulty → easiest.
-    const curSet = this.world.challenges.getCurrentSet();
-    const weekNow = curSet ? curSet.index : Infinity;
-    if (weekNow > (this._weekBefore ?? -1)) this.world.waves.startNewWeek();
-    this.inWaveTransition = false;
-    this.hud.hideWaveTransition();
-    this._runNightCycle();
   }
 
   _endGame() {
     this.running = false;
     this.loop.stop();
-    // Reset transition state in case the player died mid-pause (shouldn't
+    // Reset flow state in case the player died mid-cashout/night (shouldn't
     // happen, but defensive).
-    this.inWaveTransition = false;
     this.inCashout = false;
     this.inNightCycle = false;
     this.inGameOver = true;
@@ -882,13 +866,21 @@ export class Game {
     this.hud.setDayHint(false);
     this.sound.gameOver();
     this.haptics.gameOver();
-    // Commit any earned-but-uncommitted challenges so the game-over screen
-    // shows the player's final state.
-    this.world.challenges.commitEarned();
+    // Challenges commit INSIDE the game-over recap (so the cross-off animation +
+    // reward coins play there); we just hand it the final run's pending reveals /
+    // discoveries to flip alongside them. Draining here means they don't linger as a
+    // "backlog" into the next run's sky.
     this.hud.showGameOver(
       this._dayStats(),
       () => this.start(),
-      this.world.sessionRecipeEvents
+      this.world.sessionRecipeEvents,
+      {
+        reveals: [
+          ...this.world.drainTutorialReveals(),
+          ...this.world.regulars.drainPendingReveals()
+        ],
+        discoveries: this.world.drainPendingDiscoveries()
+      }
     );
   }
 }

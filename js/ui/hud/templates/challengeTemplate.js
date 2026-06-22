@@ -1,25 +1,8 @@
 // @ts-check
-// Challenge presentation: a single challenge row (icon + title + progress bar +
-// count), the per-challenge-type icon, and the short reward label shown in a
-// set's "Unlocks: …" summary. Pure string builders — used by the Journal's
-// Challenges tab, the wave-transition recap, and the game-over card.
-
-import { GROUP_BY_ID } from '../../../game/recipes.js';
-
-/** @param {{ type: string, value: string }} r */
-export function rewardLabel(r) {
-  if (r.type === 'unlock_powerup') {
-    const names = { heart: '❤️ Heart', feather: '⚡ Speed', pause: '❄️ Freeze', rainbow: '🌈 Rainbow' };
-    return names[r.value] || r.value;
-  }
-  if (r.type === 'unlock_coin') return '🪙 Coin tips';
-  if (r.type === 'unlock_regular') return `😀 ${r.value}`;
-  if (r.type === 'unlock_section') {
-    const g = GROUP_BY_ID.get(r.value);
-    return g ? `${g.emoji} ${g.name}` : r.value;
-  }
-  return r.value;
-}
+// Challenge presentation: a single challenge row (icon + title + percentage/check
+// count) and the per-challenge-type icon, plus the current-set list builder. Pure
+// string builders — used by the night sky, the pause menu, the game-over recap, and
+// the Journal's challenge-coin detail popup.
 
 /** @param {{ type: string, param?: string }} ch */
 function challengeIcon(ch) {
@@ -48,7 +31,7 @@ function challengeIcon(ch) {
 
 /**
  * @param {{ id: string, type: string, param?: string, title: string, progress: number, target: number, completed: boolean }} ch
- * @param {string} [extra] extra row classes (e.g. 'earned-pending', 'challenge-secondary', 'revealing')
+ * @param {string} [extra] extra row classes (e.g. 'earned-pending' for the cross-off)
  */
 export function challengeRow(ch, extra = '') {
   const pct = Math.round(Math.min(100, (ch.progress / ch.target) * 100));
@@ -67,23 +50,23 @@ export function challengeRow(ch, extra = '') {
 }
 
 /**
- * The current set's challenge rows: the primary tier always, plus the secondary
- * tier ("Complete the Week") once primary is complete. The single renderer shared
- * by the round-over modal, the night sky, and the pause menu.
- * @param {{ primary: any[], secondary: any[], primaryComplete: boolean } | null} set
- * @param {{ earnedIds?: Set<string>|null }} [opts] earnedIds → mark those rows for the cross-off
+ * The current set's challenge rows. Once the set is complete a "finish your run"
+ * note follows — the next set unlocks on death, not mid-run. The single renderer
+ * shared by the night sky, the pause menu, and the game-over recap.
+ * @param {{ challenges: any[], complete: boolean } | null} set
+ * @param {{ earnedIds?: Set<string>|null, doneNote?: boolean }} [opts]
+ *   earnedIds → mark those rows for the cross-off; doneNote → append the completion note
  * @returns {string}
  */
-export function challengeListHtml(set, { earnedIds = null } = {}) {
+export function challengeListHtml(set, { earnedIds = null, doneNote = true } = {}) {
   if (!set) return '';
-  const rowExtra = (ch, base) => {
-    const cls = base ? [base] : [];
-    if (earnedIds && earnedIds.has(ch.id) && !ch.completed) cls.push('earned-pending');
-    return cls.join(' ');
-  };
-  const rows = set.primary.map(ch => challengeRow(ch, rowExtra(ch, '')));
-  if (set.primaryComplete) {
-    for (const ch of set.secondary) rows.push(challengeRow(ch, rowExtra(ch, 'challenge-secondary')));
+  const rows = set.challenges.map(ch => {
+    const extra = (earnedIds && earnedIds.has(ch.id) && !ch.completed) ? 'earned-pending' : '';
+    return challengeRow(ch, extra);
+  });
+  let html = rows.join('');
+  if (doneNote && set.complete) {
+    html += `<div class="challenge-done-note">🌙 Finish your run to unlock new challenges</div>`;
   }
-  return rows.join('');
+  return html;
 }
