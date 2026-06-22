@@ -2142,7 +2142,9 @@ body.menu-visible #pauseBtn {
 .ro-coin .wt-reveal-inner {
   animation: none;
   transform: rotateY(0deg);
-  transition: transform 0.7s ease;
+  /* Flip time tracks the carousel dwell (CoinCarousel sets --coin-flip-ms) so fast,
+     many-coin reveals still finish each turn before advancing. */
+  transition: transform var(--coin-flip-ms, 0.7s) ease;
 }
 .ro-coin.revealed .wt-reveal-inner { transform: rotateY(180deg); }
 .ro-coin.snap .wt-reveal-inner { transition: none; }
@@ -2199,21 +2201,24 @@ body.roundover-open #pauseBtn {
 #nightSky .challenge-count { color: #ffd166; }
 #nightSky .challenge-row.completed .challenge-title { color: #cfcfcf; }
 
-/* Coins earned that day flip in below the challenges between rounds (reusing the
-   unlock-flip, which auto-flips on render). Centered, wrapping row; labels lightened
-   to read against the night sky. */
-.sky-coins {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 14px 18px;
-  margin-top: 12px;
-}
-.sky-coins .wt-reveal-label {
+/* Phase 1 between rounds: the day's coins flip in as an auto-cycling carousel
+   (reusing .ro-carousel + .ro-coin). The sky accepts taps to skip only during this
+   phase; labels are lightened to read against the night sky. */
+#nightSky.sky-tappable { pointer-events: auto; cursor: pointer; }
+.sky-carousel { margin: 0 auto; }
+.sky-carousel .wt-reveal-label {
   color: #fff;
-  font-size: 13px;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
+.sky-skip-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+/* The coins → challenges hand-off fades the swapped-in content. */
+#nightSky.sky-fade-in { animation: sky-fade-in 0.5s ease both; }
+@keyframes sky-fade-in { from { opacity: 0.15; } to { opacity: 1; } }
 
 /* Cross-fade the in-game HUD against the sky challenges: out while they're up, back
    in as they dissolve into the round. */

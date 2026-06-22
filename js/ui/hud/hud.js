@@ -44,8 +44,9 @@ export class Hud {
       onHome
     });
 
-    // The between-round night sequence: challenges in the sky + the countdown.
-    this.nightSky = new NightSky({ challenges });
+    // The between-round night sequence: the day's coins flip in (carousel), then the
+    // set's challenges drift in the sky.
+    this.nightSky = new NightSky({ challenges, sound });
 
     // Title / game-over / settings / pause overlays + all menu-button wiring.
     // Reset is wrapped to also re-render the open Journal panels so a wipe shows

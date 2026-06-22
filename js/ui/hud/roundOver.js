@@ -17,10 +17,8 @@
 
 import { RECIPE_BY_ID } from '../../game/recipes.js';
 import { challengeListHtml } from './templates/challengeTemplate.js';
-import { rewardToCard, unlockCardHtml, scoreTableHtml } from './templates/roundOverTemplate.js';
-
-// Auto-advance dwell per unlock coin: the ~0.7s flip plus a beat to read it.
-const COIN_DWELL_MS = 1500;
+import { rewardToCard, scoreTableHtml } from './templates/roundOverTemplate.js';
+import { CoinCarousel } from './coinCarousel.js';
 
 export class RoundOver {
   /**
@@ -61,8 +59,9 @@ export class RoundOver {
     /** @type {(() => void) | null} jump the cross-off animation to its end state */
     this._crossoffFinalize = null;
     this._coins = [];
-    this._coinIndex = 0;
-    this._coinsRest = false;
+    // The unlock-coins step is a shared auto-cycling carousel (also used by the
+    // night sky). On the last coin it rests and shows the "tap to continue" hint.
+    this.carousel = new CoinCarousel({ el: this.carouselEl, sound: this.sound });
 
     this._wire();
   }
@@ -101,8 +100,6 @@ export class RoundOver {
     this._settled = false;
     this._crossoffFinalize = null;
     this._coins = [];
-    this._coinIndex = 0;
-    this._coinsRest = false;
     this._setCleared = false;
     // Hide the in-game HUD buttons (debug / fit-to-screen / pause) behind the modal.
     document.body.classList.add('roundover-open');
@@ -263,68 +260,14 @@ export class RoundOver {
     if (this.subtitleEl) this.subtitleEl.textContent = 'Unlocked!';
     // Pulse the Journal button as a CTA while coins are flipping in.
     if (this.journalBtnEl) this.journalBtnEl.classList.add('flash');
-    if (this.carouselEl) {
-      this.carouselEl.innerHTML = this._coins.map(c => `<div class="ro-coin">${unlockCardHtml(/** @type {any} */ (c))}</div>`).join('');
-    }
-    this._coinIndex = 0;
-    this._coinsRest = false;
-    this._layoutCarousel();
-    this._cycleCoins();
+    // The shared carousel flips the coins in turn, then rests + shows the hint.
+    this.carousel.start(this._coins, () => this._setHint(true));
   }
 
-  /** Position every coin by its offset from the current one: centre large, others shrink + fade. */
-  _layoutCarousel() {
-    const coins = this.carouselEl ? Array.from(this.carouselEl.querySelectorAll('.ro-coin')) : [];
-    coins.forEach((c, i) => {
-      const off = i - this._coinIndex;
-      const abs = Math.abs(off);
-      const x = off * 150;
-      const scale = off === 0 ? 1 : Math.max(0.42, 0.7 - (abs - 1) * 0.12);
-      const opacity = off === 0 ? 1 : Math.max(0, 0.5 - (abs - 1) * 0.22);
-      const el = /** @type {HTMLElement} */ (c);
-      el.style.transform = `translateX(${x}px) scale(${scale})`;
-      el.style.opacity = String(opacity);
-      el.style.zIndex = String(50 - abs);
-      el.classList.toggle('current', off === 0);
-    });
-  }
-
-  /**
-   * Auto-cycle the carousel: flip the current coin, hold a beat, then advance to
-   * the next — cycle, pause, cycle, pause. After the last coin it rests and shows
-   * the continue hint.
-   */
-  _cycleCoins() {
-    const coins = this.carouselEl ? Array.from(this.carouselEl.querySelectorAll('.ro-coin')) : [];
-    const cur = /** @type {HTMLElement} */ (coins[this._coinIndex]);
-    if (cur) {
-      cur.classList.remove('snap');
-      void cur.offsetWidth;      // reflow so the flip transition plays
-      cur.classList.add('revealed');
-      if (this.sound) this.sound.perfect();
-    }
-    this._timers.push(/** @type {any} */ (setTimeout(() => {
-      if (this._coinIndex < this._coins.length - 1) {
-        this._coinIndex += 1;
-        this._layoutCarousel();
-        this._cycleCoins();
-      } else {
-        this._coinsRest = true;
-        this._setHint(true);
-      }
-    }, COIN_DWELL_MS)));
-  }
-
-  /** Tap during the carousel: at rest → score; mid-cycle → skip (reveal all at once). */
+  /** Tap during the carousel: mid-cycle → skip (reveal all); at rest → score. */
   _tapUnlocks() {
-    if (this._coinsRest) { this._goScore(); return; }
-    this._clearTimers();
-    const coins = this.carouselEl ? Array.from(this.carouselEl.querySelectorAll('.ro-coin')) : [];
-    coins.forEach(c => c.classList.add('snap', 'revealed'));
-    this._coinIndex = this._coins.length - 1;
-    this._layoutCarousel();
-    this._coinsRest = true;
-    this._setHint(true);
+    if (this.carousel.cycling) this.carousel.skip();
+    else this._goScore();
   }
 
   // === Step 3: score card =====================================================
@@ -368,5 +311,6 @@ export class RoundOver {
   _clearTimers() {
     this._timers.forEach(t => clearTimeout(t));
     this._timers = [];
+    if (this.carousel) this.carousel.clear();   // the carousel runs its own timers
   }
 }

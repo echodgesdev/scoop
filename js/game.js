@@ -22,6 +22,7 @@ import {
 } from './game/config.js';
 import { Customers } from './ui/customers.js';
 import { Hud } from './ui/hud/hud.js';
+import { coinDwellMs } from './ui/hud/coinCarousel.js';
 import { Input } from './engine/input.js';
 import { Sound } from './engine/audio.js';
 import { Haptics } from './engine/haptics.js';
@@ -788,10 +789,15 @@ export class Game {
     // Reset the cone to center for the fresh day — it snaps back during the night
     // sweep so every day opens from the middle.
     this.world.player.reposition(this.bounds.width / 2, CONE_Y);
+    // Stretch the sweep so the coin carousel plays out AND the challenges still get a
+    // beat before the dissolve. Every coin is shown; the per-coin dwell shortens past a
+    // ceiling (coinDwellMs), so the night scales with the list then levels off rather
+    // than growing forever. Uses the carousel's own timing so the two stay in lockstep.
     const coinCount = recap
       ? (recap.reveals?.length || 0) + (recap.rewards?.length || 0) + (recap.discoveries?.length || 0)
       : 0;
-    this._nightDuration = NIGHT_CYCLE_S + Math.min(coinCount, 6) * 0.7;
+    const carouselS = coinCount > 0 ? (coinCount * coinDwellMs(coinCount)) / 1000 + 0.8 : 0;
+    this._nightDuration = NIGHT_CYCLE_S + carouselS;
     this.nightT = 0;
     this.inNightCycle = true;
     // The day's challenges (checked) + earned coins drift into the sky and the in-game
