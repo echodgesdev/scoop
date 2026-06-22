@@ -7,21 +7,34 @@ import { dayCycleState, nightCycleState } from '../game/dayCycle.js';
 /**
  * Paint the full background for the frame: the day sky + sun, or the between-wave
  * night cycle (moon + fast sky), then sand and ocean on top. Drawn first each
- * frame; the actors layer over the floor afterward.
+ * frame; the actors layer over the floor afterward. Returns the resolved day/night
+ * state so the caller can reuse its colors (e.g. the floor tint for actor shadows).
  * @param {CanvasRenderingContext2D} ctx @param {Game} game
+ * @returns {{ floor: string, skyTop: string, skyBottom: string }}
  */
 export function drawEnvironment(ctx, game) {
-  if (game.inNightCycle) {
-    const nightState = nightCycleState(game.nightT, game.bounds);
-    drawNightSky(ctx, game.bounds, nightState);
-    drawSand(ctx, game.bounds, nightState);
-    drawOcean(ctx, game.bounds, nightState, game.clock);
-  } else {
-    const dayState = dayCycleState(game.world.waves.waveFraction, game.bounds);
-    drawSkyAndSun(ctx, game.bounds, dayState);
-    drawSand(ctx, game.bounds, dayState);
-    drawOcean(ctx, game.bounds, dayState, game.clock);
-  }
+  const state = game.inNightCycle
+    ? nightCycleState(game.nightT, game.bounds)
+    : dayCycleState(game.world.waves.waveFraction, game.bounds);
+  if (game.inNightCycle) drawNightSky(ctx, game.bounds, state);
+  else drawSkyAndSun(ctx, game.bounds, state);
+  drawSand(ctx, game.bounds, state);
+  drawOcean(ctx, game.bounds, state, game.clock);
+  return state;
+}
+
+/**
+ * A grounding-shadow tint for actors on the sand: the current floor color darkened
+ * and nudged toward a cool dusk tone, so the shadow shifts with the time of day and
+ * complements the warm sand. Returns an "r, g, b" string for rgba().
+ * @param {string} floorHex the day/night state's floor color
+ */
+export function groundShadowRgb(floorHex) {
+  const c = _rgb(scaleHex(floorHex, 0.68));  // darken the sand a touch (kept light)
+  const cool = { r: 70, g: 64, b: 96 };      // gentle cool shade to nudge toward
+  const t = 0.28;
+  const m = n => Math.round(n);
+  return `${m(c.r + (cool.r - c.r) * t)}, ${m(c.g + (cool.g - c.g) * t)}, ${m(c.b + (cool.b - c.b) * t)}`;
 }
 
 // === Per-frame caches =========================================================

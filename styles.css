@@ -29,7 +29,9 @@
   --waffle-surface:
     repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
     repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
-    linear-gradient(180deg, #fffaf0 0%, #ffefc8 100%);
+    /* Translucent base so the panel sits LIGHTER on a small screen — the beach
+       reads through it rather than a solid card. */
+    linear-gradient(180deg, rgba(255, 250, 240, 0.48) 0%, rgba(255, 239, 200, 0.44) 100%);
   --waffle-edge: #b97a42;
 }
 
@@ -76,15 +78,15 @@ html, body {
   /* Waffle card (see :root --waffle-surface) with an inset-white sheen. No
      backdrop-filter — blurring the canvas backdrop is a per-frame GPU cost. */
   background: var(--waffle-surface);
-  border: 2px solid var(--waffle-edge);
+  border: 2px solid rgba(185, 122, 66, 0.5);
   border-radius: 16px;
   padding: 9px 16px;
   font-size: 22px;
   font-weight: bold;
   color: #3a2a1a;
   box-shadow:
-    0 6px 16px rgba(40, 16, 4, 0.3),
-    inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+    0 4px 11px rgba(40, 16, 4, 0.16),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.32);
 }
 
 .stack-left {
@@ -176,13 +178,14 @@ html, body {
   position: absolute;
   inset: 10px;
   border-radius: 50%;
+  /* Translucent so the meter floats lightly on the beach instead of a solid disc. */
   background:
-    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.35) 60%, rgba(255, 255, 255, 0.1)),
-    linear-gradient(180deg, #fff6df, #ffe1b0);
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18) 60%, rgba(255, 255, 255, 0.05)),
+    linear-gradient(180deg, rgba(255, 246, 223, 0.48), rgba(255, 225, 176, 0.44));
   box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.25),
-    inset 0 -3px 6px rgba(193, 122, 30, 0.25),
-    inset 0 2px 4px rgba(255, 255, 255, 0.9);
+    0 3px 9px rgba(0, 0, 0, 0.16),
+    inset 0 -3px 6px rgba(193, 122, 30, 0.18),
+    inset 0 2px 4px rgba(255, 255, 255, 0.55);
 }
 
 #gauge svg {
@@ -385,7 +388,8 @@ body.day-hint #gauge::before {
 #health-fill {
   height: 100%;
   width: 100%;
-  background: hsl(120, 75%, 48%);
+  /* Translucent so the bar reads lighter; JS keeps the same alpha as it recolors. */
+  background: hsla(120, 75%, 48%, 0.72);
   border-radius: 9px;
   /* Tube shading: a bright top edge + darker base, independent of the JS hue. */
   box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.55), inset 0 -4px 5px rgba(0, 0, 0, 0.22);

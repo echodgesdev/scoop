@@ -1,7 +1,7 @@
 // @ts-check
 import { STATE } from '../game/shop.js';
 import { CUSTOMER_FACE_OFFSET_PX, GROUND_Y } from '../game/config.js';
-import { drawFace, FACE_SIZE } from './sprites/customerRenderer.js';
+import { drawFace, drawFaceShadow, FACE_SIZE } from './sprites/customerRenderer.js';
 import { drawHeldCone } from './view/customerConeView.js';
 import { drawBubble } from './view/customerBubbleView.js';
 import { drawTip } from './view/customerTipView.js';
@@ -30,7 +30,7 @@ export class Customers {
     this.width = bounds.width;
   }
 
-  draw(ctx, customers, { activeIndex, canServe, pausePatience = false, rainbow = false, time = 0, tipLabel = false, coneX = /** @type {number|null} */ (null), alpha = 1 }) {
+  draw(ctx, customers, { activeIndex, canServe, pausePatience = false, rainbow = false, time = 0, tipLabel = false, coneX = /** @type {number|null} */ (null), shadow = /** @type {string|null} */ (null), alpha = 1 }) {
     // Precompute each customer's interpolated draw state once, then render in
     // LAYERS across all of them — faces, held cones, bubbles, tips — so a
     // customer that spawns next to another never covers the earlier one's bubble
@@ -57,6 +57,12 @@ export class Customers {
       if (shake > 0) cx += Math.sin(time * SHAKE_FREQ + c.id * 1.7) * SHAKE_AMP * shake;
       return { c, cx, faceY, waiting, servable, active, patience };
     });
+
+    // Layer 0 — a head-SHAPED drop shadow beneath each customer, tinted a darker/cooler
+    // shade of the current sand (shifts with the day). Drawn first so heads sit on top.
+    if (shadow) {
+      for (const it of items) drawFaceShadow(ctx, it.c, it.cx, it.faceY, shadow);
+    }
 
     // Layer 1 — faces (customerRenderer: character picks the sheet row, mood the
     // column). Customers always carry a valid character (selection waterfall +

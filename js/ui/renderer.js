@@ -1,5 +1,5 @@
 // @ts-check
-import { drawEnvironment } from './scene.js';
+import { drawEnvironment, groundShadowRgb } from './scene.js';
 import { drawField as drawScoopField } from './view/scoopsView.js';
 import { drawPlayer } from './view/playerView.js';
 import { drawActivePowerup } from './view/activePowerupView.js';
@@ -26,8 +26,9 @@ export function drawFrame(ctx, game, alpha = 1) {
   const rainbow = world.powerups.rainbowActive;
 
   // Background: sky/sun (or the between-wave night cycle), sand, and ocean — the
-  // actors below layer over the floor.
-  drawEnvironment(ctx, game);
+  // actors below layer over the floor. Returns the day/night state so the customer
+  // shadows can tint to the current sand.
+  const env = drawEnvironment(ctx, game);
 
   drawScoopField(ctx, world.field, rainbow, alpha);
   drawPlayer(ctx, world.player, rainbow, alpha);
@@ -42,6 +43,7 @@ export function drawFrame(ctx, game, alpha = 1) {
     time:           game.clock,
     tipLabel:       game.tutorial.active,
     coneX:          world.player.drawX(alpha),  // fades a bubble translucent as the cone passes behind it
+    shadow:         groundShadowRgb(env.floor), // grounding shadow tint (shifts with the day)
     alpha
   });
   // Tutorial hint pills — over the scene but under the effect bursts.

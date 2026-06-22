@@ -63,3 +63,31 @@ export function drawFace(ctx, customer, cx, faceY, { patience, servable, pausePa
   const faceIdx = faceFor(customer, patience, servable, pausePatience);
   faceSheet.draw(ctx, customer.character || '', faceIdx, cx, faceY, FACE_SCALE);
 }
+
+// A head-SHAPED drop shadow: the face sprite is drawn far off-canvas and the cone's
+// shadow is offset back in (the effects/glow.js trick — cheaper than a per-frame
+// filter), so only the head's own tinted, lightly-blurred silhouette lands at the
+// customer — not a disc. The silhouette is the same for every mood, so use DEFAULT.
+const SHADOW_OFF = 4096;                 // park the real sprite this far left (off-screen)
+const SHADOW_DX  = FACE_SIZE * 0.05;     // shadow cast slightly to the side …
+const SHADOW_DY  = FACE_SIZE * 0.13;     // … and down, so it peeks out below the head
+const SHADOW_BLUR = 2;                   // crisp, not a soft blob
+
+/**
+ * Draw a customer's grounding drop shadow (head-shaped). Drawn before the face so the
+ * head sits on top of it.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {import('../../types.js').Customer} customer
+ * @param {number} cx @param {number} faceY
+ * @param {string} tint  "r, g, b" (the day-tinted shadow color)
+ * @param {number} [alpha]
+ */
+export function drawFaceShadow(ctx, customer, cx, faceY, tint, alpha = 0.38) {
+  ctx.save();
+  ctx.shadowColor = `rgba(${tint}, ${alpha})`;
+  ctx.shadowBlur = SHADOW_BLUR;
+  ctx.shadowOffsetX = SHADOW_OFF + SHADOW_DX;
+  ctx.shadowOffsetY = SHADOW_DY;
+  faceSheet.draw(ctx, customer.character || '', FACE.DEFAULT, cx - SHADOW_OFF, faceY, FACE_SCALE);
+  ctx.restore();
+}

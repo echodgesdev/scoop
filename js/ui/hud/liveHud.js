@@ -146,8 +146,9 @@ export class LiveHud {
     if (f === this._lastHealthQ) return;
     this._lastHealthQ = f;
     this.healthFillEl.style.width = `${f * 100}%`;
-    // green -> amber -> red as it drains
-    this.healthFillEl.style.background = `hsl(${120 * f}, 75%, 48%)`;
+    // green -> amber -> red as it drains; translucent (matches the CSS) so the bar
+    // sits lighter on a small screen.
+    this.healthFillEl.style.background = `hsla(${120 * f}, 75%, 48%, 0.72)`;
   }
 
   /**
