@@ -29,8 +29,15 @@
   --waffle-surface:
     repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
     repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
-    /* Translucent base so the panel sits LIGHTER on a small screen — the beach
-       reads through it rather than a solid card. */
+    /* Opaque card — modals (pause, round-over) and buttons sit on top of the game
+       and must NOT show the scene through them. */
+    linear-gradient(180deg, #fffaf0 0%, #ffefc8 100%);
+  /* In-game HUD chrome ONLY (the score/health panel) uses a translucent variant so
+     it sits LIGHTER on a small screen — the beach reads through it. Kept separate
+     from --waffle-surface so the pause menu etc. stay solid. */
+  --waffle-surface-hud:
+    repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
     linear-gradient(180deg, rgba(255, 250, 240, 0.48) 0%, rgba(255, 239, 200, 0.44) 100%);
   --waffle-edge: #b97a42;
 }
@@ -75,9 +82,9 @@ html, body {
 }
 
 .panel {
-  /* Waffle card (see :root --waffle-surface) with an inset-white sheen. No
-     backdrop-filter — blurring the canvas backdrop is a per-frame GPU cost. */
-  background: var(--waffle-surface);
+  /* In-game HUD card — the translucent waffle variant (see :root) so the beach
+     reads through it. No backdrop-filter — blurring the canvas is a per-frame GPU cost. */
+  background: var(--waffle-surface-hud);
   border: 2px solid rgba(185, 122, 66, 0.5);
   border-radius: 16px;
   padding: 9px 16px;
@@ -345,7 +352,11 @@ body.day-hint #gauge::before {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  min-width: 200px;
+  /* Width scales with the play area instead of a fixed 200px, which overhung the
+     right edge on a phone. The stage is full-bleed on mobile (so vw ≈ stage width)
+     and the 200px cap keeps the roomy desktop column unchanged. flex-shrink (the
+     default) lets it give up even more if the row is still tight. */
+  width: clamp(116px, 32vw, 200px);
   gap: 8px;
 }
 

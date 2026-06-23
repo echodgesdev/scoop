@@ -1,12 +1,12 @@
 // seed/gen-stars.mjs
 // Bakes the night-sky star field — was `Array.from({length:60}, () => ({ x:
-// Math.random(), … }))` rolled once at module load in js/scene.js — into a
+// Math.random(), … }))` rolled once at module load in the scene — into a
 // static array, so there's no load-time randomness and the sky is identical
 // every run. Deterministic (seeded PRNG), so re-running reproduces the SAME
 // field; tweak the seed/count below to reshuffle.
 //
 // Run:  node seed/gen-stars.mjs
-// Then paste the printed `const STARS = [...]` block into js/scene.js.
+// Then paste the printed `const STARS = [...]` block into js/ui/sceneStarView.js.
 
 const COUNT = 60;
 const SEED = 0x5c008; // change to reshuffle the (still-deterministic) layout
