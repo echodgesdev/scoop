@@ -14,8 +14,8 @@
 // frame there, but that's not gameplay). Shape + scale are fixed per cloud (the
 // base radius derives from the constant GROUND_Y), so a cloud's bitmap depends
 // only on the tint.
-import { GROUND_Y } from '../game/config.js';
-import { mixHex, scaleHex, luminance } from './colorUtils.js';
+import { GROUND_Y } from '../../game/config.js';
+import { mixHex, scaleHex, luminance } from '../colorUtils.js';
 
 // Per-layer depth feel (far → near): scroll speed (px/s), size, opacity.
 const CLOUD_LAYERS = [

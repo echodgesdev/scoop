@@ -2,9 +2,9 @@
 import { GROUND_Y } from '../game/config.js';
 import { dayCycleState, nightCycleState } from '../game/dayCycle.js';
 import { rgb, scaleHex, hexWithAlpha } from './colorUtils.js';
-import { drawStars } from './sceneStarView.js';
-import { drawClouds } from './sceneCloudView.js';
-import { drawOcean } from './sceneOceanView.js';
+import { drawStars } from './view/sceneStarView.js';
+import { drawClouds } from './view/sceneCloudView.js';
+import { drawOcean } from './view/sceneOceanView.js';
 
 /** @typedef {import('../game.js').Game} Game */
 

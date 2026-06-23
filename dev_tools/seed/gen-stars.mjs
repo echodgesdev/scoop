@@ -6,7 +6,7 @@
 // field; tweak the seed/count below to reshuffle.
 //
 // Run:  node seed/gen-stars.mjs
-// Then paste the printed `const STARS = [...]` block into js/ui/sceneStarView.js.
+// Then paste the printed `const STARS = [...]` block into js/ui/view/sceneStarView.js.
 
 const COUNT = 60;
 const SEED = 0x5c008; // change to reshuffle the (still-deterministic) layout

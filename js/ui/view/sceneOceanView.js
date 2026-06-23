@@ -8,8 +8,8 @@
 // drawOcean() is a thin orchestrator: it derives this frame's geometry (the
 // `Surf`) and tint, then calls one private pass per layer (wet sand → water body
 // → crest lines → foam band → foam bubbles), back to front.
-import { GROUND_Y } from '../game/config.js';
-import { mixHex, scaleHex, luminance, hexWithAlpha } from './colorUtils.js';
+import { GROUND_Y } from '../../game/config.js';
+import { mixHex, scaleHex, luminance, hexWithAlpha } from '../colorUtils.js';
 
 // Base colors, tinted toward the time of day in oceanTint(). The sea is a
 // shallow→deep aqua; crests/foam are pale whites.

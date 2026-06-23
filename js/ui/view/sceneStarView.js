@@ -2,7 +2,7 @@
 // The night-cycle star field: a fixed (baked) set of stars + the pass that paints
 // them above the horizon during the between-wave night cycle. Pulled out of the
 // scene so the 60-entry table doesn't bury the sky/ocean/cloud passes.
-import { GROUND_Y } from '../game/config.js';
+import { GROUND_Y } from '../../game/config.js';
 
 // Fixed star field — x/y are fractions of the sky, r the dot radius, tw a
 // static per-star brightness. BAKED (no load-time randomness, identical every
