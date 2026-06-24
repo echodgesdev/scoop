@@ -32,7 +32,7 @@ import { drawFrame } from './ui/renderer.js';
 import { PICKUP_RING_COLOR } from './ui/powerupVisuals.js';
 import { wireReactions } from './reactions.js';
 import { EventBus } from './engine/events.js';
-import { responsiveDims, fitRect } from './engine/viewport.js';
+import { Surface } from './engine/surface.js';
 import { Loop } from './engine/loop.js';
 import { World } from './game/world.js';
 import { TouchControls } from './engine/touch.js';
@@ -68,20 +68,21 @@ export class Game {
       document.fonts.load("400 16px 'Comic Sans MS'");
       document.fonts.load("700 16px 'Comic Sans MS'");
     }
-    this.canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('game'));
-    this.ctx = /** @type {CanvasRenderingContext2D} */ (this.canvas.getContext('2d'));
-    // #stage is the container the canvas + HUD live in; its on-screen rect is
-    // recomputed in _resize. The virtual canvas always tracks the viewport
-    // aspect (clamped to portrait) so it fills the screen on mobile — there's
-    // no forced-aspect / letterbox mode anymore.
-    this.stage = document.getElementById('stage');
-    // Cached #stage bounding rect for _toVirtual (the pointermove hot path);
-    // null = stale, re-read lazily. Invalidated by _resize.
-    /** @type {DOMRect | null} */
-    this._stageRect = null;
-    const _d = responsiveDims(window.innerWidth, window.innerHeight);
-    /** @type {{ width: number, height: number }} Virtual (logical) play area. */
-    this.bounds = { width: _d.width, height: _d.height };
+    // The drawing surface (engine): owns the canvas backing store, the #stage it
+    // scales to fill the viewport, and the virtual play-area `bounds`. A viewport
+    // change mutates bounds in place and calls back to _relayout (reposition +
+    // repaint); the World gets the same bounds reference, so the sim sees size
+    // changes for free.
+    this.surface = new Surface({
+      canvas: /** @type {HTMLCanvasElement} */ (document.getElementById('game')),
+      stage: document.getElementById('stage'),
+      fullscreenBtn: document.getElementById('fullscreenBtn'),
+      onResize: () => this._relayout()
+    });
+    this.canvas = this.surface.canvas;
+    this.ctx = this.surface.ctx;
+    /** @type {{ width: number, height: number }} Virtual (logical) play area, shared with the World. */
+    this.bounds = this.surface.bounds;
     // Smoothed frames-per-second for the debug overlay.
     this.fps = 60;
     // Free-running clock (seconds) for HUD pulse/flash animations.
@@ -245,7 +246,7 @@ export class Game {
     // handlers below apply relative steering + map the verbs. The down-swipe is
     // unused in Tipping (no rotate verb), so it's a no-op.
     this.touch = new TouchControls(this.canvas, {
-      toVirtual: (cx, cy) => this._toVirtual(cx, cy),
+      toVirtual: (cx, cy) => this.surface.toVirtual(cx, cy),
       onHold: () => { this.input.lastWasTouch = true; },
       onHoldEnd: () => {},
       onMove: (_vx, dvx) => { this.input.moveDelta += dvx * this.touchGain; },
@@ -270,71 +271,36 @@ export class Game {
     });
     this.bus.on('gameOver', () => this._beginDeath());
 
-    // Window resize only re-letterboxes the (unchanged) virtual canvas; the
-    // backing store is fixed per aspect. Fullscreen is just a bigger viewport.
-    // Debounce resize: a mobile URL-bar show/hide fires a burst of resize events,
-    // and each dim change reallocates the canvas backing store (a black flash) +
-    // repositions actors. Coalesce the burst into a single resize once it settles.
-    let _resizeTimer = 0;
-    window.addEventListener('resize', () => {
-      clearTimeout(_resizeTimer);
-      _resizeTimer = /** @type {any} */ (setTimeout(() => this._resize(), 150));
-    });
-    document.addEventListener('fullscreenchange', () => this._resize());
-    const fsBtn = document.getElementById('fullscreenBtn');
-    if (fsBtn) fsBtn.addEventListener('click', () => this._toggleFullscreen());
-
+    // Resize/fullscreen wiring lives in the Surface; it calls back to _relayout
+    // when the viewport actually changes the virtual dims. Lay out the actors and
+    // paint the first frame now.
     this._applyAspect();
   }
 
   /**
-   * Size the canvas backing store to the virtual resolution, reposition every
-   * actor against the bounds, then fit the stage to the viewport. Called once on
-   * construction; ongoing viewport changes go through _resize.
+   * One-time initial layout: position the actors against the surface bounds and
+   * paint the first frame, then fit #stage to the viewport. The Surface has
+   * already sized the backing store; ongoing viewport changes run _relayout via
+   * the Surface's onResize callback.
    */
   _applyAspect() {
-    this.canvas.width = this.bounds.width;
-    this.canvas.height = this.bounds.height;
-    this.world.player.reposition(this.bounds.width / 2, CONE_Y);
-    this.customers.layout(this.bounds);
-    this.world.shop.layout(this.bounds.width);
-    this._resize();
-    // Paint the ambient scene once so the title overlay sits over the dawn
-    // beach instead of a blank (black) canvas before the first start().
-    drawFrame(this.ctx, this);
+    this._relayout();
+    this.surface.fit();
   }
 
   /**
-   * Map a screen-space point (clientX/Y) into virtual canvas coordinates,
-   * via the #stage rect. Used by the touch layer to steer the cone — which
-   * means it runs on every pointermove, so the rect is CACHED (a live
-   * getBoundingClientRect forces a layout pass at input frequency, mid-drag).
-   * _resize invalidates it.
-   * @param {number} clientX @param {number} clientY
-   * @returns {{ x: number, y: number }}
+   * Reposition every actor against the (possibly just-resized) bounds and repaint
+   * synchronously. Wired as the Surface's onResize and reused for the initial
+   * layout. The synchronous repaint matters on resize: reassigning canvas.width
+   * wipes the backing store, so without it the next composite can flash the dark
+   * page background ("black frame" on mobile URL-bar / fullscreen changes). It
+   * also gives the title overlay a painted dawn beach to sit over before start().
    */
-  _toVirtual(clientX, clientY) {
-    let rect = this._stageRect;
-    if (!rect) {
-      if (!this.stage) return { x: 0, y: 0 };
-      rect = this._stageRect = this.stage.getBoundingClientRect();
-    }
-    const w = rect.width || 1;
-    const h = rect.height || 1;
-    return {
-      x: (clientX - rect.left) / w * this.bounds.width,
-      y: (clientY - rect.top) / h * this.bounds.height
-    };
-  }
-
-  _toggleFullscreen() {
-    const el = document.documentElement;
-    if (!document.fullscreenElement) {
-      const p = el.requestFullscreen && el.requestFullscreen();
-      if (p && p.catch) p.catch(() => {});
-    } else if (document.exitFullscreen) {
-      document.exitFullscreen();
-    }
+  _relayout() {
+    this.world.player.reposition(this.bounds.width / 2, CONE_Y);
+    this.customers.layout(this.bounds);
+    this.world.shop.layout(this.bounds.width);
+    drawFrame(this.ctx, this);
   }
 
   /**
@@ -424,41 +390,6 @@ export class Game {
     // _endGame; commitEarned is idempotent if the run already ended).
     this.world.challenges.commitEarned();
     this.hud.showTitle();
-  }
-
-  /**
-   * Re-derive the virtual canvas from the viewport aspect (so it fills the
-   * screen edge-to-edge on mobile); when the dims change the backing store is
-   * resized and actors are repositioned. Then fit #stage over the viewport —
-   * fitRect with a matching aspect yields a full-bleed rect; with the portrait
-   * cap on a wide desktop it centers the column. `bounds` is shared with the
-   * World, so resizing it here updates the sim's view of the play area too.
-   */
-  _resize() {
-    if (!this.stage) return;
-    const d = responsiveDims(window.innerWidth, window.innerHeight);
-    if (d.width !== this.bounds.width || d.height !== this.bounds.height) {
-      this.bounds.width = d.width;
-      this.bounds.height = d.height;
-      this.canvas.width = d.width;
-      this.canvas.height = d.height;
-      this.world.player.reposition(this.bounds.width / 2, CONE_Y);
-      this.customers.layout(this.bounds);
-      this.world.shop.layout(this.bounds.width);
-      // Reassigning canvas.width wipes the backing store to transparent, and
-      // the next rAF paint may be a frame away — long enough to flash the dark
-      // page background ("black frame" on mobile URL-bar / fullscreen changes).
-      // Repaint synchronously so there is never an unpainted composite.
-      drawFrame(this.ctx, this);
-    }
-    const r = fitRect(window.innerWidth, window.innerHeight, this.bounds.width, this.bounds.height);
-    this.stage.style.left = `${r.left}px`;
-    this.stage.style.top = `${r.top}px`;
-    this.stage.style.width = `${r.width}px`;
-    this.stage.style.height = `${r.height}px`;
-    // Drop the cached #stage rect; the next pointer event re-reads it lazily
-    // (after this layout change has applied).
-    this._stageRect = null;
   }
 
   /** @param {boolean} [forceTutorial] play the tutorial regardless of the flag (How to Play) */

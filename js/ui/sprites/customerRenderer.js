@@ -64,18 +64,54 @@ export function drawFace(ctx, customer, cx, faceY, { patience, servable, pausePa
   faceSheet.draw(ctx, customer.character || '', faceIdx, cx, faceY, FACE_SCALE);
 }
 
-// A head-SHAPED drop shadow: the face sprite is drawn far off-canvas and the cone's
-// shadow is offset back in (the effects/glow.js trick — cheaper than a per-frame
-// filter), so only the head's own tinted, lightly-blurred silhouette lands at the
-// customer — not a disc. The silhouette is the same for every mood, so use DEFAULT.
-const SHADOW_OFF = 4096;                 // park the real sprite this far left (off-screen)
+// === Baked head-shaped drop shadow ===========================================
+const SHADOW_OFF = 4096;                 // park the real sprite this far left while baking
 const SHADOW_DX  = FACE_SIZE * 0.05;     // shadow cast slightly to the side …
 const SHADOW_DY  = FACE_SIZE * 0.13;     // … and down, so it peeks out below the head
 const SHADOW_BLUR = 2;                   // crisp, not a soft blob
+const SHADOW_PAD  = 16;                  // offscreen margin so the blur isn't clipped
+
+/** @type {Map<string, { canvas: HTMLCanvasElement, dx: number, dy: number }>} */
+const _shadowCache = new Map();
+let _shadowTint = '';
+
+/**
+ * Bake one character's blurred, tinted head silhouette into an offscreen canvas at
+ * FULL opacity (the draw applies the real alpha). Same off-canvas shadow-offset
+ * trick as the old live path, run once. The silhouette is centered in the canvas;
+ * dx/dy then blit it so the face anchor maps back to (cx, faceY). Returns null if
+ * the sheet image isn't loaded yet (caller skips and retries next frame).
+ * @param {string} character @param {string} tint  "r, g, b"
+ * @returns {{ canvas: HTMLCanvasElement, dx: number, dy: number } | null}
+ */
+function bakeFaceShadow(character, tint) {
+  const dw = faceSheet.frameW * FACE_SCALE, dh = faceSheet.frameH * FACE_SCALE;
+  const W = Math.ceil(dw) + SHADOW_PAD * 2;
+  const H = Math.ceil(dh) + SHADOW_PAD * 2;
+  const f = faceSheet.frame(character, FACE.DEFAULT);
+  const offX = (f && f.offset ? f.offset.x : 0) * FACE_SCALE;
+  const offY = (f && f.offset ? f.offset.y : 0) * FACE_SCALE;
+  // Anchor placed so the silhouette (sprite center + shadow offset) lands at the
+  // canvas center, whatever the frame offset is.
+  const ax = W / 2 - offX - SHADOW_DX;
+  const ay = H / 2 - offY - SHADOW_DY;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const g = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
+  g.shadowColor = `rgba(${tint}, 1)`;
+  g.shadowBlur = SHADOW_BLUR;
+  g.shadowOffsetX = SHADOW_OFF + SHADOW_DX;
+  g.shadowOffsetY = SHADOW_DY;
+  if (!faceSheet.draw(g, character, FACE.DEFAULT, ax - SHADOW_OFF, ay, FACE_SCALE)) return null;
+  return { canvas, dx: -ax, dy: -ay };
+}
 
 /**
  * Draw a customer's grounding drop shadow (head-shaped). Drawn before the face so the
- * head sits on top of it.
+ * head sits on top of it. Blits a baked silhouette (see bakeFaceShadow); `alpha` is
+ * applied here so a fade never triggers a re-bake.
  * @param {CanvasRenderingContext2D} ctx
  * @param {import('../../types.js').Customer} customer
  * @param {number} cx @param {number} faceY
@@ -83,11 +119,16 @@ const SHADOW_BLUR = 2;                   // crisp, not a soft blob
  * @param {number} [alpha]
  */
 export function drawFaceShadow(ctx, customer, cx, faceY, tint, alpha = 0.38) {
+  if (tint !== _shadowTint) { _shadowCache.clear(); _shadowTint = tint; }
+  const character = customer.character || '';
+  let stamp = _shadowCache.get(character);
+  if (!stamp) {
+    stamp = bakeFaceShadow(character, tint);
+    if (!stamp) return;            // sheet not loaded yet — skip (the face is hidden too)
+    _shadowCache.set(character, stamp);
+  }
   ctx.save();
-  ctx.shadowColor = `rgba(${tint}, ${alpha})`;
-  ctx.shadowBlur = SHADOW_BLUR;
-  ctx.shadowOffsetX = SHADOW_OFF + SHADOW_DX;
-  ctx.shadowOffsetY = SHADOW_DY;
-  faceSheet.draw(ctx, customer.character || '', FACE.DEFAULT, cx - SHADOW_OFF, faceY, FACE_SCALE);
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(stamp.canvas, cx + stamp.dx, faceY + stamp.dy);
   ctx.restore();
 }
