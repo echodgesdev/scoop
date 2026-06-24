@@ -1,14 +1,9 @@
 // @ts-check
 import {
   COLOR_KEYS,
-  SCOOP_RADIUS,
-  SCOOP_HALF_H,
-  SCOOP_FALL_MIN,
-  SCOOP_FALL_RANGE,
-  UPCOMING_COUNT,
-  SPAWN_DEMAND_BIAS,
-  MAX_LIVE_SCOOPS,
-  SCOOP_DISSOLVE_S
+  SCOOP,
+  TRAY,
+  WAVES
 } from './config.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
@@ -37,7 +32,7 @@ export class ScoopField {
     this.upcoming = [];
     /**
      * Demand source: returns the net colors waiting customers still need
-     * (after subtracting tray). With probability SPAWN_DEMAND_BIAS, the next
+     * (after subtracting tray). With probability WAVES.SPAWN_DEMAND_BIAS, the next
      * spawn picks from this multi-set instead of uniform random — supply
      * tilts toward what the player actually needs.
      * @type {() => ScoopColor[]}
@@ -46,10 +41,10 @@ export class ScoopField {
     // Probability a spawn is biased toward demand. Seeded from the tuning
     // constant but overridable live via the debug panel — lowering it is the
     // main "make the tray bind" scarcity knob. Persists across reset().
-    this.demandBias = SPAWN_DEMAND_BIAS;
+    this.demandBias = WAVES.SPAWN_DEMAND_BIAS;
     // Hard cap on simultaneously-falling scoops; live-overridable via the debug
     // panel. Persists across reset().
-    this.maxLive = MAX_LIVE_SCOOPS;
+    this.maxLive = SCOOP.MAX_LIVE;
     // Fall-speed multiplier on top of the wave ramp — the live "how fast do
     // scoops arrive" knob (debug slider). 1 = the tuned base. Persists across
     // reset().
@@ -105,9 +100,9 @@ export class ScoopField {
     /** @type {Scoop} */
     const s = {
       x,
-      y: -SCOOP_RADIUS,
-      prevY: -SCOOP_RADIUS,
-      vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * speedMult,
+      y: -SCOOP.RADIUS,
+      prevY: -SCOOP.RADIUS,
+      vy: (SCOOP.FALL_MIN + Math.random() * SCOOP.FALL_RANGE) * speedMult,
       speedMult,
       color
     };
@@ -162,7 +157,7 @@ export class ScoopField {
       if (s.dissolve !== undefined) {
         s.dissolve += dt;
         s.y += s.vy * dt * DISSOLVE_DRIFT_MULT;
-        if (s.dissolve >= SCOOP_DISSOLVE_S) this.scoops.splice(i, 1);
+        if (s.dissolve >= SCOOP.DISSOLVE_S) this.scoops.splice(i, 1);
         continue;
       }
 
@@ -186,7 +181,7 @@ export class ScoopField {
   }
 
   _refill() {
-    while (this.upcoming.length < UPCOMING_COUNT) this.upcoming.push(this._pickColor());
+    while (this.upcoming.length < TRAY.UPCOMING_COUNT) this.upcoming.push(this._pickColor());
   }
 
   /**
@@ -202,9 +197,9 @@ export class ScoopField {
     const speedMult = fallMult * this.fallScale;
     this.scoops.push({
       x: Math.random() * (bounds.width - 80) + 40,
-      y: -SCOOP_RADIUS,
-      prevY: -SCOOP_RADIUS,
-      vy: (SCOOP_FALL_MIN + Math.random() * SCOOP_FALL_RANGE) * speedMult,
+      y: -SCOOP.RADIUS,
+      prevY: -SCOOP.RADIUS,
+      vy: (SCOOP.FALL_MIN + Math.random() * SCOOP.FALL_RANGE) * speedMult,
       speedMult,
       color
     });
@@ -220,8 +215,8 @@ export function isCaught(scoop, hitbox) {
   // rect height/2); horizontal is the cone's reach band (hitbox.halfW already
   // folds in the body's half-width). For a circle body these are equal.
   const verticalOverlap =
-    scoop.y + SCOOP_HALF_H >= hitbox.y - hitbox.r &&
-    scoop.y - SCOOP_HALF_H <= hitbox.y + hitbox.r;
+    scoop.y + SCOOP.HALF_H >= hitbox.y - hitbox.r &&
+    scoop.y - SCOOP.HALF_H <= hitbox.y + hitbox.r;
   const horizontalOverlap = Math.abs(scoop.x - hitbox.x) < hitbox.halfW;
   return verticalOverlap && horizontalOverlap;
 }

@@ -158,17 +158,6 @@ export const HANDOFF_DURATION_S = 0.32;
 
 // === Served-scoop flight =====================================================
 // Time a scoop spends in flight from the cone to the customer's mini-cone.
+// (The view-only flight ARC and the mini-cone proportions now live at the top of
+// ui/view/customerConeView.js — they're presentation, not balance.)
 export const SERVED_FLIGHT_S = 0.32;
-export const SERVED_FLIGHT_ARC = 50;   // peak upward bump along the arc
-
-// Mini-cone proportions (customer's held cone, fills with served scoops).
-// Scaled up alongside the larger customer faces so the completion read stays
-// proportional to the customer (and legible from the now-taller ground band).
-export const MINI_SCOOP_RADIUS = 19;
-export const MINI_CONE_OFFSET_X = 58;       // right of the customer face
-export const MINI_CONE_H = 50;              // bowl-seat height: how far above the tip the bottom scoop sits
-// Mini-cone tip relative to the customer's *face center* — so the held
-// cone tracks the customer however they're positioned (in/out of sand).
-// Scaled with the larger face; puts the cone tip just below the chin, with
-// the scoop-stack growing up beside the face.
-export const MINI_CONE_FACE_OFFSET_PX = 46;

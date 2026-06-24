@@ -1,5 +1,5 @@
 // @ts-check
-import { CONE_HEIGHT } from './config.js';
+import { CONE } from './config.js';
 import { glowRoundRect } from '../ui/effects/glow.js';
 
 /** @typedef {import('../game.js').Game} Game */
@@ -55,7 +55,7 @@ export class TutorialBase {
     const px = world.player.x;
     const stack = world.player.stack;
     const coneTop = world.player.coneTopY();
-    const underCone = world.player.y + CONE_HEIGHT / 2 + 36;
+    const underCone = world.player.y + CONE.HEIGHT / 2 + 36;
     const touch = this._touch(game);
 
     if (stack.length === 0) return { text: 'Catch a falling scoop!', x: px, y: coneTop - 28, point: 'down' };

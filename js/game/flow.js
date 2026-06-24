@@ -16,7 +16,7 @@
 // All timed steps run on a Scheduler, so a single cancelAll() on teardown
 // (reset / goHome / game over) stops any chain mid-flight — no per-step "am I
 // still in this phase?" guards, and no orphan timer landing in the next run.
-import { COMBO_CASHOUT_PER, CONE_Y } from './config.js';
+import { SCORING, CONE } from './config.js';
 import { coinDwellMs } from '../ui/hud/coinCarousel.js';
 import { PICKUP_RING_COLOR } from '../ui/powerupVisuals.js';
 import { Scheduler } from '../engine/scheduler.js';
@@ -210,7 +210,7 @@ export class GameFlow {
     // Combo bank.
     const combo = g.world.shop.bankCombo();
     if (combo > 0) {
-      const gain = combo * COMBO_CASHOUT_PER;
+      const gain = combo * SCORING.COMBO_CASHOUT_PER;
       g.world.shop.addScore(gain);
       const c = g.hud.gaugeCenter() || { x: g.bounds.width / 2, y: g.bounds.height * 0.3 };
       g.effects.popText(c.x, c.y, `Combo ×${combo} → +${gain}`, { color: '#ff6fa3', size: 30, life: 1.3 });
@@ -292,7 +292,7 @@ export class GameFlow {
     g.world.waves.endCelebration();
     // Reset the cone to center for the fresh day — it snaps back during the night
     // sweep so every day opens from the middle.
-    g.world.player.reposition(g.bounds.width / 2, CONE_Y);
+    g.world.player.reposition(g.bounds.width / 2, CONE.Y);
     // Stretch the sweep so the coin carousel plays out AND the challenges still get a
     // beat before the dissolve. Every coin is shown; the per-coin dwell shortens past a
     // ceiling (coinDwellMs), so the night scales with the list then levels off rather

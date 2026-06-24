@@ -8,7 +8,7 @@
 // drawOcean() is a thin orchestrator: it derives this frame's geometry (the
 // `Surf`) and tint, then calls one private pass per layer (wet sand → water body
 // → crest lines → foam band → foam bubbles), back to front.
-import { GROUND_Y } from '../../game/config.js';
+import { LAYOUT } from '../../game/config.js';
 import { mixHex, scaleHex, luminance, hexWithAlpha } from '../colorUtils.js';
 
 // Base colors, tinted toward the time of day in oceanTint(). The sea is a
@@ -46,11 +46,11 @@ let _waterCache = { key: '', grad: null };
  * @param {number} time  free-running seconds, drives the animation
  */
 export function drawOcean(ctx, bounds, state, time) {
-  const band = bounds.height - GROUND_Y;          // sand-band height
+  const band = bounds.height - LAYOUT.GROUND_Y;          // sand-band height
   if (band <= 4) return;
 
   // Waterline lives in the LOWER part of the sand band (below the customers).
-  const restY = GROUND_Y + band * 0.66;           // tide-out (low)
+  const restY = LAYOUT.GROUND_Y + band * 0.66;           // tide-out (low)
   const tideTravel = band * 0.15;                  // how far the tide can climb
   const tideY = tideLineY(time, restY, tideTravel);
 

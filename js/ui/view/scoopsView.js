@@ -1,5 +1,5 @@
 // @ts-check
-import { SCOOP_RADIUS, SCOOP_DISSOLVE_S } from '../../game/config.js';
+import { SCOOP } from '../../game/config.js';
 import { drawFallingScoop, drawDissolveSprite } from '../sprites/scoopRenderer.js';
 
 /** @typedef {import('../../game/scoops.js').ScoopField} ScoopField */
@@ -21,7 +21,7 @@ export function drawField(ctx, field, rainbow = false, alpha = 1) {
     const y = s.prevY + (s.y - s.prevY) * alpha;
     if (s.dissolve === undefined) {
       // Live scoop: the look (and any speed-flair) follows its fall speed.
-      drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color, s.speedMult);
+      drawFallingScoop(ctx, s.x, y, SCOOP.RADIUS, rainbow ? 'rainbow' : s.color, s.speedMult);
     } else {
       drawDissolvingScoop(ctx, /** @type {Scoop & { dissolve: number }} */ (s), y, rainbow);
     }
@@ -33,15 +33,15 @@ export function drawField(ctx, field, rainbow = false, alpha = 1) {
  * while a translucent outline swells slightly then collapses back down — a slow
  * "pop" that fades to nothing rather than a hard sprite swap.
  * @param {CanvasRenderingContext2D} ctx
- * @param {Scoop & { dissolve: number }} s a scoop mid-dissolve (dissolve in 0..SCOOP_DISSOLVE_S)
+ * @param {Scoop & { dissolve: number }} s a scoop mid-dissolve (dissolve in 0..SCOOP.DISSOLVE_S)
  * @param {number} y interpolated draw y
  * @param {boolean} rainbow
  */
 function drawDissolvingScoop(ctx, s, y, rainbow) {
-  const p = Math.min(1, s.dissolve / SCOOP_DISSOLVE_S);
+  const p = Math.min(1, s.dissolve / SCOOP.DISSOLVE_S);
   ctx.save();
   ctx.globalAlpha = 1 - p;                       // scoop fades out
-  drawFallingScoop(ctx, s.x, y, SCOOP_RADIUS, rainbow ? 'rainbow' : s.color);
+  drawFallingScoop(ctx, s.x, y, SCOOP.RADIUS, rainbow ? 'rainbow' : s.color);
   ctx.restore();
   ctx.save();
   ctx.globalAlpha = 0.4 * Math.sin(p * Math.PI); // outline fades in then out, max 0.4
@@ -53,6 +53,6 @@ function drawDissolvingScoop(ctx, s, y, rainbow) {
   ctx.translate(s.x, y);
   ctx.scale(grow, grow);
   ctx.translate(-s.x, -y);
-  drawDissolveSprite(ctx, s.x, y, SCOOP_RADIUS);
+  drawDissolveSprite(ctx, s.x, y, SCOOP.RADIUS);
   ctx.restore();
 }

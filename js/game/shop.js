@@ -1,11 +1,10 @@
 // @ts-check
 import {
   COLORS,
-  SLOT_COUNT,
-  PATTERN_TIME_START,
-  COMBO_DECAY_S,
-  PARTIAL_SERVE_EXTEND_S,
-  SERVED_FLIGHT_S
+  TRAY,
+  WAVES,
+  SCORING,
+  SERVE
 } from './config.js';
 import { pickCustomer, CHARACTERS } from './customers.js';
 
@@ -74,7 +73,7 @@ export class Shop {
     // Combo scoring on/off — World drives it from `tutorialActive` so the
     // tutorial scores every serve flat (combo stays 0, no multiplier, HUD hidden).
     this.comboEnabled = true;
-    this.orderTime = PATTERN_TIME_START;
+    this.orderTime = WAVES.PATTERN_TIME_START;
     this.width = 0;
     this.respawnTimer = 0;
     this._id = 0;
@@ -186,11 +185,11 @@ export class Shop {
   get list() { return this.customers; }
 
   get comboFraction() {
-    return COMBO_DECAY_S > 0 ? Math.max(0, this.comboTimer / COMBO_DECAY_S) : 0;
+    return SCORING.COMBO_DECAY_S > 0 ? Math.max(0, this.comboTimer / SCORING.COMBO_DECAY_S) : 0;
   }
 
   refreshCombo() {
-    if (this.combo > 0) this.comboTimer = COMBO_DECAY_S;
+    if (this.combo > 0) this.comboTimer = SCORING.COMBO_DECAY_S;
   }
 
   /**
@@ -224,7 +223,7 @@ export class Shop {
 
   /** @param {number} slot */
   slotX(slot) {
-    return (slot + 0.5) / SLOT_COUNT * this.width;
+    return (slot + 0.5) / TRAY.SLOT_COUNT * this.width;
   }
 
   _freeSlots() {
@@ -233,7 +232,7 @@ export class Shop {
       if (c.state !== STATE.LEAVING) taken.add(c.slot);
     }
     const free = [];
-    for (let s = 0; s < SLOT_COUNT; s++) if (!taken.has(s)) free.push(s);
+    for (let s = 0; s < TRAY.SLOT_COUNT; s++) if (!taken.has(s)) free.push(s);
     return free;
   }
 
@@ -329,7 +328,7 @@ export class Shop {
       // Tick each in-flight served scoop toward 1; landed scoops stop at 1.
       for (const s of c.order.served) {
         s.prevT = s.t;
-        if (s.t < 1) s.t = Math.min(1, s.t + dt / SERVED_FLIGHT_S);
+        if (s.t < 1) s.t = Math.min(1, s.t + dt / SERVE.SERVED_FLIGHT_S);
       }
 
 
@@ -517,7 +516,7 @@ export class Shop {
 
     if (c.order.colors.length > 0) {
       // Partial — buy patience back so long orders don't expire mid-service.
-      c.order.timeLeft = Math.min(c.order.duration, c.order.timeLeft + PARTIAL_SERVE_EXTEND_S);
+      c.order.timeLeft = Math.min(c.order.duration, c.order.timeLeft + SERVE.PARTIAL_SERVE_EXTEND_S);
       return { accepted: true, complete: false };
     }
     return { accepted: true, complete: true, ...this._completeOrder(c) };
@@ -533,7 +532,7 @@ export class Shop {
     // cheese a score — combo stays 0 and the combo HUD stays hidden.
     if (this.comboEnabled) {
       this.combo += c.order.weight || 1;
-      this.comboTimer = COMBO_DECAY_S;
+      this.comboTimer = SCORING.COMBO_DECAY_S;
       this.bestCombo = Math.max(this.bestCombo, this.combo);
       this.dayBestCombo = Math.max(this.dayBestCombo, this.combo);
     }

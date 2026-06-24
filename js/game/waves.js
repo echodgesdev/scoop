@@ -1,18 +1,6 @@
 // @ts-check
 import {
-  PHASE_ACTIVE,
-  PHASE_GOAL,
-  PHASES_PER_WAVE,
-  WAVE_CELEBRATE_S,
-  WAVE_RAMP,
-  SPAWN_INTERVAL_START,
-  SPAWN_INTERVAL_END,
-  FALL_SPEED_MULT_END,
-  PATTERN_TIME_START,
-  PATTERN_TIME_END,
-  ORDER_SIZE_WEIGHTS,
-  DISCOVERY_BIAS_START,
-  DISCOVERY_BIAS_END,
+  WAVES,
   lerp,
   pickWeighted
 } from './config.js';
@@ -73,9 +61,9 @@ export class Waves {
     // than `number | undefined` — reset() is called below but TS doesn't trace it.
     this.wave = 0;            // 0 = the tutorial wave; campaign proper is 1+ (absolute, climbs)
     this._dayAnchor = -1;     // day = wave − anchor; fixed at reset so the day number climbs forever
-    this.phase = 1;           // 1-based, 1..PHASES_PER_WAVE
+    this.phase = 1;           // 1-based, 1..WAVES.PHASES_PER_WAVE
     this.servedInPhase = 0;
-    this.completedPhases = 0; // 0..PHASES_PER_WAVE — phases cleared this wave
+    this.completedPhases = 0; // 0..WAVES.PHASES_PER_WAVE — phases cleared this wave
     this.celebrating = 0;     // seconds left in the wave-up freeze
     /** @type {Set<ScoopColor>} Colors served in Wave 0 (no-repeat spawn filter). */
     this.servedColors = new Set();
@@ -87,9 +75,9 @@ export class Waves {
   reset(startWave = 0) {
     this.wave = startWave;       // 0 = the tutorial wave; campaign proper is 1+
     this._dayAnchor = startWave - 1;  // day = wave − anchor; fixed for the whole run (no weekly reset)
-    this.phase = 1;              // 1-based, 1..PHASES_PER_WAVE
+    this.phase = 1;              // 1-based, 1..WAVES.PHASES_PER_WAVE
     this.servedInPhase = 0;
-    this.completedPhases = 0;    // 0..PHASES_PER_WAVE — phases cleared this wave
+    this.completedPhases = 0;    // 0..WAVES.PHASES_PER_WAVE — phases cleared this wave
     this.celebrating = 0;        // seconds left in the wave-up freeze
     // Wave 0 only: total serves toward WAVE0_GOAL (drives the day meter + day
     // end), and the set of colors served so far (the no-repeat spawn filter).
@@ -107,8 +95,8 @@ export class Waves {
     this.completedPhases = 0;
   }
 
-  get activeCount()    { return PHASE_ACTIVE[this.phase - 1]; }
-  get phaseGoal()      { return PHASE_GOAL[this.phase - 1]; }
+  get activeCount()    { return WAVES.PHASE_ACTIVE[this.phase - 1]; }
+  get phaseGoal()      { return WAVES.PHASE_GOAL[this.phase - 1]; }
   get phaseFraction()  {
     // Keep the ring full through the celebration so it doesn't snap to 0.
     if (this.celebrating > 0) return 1;
@@ -142,7 +130,7 @@ export class Waves {
   get waveFraction() {
     if (this.celebrating > 0) return 1;
     if (this.wave === 0) return Math.min(1, this.servedCount / WAVE0_GOAL);
-    return Math.min(1, (this.completedPhases + this.phaseFraction) / PHASES_PER_WAVE);
+    return Math.min(1, (this.completedPhases + this.phaseFraction) / WAVES.PHASES_PER_WAVE);
   }
 
   /**
@@ -164,25 +152,25 @@ export class Waves {
       this.phase = 1;
       this.servedInPhase = 0;
       this.completedPhases = 0;
-      this.celebrating = WAVE_CELEBRATE_S;
+      this.celebrating = WAVES.WAVE_CELEBRATE_S;
       return WAVE_EVENT.WAVE_UP;
     }
 
     this.servedInPhase += 1;
     if (this.servedInPhase < this.phaseGoal) return null;
 
-    if (this.phase < PHASES_PER_WAVE) {
+    if (this.phase < WAVES.PHASES_PER_WAVE) {
       this.completedPhases = this.phase;   // bank credit for the phase we just cleared
       this.phase += 1;
       this.servedInPhase = 0;
       return WAVE_EVENT.PHASE_UP;
     }
     // Wave cleared — celebrate, then reset to phase 1 of the next wave.
-    this.completedPhases = PHASES_PER_WAVE;
+    this.completedPhases = WAVES.PHASES_PER_WAVE;
     this.wave += 1;
     this.phase = 1;
     this.servedInPhase = 0;
-    this.celebrating = WAVE_CELEBRATE_S;
+    this.celebrating = WAVES.WAVE_CELEBRATE_S;
     return WAVE_EVENT.WAVE_UP;
   }
 
@@ -210,11 +198,11 @@ export class Waves {
    */
   jumpToFraction(fraction) {
     const f = Math.max(0, Math.min(0.999, fraction));
-    const phaseIdx = Math.min(PHASES_PER_WAVE - 1, Math.floor(f * PHASES_PER_WAVE));
-    const remaining = f * PHASES_PER_WAVE - phaseIdx;
+    const phaseIdx = Math.min(WAVES.PHASES_PER_WAVE - 1, Math.floor(f * WAVES.PHASES_PER_WAVE));
+    const remaining = f * WAVES.PHASES_PER_WAVE - phaseIdx;
     this.completedPhases = phaseIdx;
     this.phase = phaseIdx + 1;
-    this.servedInPhase = Math.floor(remaining * PHASE_GOAL[phaseIdx]);
+    this.servedInPhase = Math.floor(remaining * WAVES.PHASE_GOAL[phaseIdx]);
     this.celebrating = 0;
   }
 
@@ -232,10 +220,10 @@ export class Waves {
   /**
    * Roll the next customer order. Two-stage, so the order-SIZE mix is controlled
    * independently of how many recipes of each size exist:
-   *   1. Roll a size by the per-wave ORDER_SIZE_WEIGHTS, restricted to the sizes
+   *   1. Roll a size by the per-wave WAVES.ORDER_SIZE_WEIGHTS, restricted to the sizes
    *      actually present in this wave's (section-gated) pool, then renormalized.
    *   2. Among recipes of that size, apply the wave-scaled discovery bias —
-   *      with probability DISCOVERY_BIAS_*(wave), prefer one the player has not
+   *      with probability WAVES.DISCOVERY_BIAS_*(wave), prefer one the player has not
    *      yet discovered — then pick uniformly. Each recipe carries its own point
    *      value and combo weight (from its group).
    * @returns {{ recipe: string, colors: ScoopColor[], value: number, weight: number }}
@@ -272,7 +260,7 @@ export class Waves {
       else bySize.set(r.size, [r]);
     }
     const sizes = [...bySize.keys()];
-    const weights = ORDER_SIZE_WEIGHTS[Math.min(day, ORDER_SIZE_WEIGHTS.length - 1)] || {};
+    const weights = WAVES.ORDER_SIZE_WEIGHTS[Math.min(day, WAVES.ORDER_SIZE_WEIGHTS.length - 1)] || {};
     const sizePool = sizes.map(s => ({ size: s, weight: Math.max(0, weights[s] != null ? weights[s] : 1) }));
     const pickedSize = pickWeighted(sizePool);
     const chosenSize = pickedSize ? pickedSize.size : sizes[0];
@@ -281,7 +269,7 @@ export class Waves {
     // 2. Discovery bias (waves 1+): bigger waves favor surfacing recipes the
     //    player hasn't made yet, so the catalog keeps opening up.
     if (wave > 0) {
-      const bias = lerp(DISCOVERY_BIAS_START, DISCOVERY_BIAS_END, Math.min(1, (day - 1) / WAVE_RAMP));
+      const bias = lerp(WAVES.DISCOVERY_BIAS_START, WAVES.DISCOVERY_BIAS_END, Math.min(1, (day - 1) / WAVES.WAVE_RAMP));
       if (bias > 0 && Math.random() < bias) {
         const undiscovered = candidates.filter(r => !this.isDiscovered(r.id));
         if (undiscovered.length > 0) candidates = undiscovered;
@@ -304,11 +292,11 @@ export class Waves {
    */
   tuning(escalate = true) {
     // Ramp keys off the (capped) difficulty day, so it climbs to Day 7 then holds.
-    const s = escalate ? Math.min(1, (this.difficultyDay - 1) / WAVE_RAMP) : 0;
+    const s = escalate ? Math.min(1, (this.difficultyDay - 1) / WAVES.WAVE_RAMP) : 0;
     return {
-      spawnInterval: lerp(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, s),
-      fallMult:      lerp(1, FALL_SPEED_MULT_END, s),
-      patience:      lerp(PATTERN_TIME_START, PATTERN_TIME_END, s)
+      spawnInterval: lerp(WAVES.SPAWN_INTERVAL_START, WAVES.SPAWN_INTERVAL_END, s),
+      fallMult:      lerp(1, WAVES.FALL_SPEED_MULT_END, s),
+      patience:      lerp(WAVES.PATTERN_TIME_START, WAVES.PATTERN_TIME_END, s)
     };
   }
 }

@@ -14,9 +14,9 @@
 // each frame. The sim (game/world.js), the flow state machine + scripted beats
 // (game/flow.js), drawing (ui/renderer.js), and reactions (reactions.js) are delegated.
 import {
-  MAX_HEALTH,
-  SPAWN_DEMAND_BIAS,
-  CONE_Y
+  HEALTH,
+  WAVES,
+  CONE
 } from './game/config.js';
 import { Customers } from './ui/customers.js';
 import { Hud } from './ui/hud/hud.js';
@@ -196,7 +196,7 @@ export class Game {
         : this.world.waves.tuning().spawnInterval,
       onFallSpeed: m => this.world.field.setFallScale(m),
       getFallSpeed: () => this.world.field.fallScale,
-      // Combo-breaker threshold is fixed (= max combo, COMBO_BREAKER_THRESHOLD);
+      // Combo-breaker threshold is fixed (= max combo, SCORING.COMBO_BREAKER_THRESHOLD);
       // only the on/off toggle remains debug-tunable.
       onComboBreakerToggle: on => { this.world.comboBreakerEnabled = on; this._syncComboHud(); },
       getComboBreakerEnabled: () => this.world.comboBreakerEnabled
@@ -258,7 +258,7 @@ export class Game {
    * also gives the title overlay a painted dawn beach to sit over before start().
    */
   _relayout() {
-    this.world.player.reposition(this.bounds.width / 2, CONE_Y);
+    this.world.player.reposition(this.bounds.width / 2, CONE.Y);
     this.customers.layout(this.bounds);
     this.world.shop.layout(this.bounds.width);
     drawFrame(this.ctx, this);
@@ -275,7 +275,7 @@ export class Game {
     this.world.waves.jumpToWave(n);
     this.world.shop.setOrderTime(this.world.waves.tuning().patience);
     // jumpToWave floors to wave ≥ 1, so leave the Wave 0 bias behind.
-    this.world.field.setDemandBias(SPAWN_DEMAND_BIAS);
+    this.world.field.setDemandBias(WAVES.SPAWN_DEMAND_BIAS);
   }
 
   /**
@@ -401,7 +401,7 @@ export class Game {
    */
   _syncHud() {
     this.hud.setScore(this.world.shop.score);
-    this.hud.setHealth(this.world.health / MAX_HEALTH);
+    this.hud.setHealth(this.world.health / HEALTH.MAX);
     // Feed the current day so the (dormant) "Complete the Week" goal can track if
     // it's ever reinstated. Harmless no-op otherwise.
     this.world.challenges.setDayInWeek(this.world.waves.day);

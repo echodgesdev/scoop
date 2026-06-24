@@ -7,7 +7,7 @@
 // scoop — tune those two if the cone reads too big/small or scoops don't nest.
 import { SpriteSheet } from '../../engine/spriteSheet.js';
 import CONE_SPRITE from './coneSprite.js';
-import { CONE_HEIGHT, SCOOP_RADIUS } from '../../game/config.js';
+import { CONE, SCOOP } from '../../game/config.js';
 
 // Which sheet frame is which layer. Lives here (the binding), not in the def, so
 // the def stays pure tool-generated data.
@@ -19,10 +19,10 @@ const CONE_SPRITE_W = 168;                            // on-screen cone width (p
 const CONE_SPRITE_DY = -14;                           // sprite-center offset from player.y
 
 // Bowl seat: how far BELOW the bottom scoop's center the cone-sprite center sits
-// (at scoopScale 1). Derived from the layout — CONE_SPRITE_DY + CONE_HEIGHT/2 +
+// (at scoopScale 1). Derived from the layout — CONE_SPRITE_DY + CONE.HEIGHT/2 +
 // the bottom scoop's 0.2r nudge (see scoopPosition) — so any caller can seat a
 // cone of any size under a stack and nest scoops exactly like the player's cone.
-const CONE_BOWL_SEAT = CONE_HEIGHT / 2 + CONE_SPRITE_DY + SCOOP_RADIUS * 0.2;
+const CONE_BOWL_SEAT = CONE.HEIGHT / 2 + CONE_SPRITE_DY + SCOOP.RADIUS * 0.2;
 
 /**
  * Blit one cone-sheet frame (BACK or FRONT) as a square of side `w` centered at

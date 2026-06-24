@@ -1,5 +1,5 @@
 // @ts-check
-import { GROUND_Y } from './config.js';
+import { LAYOUT } from './config.js';
 
 /**
  * Day cycle driven by wave-gauge progress (0..1). Five keyframes — dawn,
@@ -95,7 +95,7 @@ export function nightCycleState(fraction, bounds) {
   const A = NIGHT_KEYFRAMES[i];
   const B = NIGHT_KEYFRAMES[i + 1];
 
-  const baseY     = GROUND_Y;
+  const baseY     = LAYOUT.GROUND_Y;
   const peakY     = bounds.height * 0.08;
   const arcHeight = baseY - peakY;
 
@@ -136,7 +136,7 @@ export function dayCycleState(fraction, bounds) {
 
   // Sun arc: horizon pinned to groundY so sunrise/sunset emerge from behind
   // the sand. Peak sits 10% from the top so it doesn't clip on small screens.
-  const baseY     = GROUND_Y;
+  const baseY     = LAYOUT.GROUND_Y;
   const peakY     = bounds.height * 0.10;
   const arcHeight = baseY - peakY;
   const sunX = lerp(bounds.width * 0.10, bounds.width * 0.90, t);

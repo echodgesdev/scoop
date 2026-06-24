@@ -1,16 +1,8 @@
 // @ts-check
 import {
-  CONE_WIDTH,
-  CONE_HEIGHT,
-  CONE_MAX_SPEED,
-  CONE_ACCEL,
-  CONE_FRICTION,
-  SCOOP_RADIUS,
-  SCOOP_HALF_W,
-  SCOOP_HALF_H,
-  SCOOP_SPACING,
-  HANDOFF_REACH,
-  HANDOFF_DURATION_S
+  CONE,
+  SCOOP,
+  SERVE
 } from './config.js';
 
 /** @typedef {import('../types.js').ScoopColor} ScoopColor */
@@ -76,10 +68,10 @@ export class Player {
     this._sloshHead = 0;
 
     // Brief lean toward a customer during a serve. Set by triggerHandoff();
-    // peaks halfway through HANDOFF_DURATION_S and snaps back to 0.
+    // peaks halfway through SERVE.HANDOFF_DURATION_S and snaps back to 0.
     this.handoffDx = 0;
     this.handoffDy = 0;
-    this.handoffT = HANDOFF_DURATION_S; // start "done" — no lean at game start
+    this.handoffT = SERVE.HANDOFF_DURATION_S; // start "done" — no lean at game start
 
     // Hard movement freeze (tutorial intro). Doesn't tick down; the game clears
     // it when control is handed over.
@@ -106,7 +98,7 @@ export class Player {
 
   /**
    * Lean briefly toward (targetX, targetY) — a "reaching to hand off" gesture.
-   * Direction is normalized so the lean depth (HANDOFF_REACH) is consistent
+   * Direction is normalized so the lean depth (SERVE.HANDOFF_REACH) is consistent
    * regardless of distance.
    * @param {number} targetX
    * @param {number} targetY
@@ -115,8 +107,8 @@ export class Player {
     const dx = targetX - this.x;
     const dy = targetY - this.y;
     const dist = Math.hypot(dx, dy) || 1;
-    this.handoffDx = (dx / dist) * HANDOFF_REACH;
-    this.handoffDy = (dy / dist) * HANDOFF_REACH;
+    this.handoffDx = (dx / dist) * SERVE.HANDOFF_REACH;
+    this.handoffDy = (dy / dist) * SERVE.HANDOFF_REACH;
     this.handoffT = 0;
   }
 
@@ -176,7 +168,7 @@ export class Player {
     // Always tick passive timers (flash, handoff lean, land squash) so visual
     // decay continues even while frozen.
     if (this.flash > 0) this.flash = Math.max(0, this.flash - dt);
-    if (this.handoffT < HANDOFF_DURATION_S) this.handoffT += dt;
+    if (this.handoffT < SERVE.HANDOFF_DURATION_S) this.handoffT += dt;
     if (this.tossBump > 0) this.tossBump = Math.max(0, this.tossBump - dt);
     for (let i = this.tossed.length - 1; i >= 0; i--) {
       const g = this.tossed[i];
@@ -200,8 +192,8 @@ export class Player {
       return;
     }
 
-    const maxV  = CONE_MAX_SPEED * speedMult;
-    const halfW = CONE_WIDTH / 2;
+    const maxV  = CONE.MAX_SPEED * speedMult;
+    const halfW = CONE.WIDTH / 2;
 
     // Relative touch steering: apply the dragged delta directly (1:1 × gain),
     // then consume it. Uncapped — small thumb travel moves the cone far, which
@@ -213,7 +205,7 @@ export class Player {
       return;
     }
 
-    const accel = CONE_ACCEL * speedMult;
+    const accel = CONE.ACCEL * speedMult;
     const dir = (input.left ? -1 : 0) + (input.right ? 1 : 0);
     if (dir !== 0) {
       // Hold longer -> ramp up toward the speed cap.
@@ -221,7 +213,7 @@ export class Player {
       this.vx = Math.max(-maxV, Math.min(maxV, this.vx));
     } else {
       // Coast to a stop when nothing is held.
-      const drop = CONE_FRICTION * dt;
+      const drop = CONE.FRICTION * dt;
       this.vx = Math.abs(this.vx) <= drop ? 0 : this.vx - Math.sign(this.vx) * drop;
     }
 
@@ -241,30 +233,30 @@ export class Player {
   }
 
   coneTopY() {
-    return this.y - CONE_HEIGHT / 2;
+    return this.y - CONE.HEIGHT / 2;
   }
 
   stackTopY() {
-    return this.coneTopY() - this.stack.length * SCOOP_SPACING;
+    return this.coneTopY() - this.stack.length * SCOOP.SPACING;
   }
 
   /** @param {number} index */
   scoopPosition(index) {
     return {
       x: this.x,
-      y: this.coneTopY() - index * SCOOP_SPACING - SCOOP_RADIUS * 0.2
+      y: this.coneTopY() - index * SCOOP.SPACING - SCOOP.RADIUS * 0.2
     };
   }
 
   catchHitbox() {
     // Catch band follows the scoop body's half-extents (so a rect body isn't
-    // forced into a circle). For a circle body SCOOP_HALF_W/H both equal the
+    // forced into a circle). For a circle body SCOOP.HALF_W/H both equal the
     // radius, so this matches the previous behavior exactly.
     return {
       x: this.x,
       y: this.stackTopY(),
-      r: SCOOP_HALF_H,
-      halfW: CONE_WIDTH / 2 + SCOOP_HALF_W * 0.4
+      r: SCOOP.HALF_H,
+      halfW: CONE.WIDTH / 2 + SCOOP.HALF_W * 0.4
     };
   }
 

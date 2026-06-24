@@ -2,10 +2,7 @@
 import {
   PICKUP_TYPE,
   POWERUP_TYPE,
-  SPEED_DURATION_S,
-  SPEED_MULT_BOOST,
-  PAUSE_DURATION_S,
-  RAINBOW_DURATION_S
+  POWERUPS
 } from './config.js';
 
 /** @typedef {import('../types.js').PickupTypeName} PickupTypeName */
@@ -13,9 +10,9 @@ import {
 
 /** @type {Record<PowerUpTypeName, number>} */
 const DURATIONS = {
-  [POWERUP_TYPE.SPEED]:   SPEED_DURATION_S,
-  [POWERUP_TYPE.PAUSE]:   PAUSE_DURATION_S,
-  [POWERUP_TYPE.RAINBOW]: RAINBOW_DURATION_S
+  [POWERUP_TYPE.SPEED]:   POWERUPS.SPEED_DURATION_S,
+  [POWERUP_TYPE.PAUSE]:   POWERUPS.PAUSE_DURATION_S,
+  [POWERUP_TYPE.RAINBOW]: POWERUPS.RAINBOW_DURATION_S
 };
 
 /**
@@ -68,7 +65,7 @@ export class PowerUps {
     return this.current.t / this.current.duration;
   }
 
-  get speedMultiplier() { return this.active(POWERUP_TYPE.SPEED)   ? SPEED_MULT_BOOST : 1; }
+  get speedMultiplier() { return this.active(POWERUP_TYPE.SPEED)   ? POWERUPS.SPEED_MULT_BOOST : 1; }
   get pauseActive()     { return this.active(POWERUP_TYPE.PAUSE); }
   get rainbowActive()   { return this.active(POWERUP_TYPE.RAINBOW); }
 }

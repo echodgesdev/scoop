@@ -3,7 +3,7 @@
 // over the actors) and the FPS / live-scoop readout. Pure presentation; both
 // self-guard on their game.flags toggle, so renderer.drawFrame calls them
 // unconditionally (hitboxes inside the shake transform; fps screen-fixed).
-import { SCOOP_RADIUS, CUSTOMER_FACE_OFFSET_PX } from '../../game/config.js';
+import { SCOOP, LAYOUT } from '../../game/config.js';
 import { REACH } from '../../game/shop.js';
 
 /** @typedef {import('../../game.js').Game} Game */
@@ -30,7 +30,7 @@ export function drawHitboxes(ctx, game) {
   for (const s of world.field.scoops) {
     if (s.dissolve !== undefined) continue;
     ctx.beginPath();
-    ctx.arc(s.x, s.y, SCOOP_RADIUS, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, SCOOP.RADIUS, 0, Math.PI * 2);
     ctx.stroke();
   }
 
@@ -39,7 +39,7 @@ export function drawHitboxes(ctx, game) {
   ctx.strokeRect(cb.x - cb.halfW, cb.y - cb.r, cb.halfW * 2, cb.r * 2);
 
   // Miss / dissolve line.
-  const missY = game.customers.groundY + SCOOP_RADIUS * 2;
+  const missY = game.customers.groundY + SCOOP.RADIUS * 2;
   ctx.strokeStyle = 'rgba(255,45,45,0.45)';
   ctx.beginPath();
   ctx.moveTo(0, missY);
@@ -49,7 +49,7 @@ export function drawHitboxes(ctx, game) {
   // Customers: face box + serve-reach band (serve test is x-distance only).
   const groundY = game.customers.groundY;
   for (const c of world.shop.list) {
-    const faceY = groundY + CUSTOMER_FACE_OFFSET_PX + c.yOff;
+    const faceY = groundY + LAYOUT.CUSTOMER_FACE_OFFSET_PX + c.yOff;
     ctx.strokeStyle = '#ff2d2d';
     ctx.strokeRect(c.x - 46, faceY - 46, 92, 92);
     ctx.strokeStyle = 'rgba(255,45,45,0.4)';

@@ -1,5 +1,5 @@
 // @ts-check
-import { GROUND_Y } from '../game/config.js';
+import { LAYOUT } from '../game/config.js';
 import { dayCycleState, nightCycleState } from '../game/dayCycle.js';
 import { rgb, scaleHex, hexWithAlpha } from './colorUtils.js';
 import { drawStars } from './view/sceneStarView.js';
@@ -74,7 +74,7 @@ let _haloCache = { key: '', grad: null };
  * rises from behind / sets into the floor.
  */
 function drawSkyAndSun(ctx, bounds, state) {
-  const groundY = GROUND_Y;
+  const groundY = LAYOUT.GROUND_Y;
 
   ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
   ctx.fillRect(0, 0, bounds.width, bounds.height);
@@ -110,7 +110,7 @@ function drawSkyAndSun(ctx, bounds, state) {
  * @param {CanvasRenderingContext2D} ctx
  */
 function drawNightSky(ctx, bounds, state) {
-  const groundY = GROUND_Y;
+  const groundY = LAYOUT.GROUND_Y;
 
   ctx.fillStyle = skyGradient(ctx, groundY, state.skyTop, state.skyBottom);
   ctx.fillRect(0, 0, bounds.width, bounds.height);
@@ -151,7 +151,7 @@ function drawNightSky(ctx, bounds, state) {
  * the floor rather than over it.
  */
 function drawSand(ctx, bounds, state) {
-  const groundY = GROUND_Y;
+  const groundY = LAYOUT.GROUND_Y;
   ctx.fillStyle = state.floor;
   ctx.fillRect(0, groundY, bounds.width, bounds.height - groundY);
 }

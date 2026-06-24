@@ -1,6 +1,6 @@
 // @ts-check
 import { STATE } from '../game/shop.js';
-import { CUSTOMER_FACE_OFFSET_PX, GROUND_Y } from '../game/config.js';
+import { LAYOUT } from '../game/config.js';
 import { drawFace, drawFaceShadow, FACE_SIZE } from './sprites/customerRenderer.js';
 import { drawHeldCone } from './view/customerConeView.js';
 import { drawBubble } from './view/customerBubbleView.js';
@@ -26,7 +26,7 @@ export class Customers {
   }
 
   layout(bounds) {
-    this.groundY = GROUND_Y;
+    this.groundY = LAYOUT.GROUND_Y;
     this.width = bounds.width;
   }
 
@@ -40,8 +40,8 @@ export class Customers {
     const items = customers.map((c, i) => {
       let cx = c.prevX + (c.x - c.prevX) * alpha;
       const yOff = c.prevYOff + (c.yOff - c.prevYOff) * alpha;
-      // Face center sits CUSTOMER_FACE_OFFSET_PX from the sand top.
-      const faceY = this.groundY + CUSTOMER_FACE_OFFSET_PX + yOff;
+      // Face center sits LAYOUT.CUSTOMER_FACE_OFFSET_PX from the sand top.
+      const faceY = this.groundY + LAYOUT.CUSTOMER_FACE_OFFSET_PX + yOff;
       const waiting = c.state === STATE.WAITING;
       const servable = waiting && canServe(i);
       const active = waiting && i === activeIndex;

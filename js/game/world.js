@@ -8,26 +8,16 @@
 // driven by these events plus a per-frame read of World state. This one-way
 // dataflow (input → step → events → presentation) keeps the ruleset portable.
 import {
-  MAX_HEALTH,
-  DAMAGE_PER_EXPIRE,
-  HEAL_PER_SERVE,
-  MAX_STACK,
-  PERFECT_CATCH_BAND,
-  PERFECT_CATCH_BONUS,
-  HEART_HEAL_AMOUNT,
+  HEALTH,
+  TRAY,
+  SCORING,
+  POWERUPS,
   PICKUP_TYPE,
   PICKUP_TO_POWER,
-  PICKUP_WEIGHTS,
-  PICKUP_SPAWN_MIN_S,
-  PICKUP_SPAWN_MAX_S,
-  CUSTOMER_FACE_OFFSET_PX,
-  SCOOP_RADIUS,
-  COMBO_BREAKER_THRESHOLD,
-  COMBO_BREAKER_DURATION_MULT,
-  SPAWN_DEMAND_BIAS,
-  WAVE0_DEMAND_BIAS,
-  CONE_Y,
-  GROUND_Y,
+  LAYOUT,
+  SCOOP,
+  WAVES,
+  CONE,
   pickWeighted
 } from './config.js';
 import { Player } from './player.js';
@@ -104,9 +94,9 @@ export class World {
     // Combo breaker: the score combo doubles as a charge meter — at this many
     // chained serves it "breaks" into a supercharged power-up. comboBreakerEnabled
     // is a per-mode capability (set by _applyModeConfig); the threshold is tunable.
-    this.comboBreakerThreshold = COMBO_BREAKER_THRESHOLD;
+    this.comboBreakerThreshold = SCORING.COMBO_BREAKER_THRESHOLD;
     this.comboBreakerEnabled = false;
-    this.maxStack = MAX_STACK;  // re-set per mode by _applyModeConfig below
+    this.maxStack = TRAY.MAX_STACK;  // re-set per mode by _applyModeConfig below
     /** @type {number | null} Debug patience override (seconds). null = wave ramp. */
     this.patienceOverride = null;
 
@@ -126,9 +116,9 @@ export class World {
     // it lives here, not on the rebuilt mode). `powerupWeights` is the relative
     // mix of heart/⚡/❄️/🌈 (aligned to PICKUP order); `tipGap{Min,Max}` is the
     // seconds-between-tips range the tip roller reads.
-    this.powerupWeights = PICKUP_WEIGHTS.slice();
-    this.tipGapMin = PICKUP_SPAWN_MIN_S;
-    this.tipGapMax = PICKUP_SPAWN_MAX_S;
+    this.powerupWeights = POWERUPS.PICKUP_WEIGHTS.slice();
+    this.tipGapMin = POWERUPS.PICKUP_SPAWN_MIN_S;
+    this.tipGapMax = POWERUPS.PICKUP_SPAWN_MAX_S;
 
     // The game mode (Tipping) owns board size, the tip-sourced power-ups, the
     // tray verbs, and the active slot. World DELEGATES to it via modes/index.js.
@@ -150,7 +140,7 @@ export class World {
     /** @type {{ type: PickupTypeName, x: number, y: number, r0: number, t: number }[]} */
     this.puLeaving = [];
 
-    this.health = MAX_HEALTH;
+    this.health = HEALTH.MAX;
 
     // Recipes unlocked / mastered during this session — drained on game over.
     /** @type {{ unlocked: string[], mastered: string[] }} */
@@ -172,7 +162,7 @@ export class World {
   }
 
   /** Y of the sand-floor top edge — the customer ground line (no view dependency). */
-  _groundY() { return GROUND_Y; }
+  _groundY() { return LAYOUT.GROUND_Y; }
 
   /**
    * Which regulars can walk up right now: every unlocked one, plus this run's
@@ -213,7 +203,7 @@ export class World {
    * @param {boolean} playWave0 whether the run opens on the tutorial wave
    */
   reset(playWave0) {
-    this.player.reposition(this.bounds.width / 2, CONE_Y);
+    this.player.reposition(this.bounds.width / 2, CONE.Y);
     this.player.clearStack();
     this.player.frozen = false;
     this.player.fractured = false;
@@ -229,7 +219,7 @@ export class World {
     this._mysteryName = this.regulars.pickMysteryCandidate();
     this._mysteryRevealDay = 3 + Math.floor(Math.random() * 5);
     this._tutorialServed = [];
-    this.health = MAX_HEALTH;
+    this.health = HEALTH.MAX;
     this.activeBubble = null;
     this.puLeaving.length = 0;
     this.input.moveDelta = 0;  // drop any stale touch-steer state
@@ -238,7 +228,7 @@ export class World {
     this.mode.reset();
     this._applyModeConfig();
     // Wave 0 (the opening tutorial wave) leans harder toward demanded colors.
-    this.field.setDemandBias(this.waves.wave === 0 ? WAVE0_DEMAND_BIAS : SPAWN_DEMAND_BIAS);
+    this.field.setDemandBias(this.waves.wave === 0 ? WAVES.WAVE0_DEMAND_BIAS : WAVES.SPAWN_DEMAND_BIAS);
     this.sessionRecipeEvents = { unlocked: [], mastered: [] };
     this.pendingDiscoveries = [];
     this.challenges.resetSession();
@@ -279,7 +269,7 @@ export class World {
     const hitbox = this.player.catchHitbox();
     // Missed scoops fall past the cone and dissolve down in the sand (below the
     // ground line), so the fizzle reads as the scoop melting into the floor.
-    const missY = this._groundY() + SCOOP_RADIUS * 2;
+    const missY = this._groundY() + SCOOP.RADIUS * 2;
 
     // The falling field runs during the tutorial too — Wave 0 is a real,
     // playable wave; the tutorial only overlays hints on top of it.
@@ -287,7 +277,7 @@ export class World {
       if (!isCaught(scoop, hitbox)) return false;
       // No "perfect" catches in the tutorial — kills the bonus, the combo refresh,
       // and the perfect FX so it can't be used to cheese a score.
-      const perfect = !this.tutorialActive && Math.abs(scoop.x - hitbox.x) <= PERFECT_CATCH_BAND;
+      const perfect = !this.tutorialActive && Math.abs(scoop.x - hitbox.x) <= SCORING.PERFECT_CATCH_BAND;
       this._onCatch(scoop, perfect);
       return true;
     });
@@ -318,7 +308,7 @@ export class World {
     }
     this.player.push(scoop.color);
     if (perfect) {
-      this.shop.addScore(PERFECT_CATCH_BONUS);
+      this.shop.addScore(SCORING.PERFECT_CATCH_BONUS);
       this.shop.refreshCombo();
     }
     this.bus.emit('catch', { scoop, perfect });
@@ -373,7 +363,7 @@ export class World {
     // Cone leans toward the customer's face for a brief moment — the "handing"
     // gesture. Face center is groundY + CUSTOMER_FACE_OFFSET_PX, modulated by
     // their slide-in offset.
-    const targetY = this._groundY() + CUSTOMER_FACE_OFFSET_PX + customer.yOff;
+    const targetY = this._groundY() + LAYOUT.CUSTOMER_FACE_OFFSET_PX + customer.yOff;
     this.player.triggerHandoff(customer.x, targetY);
 
     // Source burst at the cone for the scoop leaving the tray (presentation).
@@ -398,10 +388,10 @@ export class World {
     const cx = customer.x;
     const cy = this._groundY() - SERVE_FX_RISE;
 
-    const targetY = this._groundY() + CUSTOMER_FACE_OFFSET_PX + customer.yOff;
+    const targetY = this._groundY() + LAYOUT.CUSTOMER_FACE_OFFSET_PX + customer.yOff;
     this.player.triggerHandoff(customer.x, targetY);
 
-    this.health = Math.min(MAX_HEALTH, this.health + HEAL_PER_SERVE);
+    this.health = Math.min(HEALTH.MAX, this.health + HEALTH.HEAL_PER_SERVE);
 
     // Recipe book: record the completion. Stash any first-time-unlocked or just-
     // mastered ids for the game-over celebration overlay, then forward to
@@ -466,7 +456,7 @@ export class World {
       // challenges; the coordinator resets it when the night cycle lands.)
       this.challenges.recordWaveReached(this.waves.wave);
       // Leaving Wave 0 → restore the normal demand bias for the campaign proper.
-      if (this.waves.wave === 1) this.field.setDemandBias(SPAWN_DEMAND_BIAS);
+      if (this.waves.wave === 1) this.field.setDemandBias(WAVES.SPAWN_DEMAND_BIAS);
     }
   }
 
@@ -487,7 +477,7 @@ export class World {
     this.challenges.recordPowerupUsed(type);
     if (type === PICKUP_TYPE.HEART) {
       if (!this.flags.invincible) {
-        this.health = Math.min(MAX_HEALTH, this.health + HEART_HEAL_AMOUNT);
+        this.health = Math.min(HEALTH.MAX, this.health + POWERUPS.HEART_HEAL_AMOUNT);
       }
     } else {
       this._activateBubble(type, x, y);
@@ -517,7 +507,7 @@ export class World {
     // it keeps building until the player unlocks one (via challenges).
     if (!type) return;
     this.shop.breakCombo();
-    this.firePower(type, this.player.x, this.player.stackTopY(), COMBO_BREAKER_DURATION_MULT);
+    this.firePower(type, this.player.x, this.player.stackTopY(), SCORING.COMBO_BREAKER_DURATION_MULT);
     this.bus.emit('comboBreak', { x, y });
   }
 
@@ -544,7 +534,7 @@ export class World {
   /** Customers expired (patience ran out): take damage; decide death. @param {number} count */
   onExpire(count) {
     if (!this.flags.invincible) {
-      this.health = Math.max(0, this.health - DAMAGE_PER_EXPIRE * count);
+      this.health = Math.max(0, this.health - HEALTH.DAMAGE_PER_EXPIRE * count);
     }
     this.bus.emit('expire', { count });
     // The sim only DECIDES death; the game's 'gameOver' handler runs _endGame.

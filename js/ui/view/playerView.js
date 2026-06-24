@@ -1,9 +1,5 @@
 // @ts-check
-import {
-  CONE_WIDTH,
-  SCOOP_RADIUS,
-  HANDOFF_DURATION_S
-} from '../../game/config.js';
+import { CONE, SCOOP, SERVE } from '../../game/config.js';
 import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../../game/player.js';
 import { SCOOP_STATE, drawScoopSprite } from '../sprites/scoopRenderer.js';
 import { drawPlayerCone, CONE_FRAME } from '../sprites/coneRenderer.js';
@@ -55,7 +51,7 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
  *    by (drawX − x) draws the whole assembly at the interpolated x;
  * 2. idle bob — hoverY (0 while moving) floats the assembly while standing still;
  * 3. handoff lean — a sin-bumped offset toward the customer that snaps back by
- *    the end of HANDOFF_DURATION_S (the coordinated "reach").
+ *    the end of SERVE.HANDOFF_DURATION_S (the coordinated "reach").
  * @param {CanvasRenderingContext2D} ctx
  * @param {Player} player
  * @param {number} alpha
@@ -63,8 +59,8 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
 function applyAssemblyTransform(ctx, player, alpha) {
   let tx = player.drawX(alpha) - player.x;
   let ty = player.hoverY;
-  if (player.handoffT < HANDOFF_DURATION_S) {
-    const p = player.handoffT / HANDOFF_DURATION_S;
+  if (player.handoffT < SERVE.HANDOFF_DURATION_S) {
+    const p = player.handoffT / SERVE.HANDOFF_DURATION_S;
     const ease = Math.sin(p * Math.PI);
     tx += player.handoffDx * ease;
     ty += player.handoffDy * ease;
@@ -79,7 +75,7 @@ function applyAssemblyTransform(ctx, player, alpha) {
  */
 function drawServeFlash(ctx, player) {
   if (player.flash > 0) {
-    glowCircle(ctx, player.x, player.y, CONE_WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
+    glowCircle(ctx, player.x, player.y, CONE.WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
   }
 }
 
@@ -147,7 +143,7 @@ function drawTossBumpScoop(ctx, player, drawX, drawY, colorKey, drawScale, state
   const wob = Math.cos(q * Math.PI * 3) * (1 - q);   // +1 stretched .. damps to 0
   const sy = 1 + 0.60 * wob;
   const sx = 1 - 0.38 * wob;
-  const baseY = drawY + SCOOP_RADIUS;
+  const baseY = drawY + SCOOP.RADIUS;
   ctx.save();
   ctx.translate(drawX, baseY);
   ctx.scale(sx, sy);
@@ -190,5 +186,5 @@ function drawTossedScoops(ctx, player, rainbow) {
  * @param {number | string} [state] one of SCOOP_STATE (sprite row)
  */
 export function drawScoop(ctx, x, y, colorKey, scale = 1, state = SCOOP_STATE.CONE) {
-  drawScoopSprite(ctx, x, y, SCOOP_RADIUS * scale, colorKey, state);
+  drawScoopSprite(ctx, x, y, SCOOP.RADIUS * scale, colorKey, state);
 }

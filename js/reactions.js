@@ -74,10 +74,13 @@ export function wireReactions(game) {
 
   // A power-up fired (a tip or the combo breaker). Heart heal vs. a timed
   // power-up differ only in the burst palette + which trigger ding plays.
-  // Power-up fired: a swirl of colored triangle shards around the CONE — no text.
-  // (Names live in the Power-ups Journal tab; the in-play read is purely the color.)
+  // Power-up fired: a conical vortex of colored dots spiralling up around the CONE
+  // and dissipating — no text. (Names live in the Power-ups Journal tab; the
+  // in-play read is purely the color.)
   game.bus.on('powerup', ({ type }) => {
-    const cx = game.world.player.x, cy = game.world.player.stackTopY();
+    const p = game.world.player;
+    const cx = p.x, cy = p.y;
+    const height = cy - p.scoopPosition(5).y;   // funnel fades out ~5 scoops tall
     let palette;
     switch (type) {
       case PICKUP_TYPE.HEART:   palette = ['#ff4d6d', '#ff8fa3', '#ffd1dc']; break; // red
@@ -86,7 +89,7 @@ export function wireReactions(game) {
       case PICKUP_TYPE.RAINBOW: palette = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff']; break;
       default:                  palette = ['#ffd700', '#ffb703', '#ffe9a0'];        // fallback gold
     }
-    game.effects.swirl(cx, cy, palette);
+    game.effects.vortex(cx, cy, palette, height);
     game.world.player.triggerFlash(0.2);
     if (type === PICKUP_TYPE.HEART) game.sound.heart(); else game.sound.powerupTrigger();
     game.haptics.powerup();
@@ -108,11 +111,13 @@ export function wireReactions(game) {
     game.sound.catch_();
   });
 
-  // Coin tip ($): a yellow/orange swirl around the cone — no text. Points still
-  // land on the HUD score counter.
+  // Coin tip ($): a yellow/orange vortex spiralling up around the cone — no text.
+  // Points still land on the HUD score counter.
   game.bus.on('coin', () => {
-    const cx = game.world.player.x, cy = game.world.player.stackTopY();
-    game.effects.swirl(cx, cy, ['#ffd700', '#ffb703', '#ffe9a0']);
+    const p = game.world.player;
+    const cx = p.x, cy = p.y;
+    const height = cy - p.scoopPosition(5).y;   // funnel fades out ~5 scoops tall
+    game.effects.vortex(cx, cy, ['#ffd700', '#ffb703', '#ffe9a0'], height);
     game.sound.bubblePop();
   });
 

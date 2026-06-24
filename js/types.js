@@ -30,7 +30,7 @@
  * @typedef {{ x: number, y: number, r: number, halfW: number }} Hitbox
  *
  * @typedef {{ x: number, y: number, prevY: number, vy: number, color: ScoopColor, dissolve?: number, speedMult?: number }} Scoop
- *   `dissolve` (seconds, 0..SCOOP_DISSOLVE_S) is present only while a missed
+ *   `dissolve` (seconds, 0..SCOOP.DISSOLVE_S) is present only while a missed
  *   scoop is fading out in the ground; absent means live/catchable.
  *   `speedMult` is the fall multiplier over default (1.0) the scoop spawned with;
  *   the view reads it to pick the falling-scoop sprite tier.
@@ -56,7 +56,7 @@
  *
  * @typedef {object} Customer
  * @property {number} id
- * @property {number} slot         0..SLOT_COUNT-1
+ * @property {number} slot         0..TRAY.SLOT_COUNT-1
  * @property {number} x            current x
  * @property {number} prevX        x at the start of the latest sim step (render interpolation)
  * @property {number} targetX      lane-shift target
@@ -98,9 +98,5 @@
  * @property {{ wave: number }} waveUp
  * @property {{}} gameOver
  */
-
-// Sprite-sheet data contracts (SpriteSheetDef / SpriteFrame / SpriteAnimation /
-// SpriteBody) moved to engine/types.js — they're game-agnostic and travel with
-// the reusable SpriteSheet renderer.
 
 export {};

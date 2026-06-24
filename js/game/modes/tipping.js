@@ -1,5 +1,5 @@
 // @ts-check
-import { PICKUP_TYPE, PICKUP_TO_POWER, CUSTOMER_FACE_OFFSET_PX, pickWeighted } from '../config.js';
+import { PICKUP_TYPE, PICKUP_TO_POWER, LAYOUT, pickWeighted } from '../config.js';
 import { STATE, REACH } from '../shop.js';
 import { TutorialBase } from '../tutorial.js';
 import { drawScoop } from '../../ui/view/playerView.js';
@@ -178,11 +178,11 @@ class TippingTutorial extends TutorialBase {
     return { x: pl.x, y: pl.stackTopY() - 44, text, point: /** @type {'down'} */ ('down'), accent };
   }
   /** A bubble hugging a customer's FACE — above (point down) or below (point up).
-   *  Anchored to the real face center (groundY + CUSTOMER_FACE_OFFSET_PX + yOff), so
+   *  Anchored to the real face center (groundY + LAYOUT.CUSTOMER_FACE_OFFSET_PX + yOff), so
    *  "below" lands under the chin pointing up at them — i.e. what you tap.
    *  @param {Game} game @param {Customer} c @param {string} text @param {boolean} above @param {string} [accent] */
   _customerBubble(game, c, text, above, accent) {
-    const faceY = game.world._groundY() + CUSTOMER_FACE_OFFSET_PX + (c.yOff || 0);
+    const faceY = game.world._groundY() + LAYOUT.CUSTOMER_FACE_OFFSET_PX + (c.yOff || 0);
     return above
       ? { x: c.x, y: faceY - FACE_BUBBLE_GAP, text, point: /** @type {'down'} */ ('down'), accent }
       : { x: c.x, y: faceY + FACE_BUBBLE_GAP, text, point: /** @type {'up'} */ ('up'), accent };

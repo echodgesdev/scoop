@@ -7,16 +7,19 @@
 import { drawScoop } from './playerView.js';
 import { drawConeUnderStack, CONE_FRAME } from '../sprites/coneRenderer.js';
 import { SCOOP_STATE } from '../sprites/scoopRenderer.js';
-import {
-  SCOOP_RADIUS,
-  MINI_SCOOP_RADIUS,
-  MINI_CONE_OFFSET_X,
-  MINI_CONE_H,
-  MINI_CONE_FACE_OFFSET_PX,
-  SERVED_FLIGHT_ARC
-} from '../../game/config.js';
+import { SCOOP } from '../../game/config.js';
 
 /** @typedef {import('../../types.js').Customer} Customer */
+
+// Mini-cone proportions (the customer's held cone, fills with served scoops) and
+// the served-scoop flight arc — view-only presentation, scaled to read
+// proportionally beside the larger customer faces. Not gameplay balance, so they
+// live here rather than in tuning.js.
+const MINI_SCOOP_RADIUS = 19;
+const MINI_CONE_OFFSET_X = 58;        // right of the customer face
+const MINI_CONE_H = 50;               // bowl-seat height: how far above the tip the bottom scoop sits
+const MINI_CONE_FACE_OFFSET_PX = 46;  // cone tip relative to the customer's face center
+const SERVED_FLIGHT_ARC = 50;         // peak upward bump along the in-flight arc
 
 /**
  * Draw a customer's held mini-cone + its served-scoop stack. Stack grows upward
@@ -38,7 +41,7 @@ export function drawHeldCone(ctx, c, cx, faceY, alpha = 1) {
   const baseY = faceY + MINI_CONE_FACE_OFFSET_PX;
 
   const spacing = MINI_SCOOP_RADIUS * 1.6;
-  const scale = MINI_SCOOP_RADIUS / SCOOP_RADIUS;
+  const scale = MINI_SCOOP_RADIUS / SCOOP.RADIUS;
 
   // The bottom scoop's resting center (i = 0 of the stack below). The layered cone
   // sprite — the same one the player carries, scaled down — is seated under it so

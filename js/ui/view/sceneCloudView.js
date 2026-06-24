@@ -12,9 +12,9 @@
 // only when the day state changes — i.e. on serves during play (the night-cycle
 // sweep changes the tint continuously over ~2s between waves, so it rebakes each
 // frame there, but that's not gameplay). Shape + scale are fixed per cloud (the
-// base radius derives from the constant GROUND_Y), so a cloud's bitmap depends
+// base radius derives from the constant LAYOUT.GROUND_Y), so a cloud's bitmap depends
 // only on the tint.
-import { GROUND_Y } from '../../game/config.js';
+import { LAYOUT } from '../../game/config.js';
 import { mixHex, scaleHex, luminance } from '../colorUtils.js';
 
 // Per-layer depth feel (far → near): scroll speed (px/s), size, opacity.
@@ -71,8 +71,8 @@ const CLOUDS = [
   { layer: 2, x: 0.35, y: 0.37, w: 0.90, shape: 0 }
 ];
 
-// Base puff radius scales with the play area; constant since GROUND_Y is fixed.
-const BASE_R = GROUND_Y * 0.05;
+// Base puff radius scales with the play area; constant since LAYOUT.GROUND_Y is fixed.
+const BASE_R = LAYOUT.GROUND_Y * 0.05;
 const SPRITE_PAD = 2;  // transparent margin so anti-aliased edges never clip
 
 /**
@@ -167,7 +167,7 @@ function ensureCloudSprites(tintKey, state) {
  */
 export function drawClouds(ctx, bounds, state, time) {
   const W = bounds.width;
-  const groundY = GROUND_Y;
+  const groundY = LAYOUT.GROUND_Y;
   const sprites = ensureCloudSprites(state.skyTop + '|' + state.skyBottom, state);
 
   ctx.save();

@@ -2,6 +2,7 @@
 /** @typedef {{ x: number, y: number, vx: number, vy: number, life: number, maxLife: number, r: number, color: string }} Particle */
 /** @typedef {{ x: number, y: number, vy: number, text: string, color: string, size: number, life: number, maxLife: number }} FloatText */
 /** @typedef {{ cx: number, cy: number, angle: number, radius: number, angVel: number, radVel: number, rot: number, spin: number, size: number, color: string, life: number, maxLife: number }} Swirl */
+/** @typedef {{ cx: number, y: number, angle: number, angVel: number, topRadius: number, rise: number, rot: number, spin: number, size: number, color: string, life: number, maxLife: number }} Vortex */
 /** @typedef {{ x: number, y: number, vx: number, vy: number, rot: number, spin: number, size: number, color: string, life: number, maxLife: number }} Shard */
 
 const GRAVITY = 520;
@@ -22,6 +23,8 @@ export class Effects {
     this.texts = [];
     /** @type {Swirl[]} triangle shards that orbit + spiral out (power-up "got it" flourish) */
     this.swirls = [];
+    /** @type {Vortex[]} dots spiralling up a vertical axis + converging — the power-up / tip vortex */
+    this.vortices = [];
     /** @type {Shard[]} chunky debris flung outward with gravity + spin (the cone fracturing) */
     this.shards = [];
     this.shake = 0;
@@ -32,6 +35,7 @@ export class Effects {
     this.particles = [];
     this.texts = [];
     this.swirls = [];
+    this.vortices = [];
     this.shards = [];
     this.shake = 0;
     this.hurt = 0;
@@ -89,6 +93,37 @@ export class Effects {
         rot: Math.random() * Math.PI * 2,
         spin: (Math.random() * 2 - 1) * 12,
         size: 6 + Math.random() * 5,
+        color: colors[i % colors.length],
+        life, maxLife: life
+      });
+    }
+  }
+
+  /**
+   * A conical vortex: triangle shards spiral around a vertical axis (a shallow
+   * ellipse, so they read as orbiting IN FRONT OF and BEHIND the cone rather than
+   * a flat ring) while climbing and FANNING OUT toward the top, then dissipate —
+   * the power-up / tip "got it" flourish wrapped around the whole cone. The funnel
+   * is apex-down: a tight point at (cx, cy) widening as it rises. `height` is the
+   * px each shard climbs over its life, so the column fades out ~that tall.
+   * @param {number} cx @param {number} cy base of the funnel (the narrow point)
+   * @param {string[]} colors palette each shard's color is picked from
+   * @param {number} height px climbed before a shard dissipates (the funnel height)
+   * @param {number} [count]
+   */
+  vortex(cx, cy, colors, height, count = 60) {
+    for (let i = 0; i < count; i++) {
+      const life = 0.6 + Math.random() * 0.45;
+      this.vortices.push({
+        cx,
+        y: cy + Math.random() * 8,              // tight base — the narrow point of the cone
+        angle: Math.random() * Math.PI * 2,
+        angVel: 7 + Math.random() * 4,          // rad/s — all one direction (a coherent spin)
+        topRadius: 30 + Math.random() * 22,     // orbit radius at the wide top
+        rise: height / life,                    // climbs `height` over its life -> fades at the top
+        rot: Math.random() * Math.PI * 2,
+        spin: (Math.random() * 2 - 1) * 12,     // tumble
+        size: 7 + Math.random() * 6,
         color: colors[i % colors.length],
         life, maxLife: life
       });
@@ -179,6 +214,14 @@ export class Effects {
       s.life -= dt;
       if (s.life <= 0) this.swirls.splice(i, 1);
     }
+    for (let i = this.vortices.length - 1; i >= 0; i--) {
+      const v = this.vortices[i];
+      v.angle += v.angVel * dt;
+      v.y -= v.rise * dt;
+      v.rot += v.spin * dt;
+      v.life -= dt;
+      if (v.life <= 0) this.vortices.splice(i, 1);
+    }
     for (let i = this.shards.length - 1; i >= 0; i--) {
       const s = this.shards[i];
       s.vy += GRAVITY * dt;
@@ -213,6 +256,25 @@ export class Effects {
       ctx.moveTo(0, -s.size);
       ctx.lineTo(s.size * 0.86, s.size * 0.5);
       ctx.lineTo(-s.size * 0.86, s.size * 0.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    for (const v of this.vortices) {
+      const q = 1 - v.life / v.maxLife;             // 0 at the narrow base .. 1 at the wide top
+      const r = v.topRadius * (0.25 + 0.88 * q);    // fan OUT as it climbs (apex-down cone)
+      const px = v.cx + Math.cos(v.angle) * r;
+      const py = v.y + Math.sin(v.angle) * r * 0.3; // shallow ellipse -> orbit AROUND a vertical axis
+      const sz = v.size * (1 - 0.3 * q);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, v.life / v.maxLife);
+      ctx.translate(px, py);
+      ctx.rotate(v.rot);
+      ctx.fillStyle = v.color;
+      ctx.beginPath();
+      ctx.moveTo(0, -sz);
+      ctx.lineTo(sz * 0.86, sz * 0.5);
+      ctx.lineTo(-sz * 0.86, sz * 0.5);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
