@@ -4,7 +4,7 @@
 // scoop draw helpers + maps. Two sheets: the base scoops (resting states +
 // default-speed fall, 70px cells) and the oversized fast-fall scoops (taller
 // cells, one frame per speed tier). The generic SpriteSheet handles both.
-import { SpriteSheet } from './spriteSheet.js';
+import { SpriteSheet } from '../../engine/spriteSheet.js';
 import SCOOP_SPRITE from './scoopSprite.js';
 import SCOOP_FAST_SPRITE from './scoopFastSprite.js';
 

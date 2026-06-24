@@ -1,7 +1,7 @@
 // @ts-check
 // The scoop sprite-sheet DEFINITION (data) — the resting states + default-speed
 // fall. Each frame's `body` is the collision shape; config.js derives the scoop's
-// size from it and the generic renderer (view/spriteSheet.js) draws from it.
+// size from it and the generic renderer (engine/spriteSheet.js) draws from it.
 //
 // Regenerate from the sprite editor (dev_tools/sprite_sheet_generator →
 // "Download .js" / "Copy as JS"); it emits a flat `export default { … }` you can
@@ -20,7 +20,7 @@ const ROWS = [
   'Fast Fall Top', 'Fast Fall Bottom'
 ];
 
-/** @type {import('../../types.js').SpriteSheetDef} */
+/** @type {import('../../engine/types.js').SpriteSheetDef} */
 const SCOOP_SPRITE = {
   // Runtime path (relative to index.html) — consumers use it verbatim.
   image: 'assets/scoop_sheet.png',

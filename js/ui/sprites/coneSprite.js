@@ -17,7 +17,7 @@
 const FRAME = 256;
 const COLS = 4;
 
-/** @type {import('../../types.js').SpriteSheetDef} */
+/** @type {import('../../engine/types.js').SpriteSheetDef} */
 const CONE_SPRITE = {
   // Runtime path (relative to index.html) — used verbatim.
   image: 'assets/cone_sheet.png',

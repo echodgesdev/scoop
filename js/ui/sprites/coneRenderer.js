@@ -5,7 +5,7 @@
 // (customers) so both nest scoops identically. CONE_SPRITE_W is the on-screen art
 // width and CONE_SPRITE_DY nudges it vertically so the bowl meets the bottom
 // scoop — tune those two if the cone reads too big/small or scoops don't nest.
-import { SpriteSheet } from './spriteSheet.js';
+import { SpriteSheet } from '../../engine/spriteSheet.js';
 import CONE_SPRITE from './coneSprite.js';
 import { CONE_HEIGHT, SCOOP_RADIUS } from '../../game/config.js';
 

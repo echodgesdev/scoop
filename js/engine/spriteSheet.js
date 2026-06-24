@@ -1,6 +1,6 @@
 // @ts-check
 // Generic sprite-sheet renderer. Consumes the data contract the sprite editor
-// (assets/index.html) exports — see SpriteSheetDef in types.js — so every sprite
+// (assets/index.html) exports — see SpriteSheetDef in ./types.js — so every sprite
 // swap in the game is just a different `def`, never new rendering code.
 //
 // Coordinates in the def are the sheet's native pixels. The renderer is told an
@@ -11,8 +11,8 @@
 // is the contract between art and physics), so art resolution/padding can change
 // without moving anything else.
 
-/** @typedef {import('../../types.js').SpriteSheetDef} SpriteSheetDef */
-/** @typedef {import('../../types.js').SpriteFrame} SpriteFrame */
+/** @typedef {import('./types.js').SpriteSheetDef} SpriteSheetDef */
+/** @typedef {import('./types.js').SpriteFrame} SpriteFrame */
 
 export class SpriteSheet {
   /** @param {SpriteSheetDef} def */

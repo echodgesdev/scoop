@@ -29,7 +29,7 @@ const ROWS = [
   'Axel', 'Reginald', 'Chris', 'Freddie', 'Harvey Green', 'Poop'
 ];
 
-/** @type {import('../../types.js').SpriteSheetDef} */
+/** @type {import('../../engine/types.js').SpriteSheetDef} */
 const CUSTOMER_SPRITE = {
   // Runtime path (relative to index.html) — consumers use it verbatim.
   image: 'assets/customer_sheet.png',

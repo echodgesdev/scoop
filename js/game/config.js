@@ -25,7 +25,7 @@ export const COLOR_KEYS = /** @type {ScoopColor[]} */ (Object.keys(COLORS));
 
 // === Geometry / layout ========================================================
 // The scoop's collision body comes from its sprite definition
-// (view/sprites/scoopSprite.js, set in the sprite editor) — no magic radius here.
+// (ui/sprites/scoopSprite.js, set in the sprite editor) — no magic radius here.
 // SCOOP_HALF_W/H are the body's
 // half-extents (circle → radius; rect → width/2, height/2) used by the catch
 // hitbox, so the hitbox shape follows the sprite instead of being locked to a

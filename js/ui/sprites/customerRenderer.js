@@ -5,7 +5,7 @@
 // customer (Layer 1). FACE_SIZE — the on-screen head diameter — is exported because
 // it's the layout anchor the speech bubble and tip badge also sit against.
 
-import { SpriteSheet } from './spriteSheet.js';
+import { SpriteSheet } from '../../engine/spriteSheet.js';
 import CUSTOMER_SPRITE from './customerSprite.js';
 import { STATE } from '../../game/shop.js';
 

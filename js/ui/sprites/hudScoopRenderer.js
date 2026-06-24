@@ -3,7 +3,7 @@
 // speech-bubble wanted-color swatches + the recipe-book coins) and exposes the
 // color→column map plus a draw helper. Shared by bubbleView (canvas swatches) and
 // coinTemplate (the COL map for the journal's recipe-coin scoops).
-import { SpriteSheet } from './spriteSheet.js';
+import { SpriteSheet } from '../../engine/spriteSheet.js';
 import HUD_SCOOP_SPRITE from './hudScoopSprite.js';
 
 // color → column on the HUD scoop sheet (same color order as the gameplay scoop

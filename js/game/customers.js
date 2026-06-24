@@ -1,7 +1,7 @@
 // @ts-check
 // The customer ROSTER — the static catalog of playable "regulars" on the
 // customer sheet (sprite rows 1..13; row 0 is the sheet's legend, not a
-// character — see view/sprites/customerSprite.js). Each regular carries the data
+// character — see ui/sprites/customerSprite.js). Each regular carries the data
 // the "unlockable characters" epic hangs off of:
 //   · favoriteRecipe — canonical recipe id (recipeIdFor — see recipes.js) of their
 //                      go-to order; shown on their collection card.

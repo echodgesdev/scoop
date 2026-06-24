@@ -15,10 +15,10 @@ const FRAME_W = 70;
 const FRAME_H = 140;
 const BODY_R = 35;        // the scoop ball (= base SCOOP_RADIUS → renders 1:1)
 const COLS = 6;           // flavors: choco, pink, mint, vanilla, blueberry, rainbow
-const ROWS = 3;           // speed tiers, top→bottom (mapped in view/sprites/scoopRenderer.js by index)
+const ROWS = 3;           // speed tiers, top→bottom (mapped in ui/sprites/scoopRenderer.js by index)
 const OFFSET_Y = -(FRAME_H / 2 - BODY_R);  // ball at the cell bottom → lift onto the anchor
 
-/** @type {import('../../types.js').SpriteSheetDef} */
+/** @type {import('../../engine/types.js').SpriteSheetDef} */
 const SCOOP_FAST_SPRITE = {
   // Runtime path (relative to index.html) — consumers use it verbatim.
   image: 'assets/scoop_sheet_falling.png',
