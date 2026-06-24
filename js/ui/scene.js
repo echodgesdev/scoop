@@ -19,10 +19,10 @@ import { drawOcean } from './view/sceneOceanView.js';
  * @returns {{ floor: string, skyTop: string, skyBottom: string }}
  */
 export function drawEnvironment(ctx, game) {
-  const state = game.inNightCycle
-    ? nightCycleState(game.nightT, game.bounds)
+  const state = game.flow.inNightCycle
+    ? nightCycleState(game.flow.nightT, game.bounds)
     : dayCycleState(game.world.waves.waveFraction, game.bounds);
-  if (game.inNightCycle) drawNightSky(ctx, game.bounds, state);
+  if (game.flow.inNightCycle) drawNightSky(ctx, game.bounds, state);
   else drawSkyAndSun(ctx, game.bounds, state);
   drawClouds(ctx, game.bounds, state, game.clock);
   drawSand(ctx, game.bounds, state);
