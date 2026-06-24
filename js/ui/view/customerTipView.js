@@ -32,7 +32,20 @@ export function drawTip(ctx, tip, cx, faceY, faceSize, canvasWidth, time, showLa
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // Soft rotating sparkles around the badge to pull the eye (tighter orbit).
+  drawTipSparkles(ctx, bx, by, r, ring, time);
+  drawTipCoin(ctx, bx, by, r, ring, tip);
+  if (showLabel) drawTipLabel(ctx, bx, by, r);
+
+  ctx.restore();
+}
+
+/**
+ * Soft rotating sparkles orbiting the badge to pull the eye (tight orbit).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} bx @param {number} by badge center
+ * @param {number} r badge radius @param {string} ring sparkle color @param {number} time
+ */
+function drawTipSparkles(ctx, bx, by, r, ring, time) {
   ctx.fillStyle = ring;
   for (let k = 0; k < 3; k++) {
     const a = time * 1.6 + k * (Math.PI * 2 / 3);
@@ -45,9 +58,19 @@ export function drawTip(ctx, tip, cx, faceY, faceSize, canvasWidth, time, showLa
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+}
 
-  // Baked soft drop shadow (offset down) + a tight colored ring glow, then the
-  // coin body and ring drawn crisp on top — no per-frame shadowBlur.
+/**
+ * The coin itself: a baked soft drop shadow (offset down) + a tight colored ring
+ * glow, then the white body, the colored eye-catcher ring, a faint inner ring
+ * (minted-coin read), and the reward icon — all drawn crisp on top, no per-frame
+ * shadowBlur.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} bx @param {number} by badge center
+ * @param {number} r badge radius @param {string} ring ring color
+ * @param {string} tip pickup type or PICKUP_TYPE.COIN (selects the icon)
+ */
+function drawTipCoin(ctx, bx, by, r, ring, tip) {
   glowCircle(ctx, bx, by + 3, r, 'rgba(0, 0, 0, 0.45)');
   glowCircle(ctx, bx, by, r + 1, ring, 0.85);
   ctx.beginPath();
@@ -55,8 +78,6 @@ export function drawTip(ctx, tip, cx, faceY, faceSize, canvasWidth, time, showLa
   ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
   ctx.fill();
 
-  // Colored ring (the eye-catcher) on the same circle path; then a faint inner
-  // ring for a minted-coin read.
   ctx.lineWidth = 4;
   ctx.strokeStyle = ring;
   ctx.stroke();
@@ -66,19 +87,22 @@ export function drawTip(ctx, tip, cx, faceY, faceSize, canvasWidth, time, showLa
   ctx.arc(bx, by, r - 5, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Reward icon.
   ctx.font = `${Math.floor(r * 1.05)}px 'Segoe UI Emoji', 'Apple Color Emoji', sans-serif`;
   ctx.fillStyle = '#222';
   ctx.fillText(PICKUP_ICONS[tip] || '🪙', bx, by + 1);
+}
 
-  // "TIP" tag beneath — onboarding affordance, shown only during the tutorial.
-  if (showLabel) {
-    ctx.font = "bold 12px 'Comic Sans MS', sans-serif";
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
-    ctx.fillStyle = '#fff';
-    ctx.strokeText('TIP', bx, by + r + 8);
-    ctx.fillText('TIP', bx, by + r + 8);
-  }
-  ctx.restore();
+/**
+ * "TIP" tag beneath the badge — an onboarding affordance, shown only during the
+ * tutorial.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} bx @param {number} by badge center @param {number} r badge radius
+ */
+function drawTipLabel(ctx, bx, by, r) {
+  ctx.font = "bold 12px 'Comic Sans MS', sans-serif";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+  ctx.fillStyle = '#fff';
+  ctx.strokeText('TIP', bx, by + r + 8);
+  ctx.fillText('TIP', bx, by + r + 8);
 }

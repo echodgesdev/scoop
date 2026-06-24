@@ -48,27 +48,33 @@ export function drawHeldCone(ctx, c, cx, faceY, alpha = 1) {
 
   for (let i = 0; i < served.length; i++) {
     const s = served[i];
-    const slotX = baseX;
     const slotY = baseY - MINI_CONE_H - i * spacing - MINI_SCOOP_RADIUS * 0.2;
-
-    // Ease-in-out from src to slot, with a sin-bump that arcs the path upward so
-    // the scoop reads as "tossed across". Flight progress is interpolated between
-    // sim steps (it's a fast 0.32s arc).
-    const st = s.prevT !== undefined ? s.prevT + (s.t - s.prevT) * alpha : s.t;
-    const t = Math.max(0, Math.min(1, st));
-    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    const x = s.srcX + (slotX - s.srcX) * e;
-    const linearY = s.srcY + (slotY - s.srcY) * e;
-    const bump = Math.sin(t * Math.PI) * SERVED_FLIGHT_ARC;
-    const y = linearY - bump;
-
-    // Squash-pop on the last sliver of the flight, mimicking the player tray's
-    // land animation.
-    const squash = t > 0.85 ? 1 + 0.35 * (1 - (t - 0.85) / 0.15) : 1;
-
+    const { x, y, squash } = servedScoopFlight(s, baseX, slotY, alpha);
     drawScoop(ctx, x, y, s.color, scale * squash, SCOOP_STATE.CONE);
   }
 
   // Cone FRONT — over the stack, so the bottom scoop nests into the bowl.
   drawConeUnderStack(ctx, baseX, seatY, scale, CONE_FRAME.FRONT);
+}
+
+/**
+ * In-flight pose for one served scoop arcing from its serve source to its slot:
+ * ease-in-out along the path, plus a sin-bump that lifts it (so it reads as
+ * "tossed across") and a squash-pop on the last sliver of the flight (mimicking
+ * the player tray's land animation). Flight progress is interpolated between sim
+ * steps — it's a fast arc.
+ * @param {{ srcX: number, srcY: number, t: number, prevT?: number }} s served-scoop flight state
+ * @param {number} slotX @param {number} slotY resting slot the scoop flies into
+ * @param {number} alpha render-interpolation fraction
+ * @returns {{ x: number, y: number, squash: number }}
+ */
+function servedScoopFlight(s, slotX, slotY, alpha) {
+  const st = s.prevT !== undefined ? s.prevT + (s.t - s.prevT) * alpha : s.t;
+  const t = Math.max(0, Math.min(1, st));
+  const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  const x = s.srcX + (slotX - s.srcX) * e;
+  const linearY = s.srcY + (slotY - s.srcY) * e;
+  const y = linearY - Math.sin(t * Math.PI) * SERVED_FLIGHT_ARC;
+  const squash = t > 0.85 ? 1 + 0.35 * (1 - (t - 0.85) / 0.15) : 1;
+  return { x, y, squash };
 }

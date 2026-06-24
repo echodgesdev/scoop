@@ -38,7 +38,9 @@ function bubbleWidthFor(orderLen) {
 }
 
 /**
- * Draw one customer's speech bubble above their face.
+ * Draw one customer's speech bubble above their face. Reads as the bubble's
+ * recipe: compute the pop scale + cone-proximity fade + geometry, then paint the
+ * shell, the wanted-color row, and the patience bar inside the scale-in transform.
  * @param {CanvasRenderingContext2D} ctx
  * @param {Customer} c
  * @param {number} cx interpolated customer x (drawn position)
@@ -48,13 +50,7 @@ function bubbleWidthFor(orderLen) {
  */
 export function drawBubble(ctx, c, cx, faceY, faceSize, { servable, active, patience, rainbow, coneX = null }) {
   const pop = easeOut(Math.min(1, c.waitT / POP_TIME));
-  // Fade toward translucent as the cone passes horizontally behind the bubble.
-  let alpha = 1;
-  if (coneX != null) {
-    const range = bubbleWidthFor(c.order.colors.length) / 2 + CONE_OVERLAP_HALF;
-    const overlap = Math.max(0, 1 - Math.abs(cx - coneX) / range);
-    alpha = 1 - (1 - BUBBLE_MIN_ALPHA) * overlap;
-  }
+  const alpha = coneProximityAlpha(c, cx, coneX);
 
   const bubbleBottom = faceY - faceSize / 2 - GAP;
   const top = bubbleBottom - BUBBLE_H;
@@ -69,10 +65,37 @@ export function drawBubble(ctx, c, cx, faceY, faceSize, { servable, active, pati
   ctx.scale(pop, pop);
   ctx.translate(-cx, -bubbleBottom);
 
-  // Bubble + tail. The tail is a solid triangle in the OUTLINE color (its infill
-  // matches the border — same as the tutorial tooltip tail), pointing down at the
-  // customer; the body's bottom border is that color too, so the two blend into
-  // one continuous pointer.
+  drawBubbleShell(ctx, { cx, bubbleBottom, left, top, bubbleW, active, servable });
+  drawWantedColors(ctx, c, cx, top, rainbow);
+  drawPatienceBar(ctx, left, top, bubbleW, patience);
+
+  ctx.restore();
+}
+
+/**
+ * Fade toward translucent as the player's cone passes horizontally behind the
+ * bubble, so the cone + tray stay readable through it. Returns 1 (opaque) when
+ * there's no cone, or when it's clear of the bubble's reach.
+ * @param {Customer} c @param {number} cx @param {number | null} coneX
+ * @returns {number}
+ */
+function coneProximityAlpha(c, cx, coneX) {
+  if (coneX == null) return 1;
+  const range = bubbleWidthFor(c.order.colors.length) / 2 + CONE_OVERLAP_HALF;
+  const overlap = Math.max(0, 1 - Math.abs(cx - coneX) / range);
+  return 1 - (1 - BUBBLE_MIN_ALPHA) * overlap;
+}
+
+/**
+ * The bubble shell: a baked state-colored halo, the downward tail, then the
+ * rounded body + border. The tail is a solid triangle in the OUTLINE color (its
+ * infill matches the border — same as the tutorial tooltip tail), pointing down
+ * at the customer; the body's bottom border is that color too, so the two blend
+ * into one continuous pointer.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {{ cx: number, bubbleBottom: number, left: number, top: number, bubbleW: number, active: boolean, servable: boolean }} g
+ */
+function drawBubbleShell(ctx, { cx, bubbleBottom, left, top, bubbleW, active, servable }) {
   const outline = active ? '#ffb703' : (servable ? '#06d6a0' : '#666');
   ctx.save();
   // Baked halo behind the whole bubble (replaces the per-frame shadowBlur).
@@ -95,8 +118,15 @@ export function drawBubble(ctx, c, cx, faceY, faceSize, { servable, active, pati
   ctx.strokeStyle = outline;
   ctx.stroke();
   ctx.restore();
+}
 
-  // Wanted colors — centered row that scales with order length.
+/**
+ * The wanted-color scoop icons — a centered row that scales with order length
+ * (rainbow mode paints every slot as the rainbow scoop).
+ * @param {CanvasRenderingContext2D} ctx @param {Customer} c
+ * @param {number} cx @param {number} top @param {boolean} rainbow
+ */
+function drawWantedColors(ctx, c, cx, top, rainbow) {
   const n = c.order.colors.length;
   const step = SWATCH_R * 2 + SWATCH_GAP;
   const rowW = n * SWATCH_R * 2 + (n - 1) * SWATCH_GAP;
@@ -104,12 +134,18 @@ export function drawBubble(ctx, c, cx, faceY, faceSize, { servable, active, pati
   const firstX = cx - rowW / 2 + SWATCH_R;
   for (let k = 0; k < n; k++) {
     const sx = firstX + k * step;
-    // A scoop icon per wanted color (rainbow mode → the rainbow scoop).
     const col = rainbow ? HUD_SCOOP_COL.rainbow : HUD_SCOOP_COL[c.order.colors[k]];
     drawHudScoop(ctx, sx, swatchY, SWATCH_SCOOP_SIZE, col);
   }
+}
 
-  // Patience bar
+/**
+ * Draining patience bar along the bubble's lower edge — green, turning red below
+ * 30%.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} left @param {number} top @param {number} bubbleW @param {number} patience
+ */
+function drawPatienceBar(ctx, left, top, bubbleW, patience) {
   const barX = left + 14;
   const barW = bubbleW - 28;
   const barY = top + BUBBLE_H - 16;
@@ -121,6 +157,4 @@ export function drawBubble(ctx, c, cx, faceY, faceSize, { servable, active, pati
   ctx.beginPath();
   ctx.roundRect(barX, barY, barW * Math.max(0, patience), 8, 4);
   ctx.fill();
-
-  ctx.restore();
 }

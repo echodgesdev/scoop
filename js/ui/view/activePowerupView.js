@@ -46,32 +46,51 @@ export function drawActivePowerup(ctx, game) {
     const cx = aslot.x;
     const restY = aslot.y;                              // final rest
     const midY = restY - game.bounds.height * 0.10;     // pause waypoint
-    let bx, by, grow;
-    if (a.anim < ACTIVE_ARC_FRAC) {
-      // Quadratic Bézier with a control point lifted above both ends → a toss.
-      const t = a.anim / ACTIVE_ARC_FRAC;
-      const e = 1 - (1 - t) * (1 - t);                  // easeOut along the arc
-      const u = 1 - e;
-      const ctrlX = (a.fromX + cx) / 2;
-      const ctrlY = Math.min(a.fromY, midY) - game.bounds.height * 0.15;
-      bx = u * u * a.fromX + 2 * u * e * ctrlX + e * e * cx;
-      by = u * u * a.fromY + 2 * u * e * ctrlY + e * e * midY;
-      grow = 0.5 + 0.9 * e;                             // → ~1.4× by the waypoint
-    } else if (a.anim < ACTIVE_PAUSE_FRAC) {
-      bx = cx; by = midY; grow = 1.4;                   // slight hold, large
-    } else {
-      const p = (a.anim - ACTIVE_PAUSE_FRAC) / (1 - ACTIVE_PAUSE_FRAC);
-      const e = p * p * (3 - 2 * p);                    // smoothstep settle
-      bx = cx;
-      by = midY + (restY - midY) * e;
-      grow = 1.4 - 0.4 * e;                             // shrink 1.4× → 1.0×
-    }
+    const { bx, by, grow } = activeBubblePose(a, cx, restY, midY, game.bounds.height);
     const pulse = 1 + 0.08 * Math.sin(game.clock * 6);
     const radius = aslot.r * grow * pulse;
     const frac = world.powerups.fraction(PICKUP_TO_POWER[a.type]);
     drawPowerupBubble(ctx, bx, by, radius, a.type, true, frac);
   }
   ctx.restore();
+}
+
+/**
+ * Entrance pose for the active bubble at its current animation fraction → drawn
+ * center + scale. Three phases: a quadratic Bézier toss up to the mid waypoint
+ * (growing to ~1.4×), a brief hold there, then a smoothstep settle down into the
+ * resting slot while shrinking back to 1.0×.
+ * @param {{ anim: number, fromX: number, fromY: number }} a
+ * @param {number} cx resting-slot x (the column the bubble settles into)
+ * @param {number} restY final resting y
+ * @param {number} midY pause-waypoint y
+ * @param {number} height canvas height (sets the toss/control-point lift)
+ * @returns {{ bx: number, by: number, grow: number }}
+ */
+function activeBubblePose(a, cx, restY, midY, height) {
+  if (a.anim < ACTIVE_ARC_FRAC) {
+    // Quadratic Bézier with a control point lifted above both ends → a toss.
+    const t = a.anim / ACTIVE_ARC_FRAC;
+    const e = 1 - (1 - t) * (1 - t);                  // easeOut along the arc
+    const u = 1 - e;
+    const ctrlX = (a.fromX + cx) / 2;
+    const ctrlY = Math.min(a.fromY, midY) - height * 0.15;
+    return {
+      bx: u * u * a.fromX + 2 * u * e * ctrlX + e * e * cx,
+      by: u * u * a.fromY + 2 * u * e * ctrlY + e * e * midY,
+      grow: 0.5 + 0.9 * e                             // → ~1.4× by the waypoint
+    };
+  }
+  if (a.anim < ACTIVE_PAUSE_FRAC) {
+    return { bx: cx, by: midY, grow: 1.4 };           // slight hold, large
+  }
+  const p = (a.anim - ACTIVE_PAUSE_FRAC) / (1 - ACTIVE_PAUSE_FRAC);
+  const e = p * p * (3 - 2 * p);                      // smoothstep settle
+  return {
+    bx: cx,
+    by: midY + (restY - midY) * e,
+    grow: 1.4 - 0.4 * e                               // shrink 1.4× → 1.0×
+  };
 }
 
 /**
