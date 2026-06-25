@@ -1,0 +1,175 @@
+/* HUD: wave/day gauge, tutorial day-hint, wave-up screen flash.
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+.gauge-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+#gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  user-select: none;
+}
+
+#gauge {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  pointer-events: none;
+}
+
+#gauge::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  /* Translucent so the meter floats lightly on the beach instead of a solid disc. */
+  background:
+    radial-gradient(circle at 50% 32%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.18) 60%, rgba(255, 255, 255, 0.05)),
+    linear-gradient(180deg, rgba(255, 246, 223, 0.48), rgba(255, 225, 176, 0.44));
+  box-shadow:
+    0 3px 9px rgba(0, 0, 0, 0.16),
+    inset 0 -3px 6px rgba(193, 122, 30, 0.18),
+    inset 0 2px 4px rgba(255, 255, 255, 0.55);
+}
+
+#gauge svg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: rotate(-90deg); /* fill starts at 12 o'clock */
+}
+
+.ring-bg {
+  fill: none;
+  stroke: rgba(120, 80, 30, 0.22);
+  stroke-width: 9;
+}
+
+.ring-fill {
+  fill: none;
+  stroke: url(#gaugeGrad);
+  stroke-width: 10;
+  stroke-linecap: round;
+  /* pathLength=100 in markup, so dasharray of 100 covers the full ring and the
+     visible arc is controlled entirely via stroke-dashoffset (0..100). */
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  filter: drop-shadow(0 0 5px rgba(255, 183, 3, 0.75));
+  transition: stroke-dashoffset 0.18s ease-out, stroke 0.2s ease;
+}
+
+.ring-fill.phase-up {
+  animation: ring-pulse 0.55s ease;
+}
+
+@keyframes ring-pulse {
+  0%   { stroke: #ffb703;  stroke-width: 8;  filter: none; }
+  40%  { stroke: #ffec5c; stroke-width: 12; filter: drop-shadow(0 0 10px rgba(255, 236, 92, 0.9)); }
+  100% { stroke: #ffb703;  stroke-width: 8;  filter: none; }
+}
+
+#gauge.celebrate .ring-fill {
+  stroke: #ffec5c;
+  stroke-width: 12;
+  filter: drop-shadow(0 0 14px rgba(255, 236, 92, 0.9));
+}
+
+.wave-num {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: bold;
+  color: #8a4a2a;   /* dark brown — matches the "Paused" title, not red */
+  text-shadow: 0 2px 0 #fff, 0 0 10px rgba(255, 183, 3, 0.55);
+  line-height: 1;
+  pointer-events: none;
+}
+
+#gauge.wave-up .wave-num {
+  animation: wave-bump 0.7s ease;
+}
+
+@keyframes wave-bump {
+  0%   { transform: scale(1);   color: #c1121f; }
+  40%  { transform: scale(1.7); color: #ffd166; text-shadow: 0 0 16px rgba(255, 209, 102, 0.9); }
+  100% { transform: scale(1);   color: #c1121f; }
+}
+
+#dayHint {
+  position: absolute;
+  top: 118px;
+  left: 12px;
+  z-index: 22;
+  max-width: 240px;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+
+#dayHint.hidden { opacity: 0; }
+
+.day-hint-arrow {
+  width: 0;
+  height: 0;
+  margin-left: 44px;
+  border-left: 12px solid transparent;
+  border-right: 12px solid transparent;
+  border-bottom: 14px solid #ffd166;
+}
+
+.day-hint-body {
+  background: linear-gradient(180deg, #2a2f40, #14161f);
+  color: #fff;
+  font-weight: bold;
+  font-size: 18px;
+  line-height: 1.25;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 2px solid #ffd166;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 16px rgba(255, 209, 102, 0.5);
+  animation: day-hint-bob 1.4s ease-in-out infinite;
+}
+
+@keyframes day-hint-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5px); }
+}
+
+body.day-hint #gauge::before {
+  animation: gauge-attention 1.2s ease-in-out infinite;
+}
+
+@keyframes gauge-attention {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), inset 0 -3px 6px rgba(193, 122, 30, 0.25), inset 0 2px 4px rgba(255, 255, 255, 0.9);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 209, 102, 0.75), 0 4px 18px rgba(255, 183, 3, 0.65), inset 0 2px 4px rgba(255, 255, 255, 0.9);
+  }
+}
+
+#screen-flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+#screen-flash.go {
+  animation: screen-flash 0.55s ease-out;
+}
+
+@keyframes screen-flash {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0;    }
+}

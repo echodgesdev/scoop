@@ -1,0 +1,154 @@
+/* Between-wave / round transition overlay + challenge cross-off.
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+.wt-reveal-item { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+
+.wt-reveal-coin { width: 120px; height: 120px; perspective: 700px; }
+
+.wt-reveal-inner {
+  position: relative;
+  width: 100%; height: 100%;
+  transform-style: preserve-3d;
+  animation: wt-coin-flip 0.9s ease 0.4s both;   /* hold silhouette 0.4s, then flip */
+}
+
+.wt-reveal-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background-image: url('../../assets/customer_sheet.png');
+  background-size: 840px 1680px;     /* 7×120 by 14×120 — matches REGULAR_FACE_TILE */
+  background-repeat: no-repeat;
+  background-color: #ffe9b8;
+  border: 3px solid #d9b285;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6), 0 4px 12px rgba(40, 16, 4, 0.35);
+  backface-visibility: hidden;
+}
+
+.wt-reveal-back { background-color: #9b9b9b; filter: grayscale(1) brightness(0.62); }
+
+.wt-reveal-front { transform: rotateY(180deg); }
+
+.wt-reveal-label { font-weight: bold; color: #8a4a2a; font-size: 16px; }
+
+.wt-reveal-item { animation: wt-reveal-in 0.25s ease both; }
+
+.wt-reveal-face.wt-reveal-emoji {
+  background-image: none;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 58px;
+  line-height: 1;
+  border-color: var(--ring, #d9b285);
+  box-shadow: inset 0 0 0 3px var(--ring, rgba(255, 255, 255, 0.6)), 0 4px 12px rgba(40, 16, 4, 0.35);
+}
+
+.wt-reveal-back.wt-reveal-emoji {
+  background-color: #e6e0d2;
+  color: #b3a890;
+  filter: none;
+}
+
+.wt-reveal-face.wt-reveal-scoops {
+  background-image: none;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: var(--ring, #d9b285);
+  box-shadow: inset 0 0 0 3px var(--ring, rgba(255, 255, 255, 0.6)), 0 4px 12px rgba(40, 16, 4, 0.35);
+}
+
+.wt-reveal-scoops .jcoin-scoops { gap: 4px; }
+
+#waveTransitionOverlay {
+  /* absolute (not fixed) so it fills the letterboxed #stage, not the whole window. */
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  transition: opacity 0.4s ease;
+  opacity: 1;
+}
+
+#waveTransitionOverlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wave-transition-modal {
+  background: linear-gradient(180deg, #fff8d6 0%, #fff3c0 100%);
+  border: 4px solid #b85;
+  border-radius: 16px;
+  padding: 24px 28px;
+  max-width: 560px;
+  width: 92%;
+  text-align: center;
+  color: #3a2a1a;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.wt-title {
+  margin: 0 0 6px 0;
+  font-size: 28px;
+  color: #c1121f;
+}
+
+.wt-subtitle {
+  font-weight: bold;
+  color: #6a4a2a;
+  margin-bottom: 14px;
+  font-size: 15px;
+}
+
+.wt-challenges {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  transition: opacity 0.3s ease;
+}
+
+.wt-challenges.fading-out { opacity: 0; }
+
+.wt-challenges.fading-in  { animation: wt-fade-in 0.5s ease both; }
+
+@keyframes wt-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wt-new-label {
+  font-weight: bold;
+  color: #06d6a0;
+  text-align: center;
+  letter-spacing: 1px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+@keyframes cc-check-pop {
+  0%   { transform: scale(0.2) rotate(-25deg); opacity: 0; }
+  55%  { transform: scale(1.55) rotate(10deg); opacity: 1; }
+  80%  { transform: scale(0.95) rotate(-4deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+#waveTransitionOverlay .wt-play-btn { font-size: 20px; padding: 16px 10px; }
+
+#waveTransitionOverlay .wt-home-btn { grid-column: auto; justify-self: stretch; padding: 12px 8px; }
+
+.pause-modal .wt-title {
+  color: #6a4a2a;
+}
+
+.wave-transition-modal .wt-title { color: #c1121f; }
+
+.pause-modal .wt-title { color: #8a4a2a; }
+
+#waveTransitionOverlay { padding: 0; background: transparent; }

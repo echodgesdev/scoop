@@ -1,0 +1,40 @@
+/* Design tokens — fonts + CSS custom properties (the shared parlor palette).
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+@font-face {
+  font-family: 'Comic Sans MS';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../assets/fonts/comic-neue-400.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Comic Sans MS';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../../assets/fonts/comic-neue-700.woff2') format('woff2');
+}
+
+:root {
+  /* The shared "parlor card" look — a cream waffle surface (45°/-45° crosshatch
+     over a warm gradient) with a brown rim. Used by the modals AND the in-game
+     chrome (HUD panel, pause / fullscreen buttons). Change it ONCE here and every
+     card follows. (Element-specific bits — border width, radius, drop shadow —
+     stay on each rule, since they scale with the element.) */
+  --waffle-surface:
+    repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    /* Opaque card — modals (pause, round-over) and buttons sit on top of the game
+       and must NOT show the scene through them. */
+    linear-gradient(180deg, #fffaf0 0%, #ffefc8 100%);
+  /* In-game HUD chrome ONLY (the score/health panel) uses a translucent variant so
+     it sits LIGHTER on a small screen — the beach reads through it. Kept separate
+     from --waffle-surface so the pause menu etc. stay solid. */
+  --waffle-surface-hud:
+    repeating-linear-gradient(45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
+    linear-gradient(180deg, rgba(255, 250, 240, 0.48) 0%, rgba(255, 239, 200, 0.44) 100%);
+  --waffle-edge: #b97a42;
+}

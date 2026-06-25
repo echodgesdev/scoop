@@ -1,0 +1,25 @@
+/* Pause overlay.
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+#pauseOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 85;
+  transition: opacity 0.3s ease;
+  opacity: 1;
+}
+
+#pauseOverlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pause-modal {
+  /* Slightly tighter than the wave-transition modal since there's no
+     challenge list — keeps the visual weight balanced. */
+  max-width: 460px;
+}

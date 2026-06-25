@@ -1,0 +1,40 @@
+/* Mid-play challenge toast.
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+#challengeToast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(20, 20, 20, 0.85);
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 28px;
+  font-weight: bold;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.32s ease, transform 0.32s ease;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+#challengeToast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#challengeToast .toast-check {
+  color: #06d6a0;
+  font-size: 22px;
+}
+
+#challengeToast:empty { display: none; }
+
+#challengeToast {
+  background: rgba(58, 36, 18, 0.92);
+  border: 2px solid #ffd166;
+}

@@ -1,0 +1,49 @@
+/* In-game HUD shell — panel + menu cross-fade.
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+#hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 12px 20px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.panel {
+  /* In-game HUD card — the translucent waffle variant (see :root) so the beach
+     reads through it. No backdrop-filter — blurring the canvas is a per-frame GPU cost. */
+  background: var(--waffle-surface-hud);
+  border: 2px solid rgba(185, 122, 66, 0.5);
+  border-radius: 16px;
+  padding: 9px 16px;
+  font-size: 22px;
+  font-weight: bold;
+  color: #3a2a1a;
+  box-shadow:
+    0 4px 11px rgba(40, 16, 4, 0.16),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.32);
+}
+
+.stack-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+#hud {
+  /* Mirror of #overlay's fade so the two cross-dissolve. The HUD is hidden
+     while menus are up because none of its readouts are meaningful then. */
+  transition: opacity 0.45s ease;
+  opacity: 1;
+}
+
+body.menu-visible #hud {
+  opacity: 0;
+  pointer-events: none;
+}
+
+#hud { transition: opacity 0.8s ease; }

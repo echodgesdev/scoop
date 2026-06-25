@@ -1,0 +1,277 @@
+/* Debug button + panel (developer-only).
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+#debugBtn {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 30;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 8px 14px;
+  border: 3px solid #444;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
+}
+
+#debugBtn.active {
+  background: #ffd166;
+}
+
+#debugPanel {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+#debugPanel.hidden {
+  display: none;
+}
+
+.debug-modal {
+  width: min(380px, 92%);
+  max-height: 86%;
+  overflow-y: auto;
+  padding: 18px 20px;
+  border: 3px solid #444;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  font-size: 16px;
+}
+
+.debug-modal h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  text-align: center;
+}
+
+.debug-paused {
+  font-weight: normal;
+  font-size: 14px;
+  opacity: 0.55;
+}
+
+.debug-top {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.debug-top .debug-wave,
+.debug-top .debug-time {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.debug-section {
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.debug-section > summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-weight: bold;
+  list-style: none;
+  user-select: none;
+}
+
+.debug-section > summary::-webkit-details-marker { display: none; }
+
+.debug-section > summary::before { content: '▸  '; }
+
+.debug-section[open] > summary::before { content: '▾  '; }
+
+.debug-section-body {
+  padding: 2px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debug-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.debug-row input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+#debugResume {
+  margin-top: 12px;
+  width: 100%;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 8px;
+  border: none;
+  border-radius: 10px;
+  background: #06d6a0;
+  cursor: pointer;
+}
+
+.debug-wave {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+}
+
+.debug-wave input {
+  width: 60px;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid #888;
+}
+
+.debug-wave button {
+  font-family: inherit;
+  font-size: 14px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #06d6a0;
+  color: #fff;
+  cursor: pointer;
+}
+
+.debug-time {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+}
+
+.debug-time label {
+  display: flex;
+  justify-content: space-between;
+}
+
+#debugTimeLabel {
+  font-weight: bold;
+  color: #555;
+}
+
+#debugTimeSlider {
+  width: 100%;
+  /* gradient track that mirrors the day-cycle: dawn → noon → sunset */
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    #ff9b6b 0%,
+    #7fc8f0 25%,
+    #4fb6f0 50%,
+    #9d8ec4 75%,
+    #ff7a3a 100%
+  );
+  outline: none;
+}
+
+#debugTimeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #444;
+  cursor: pointer;
+}
+
+#debugTimeSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #444;
+  cursor: pointer;
+}
+
+.debug-bias,
+.debug-patience {
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+.debug-slider {
+  font-size: 15px;
+}
+
+.debug-slider label {
+  display: flex;
+  justify-content: space-between;
+}
+
+.debug-slider input[type="range"] {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.debug-bias #debugBiasSlider {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.debug-patience input {
+  font-family: inherit;
+  font-size: 15px;
+  width: 64px;
+  margin-left: 4px;
+  padding: 2px 4px;
+}
+
+.debug-pow-freq input {
+  font-family: inherit;
+  font-size: 15px;
+  width: 52px;
+  padding: 2px 4px;
+}
+
+.debug-pow-weights {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.debug-pow-weights label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.debug-pow-weights input {
+  font-family: inherit;
+  font-size: 15px;
+  width: 48px;
+  padding: 2px 4px;
+}

@@ -1,0 +1,121 @@
+/* Home / title screen (overlay, soft-serve title, tap-to-begin, button bar).
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+#overlay .record {
+  font-size: 30px;
+  color: #ffd166;
+  text-shadow: 0 0 12px rgba(255, 200, 0, 0.7);
+  margin: 4px 0;
+}
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  color: white;       /* wash background is its own ::before layer (parlor theme below) */
+  display: flex;
+  flex-direction: column;   /* tap-to-begin content (flex:1) + bottom button bar */
+  z-index: 20;
+  text-align: center;
+  /* Default off + inert: the attract flow turns the layers (wash / title / buttons)
+     on in stages via the home-* classes, each of which also enables interaction. */
+  pointer-events: none;
+}
+
+#overlay h1 {
+  font-size: 64px;
+  margin: 0;
+}
+
+#overlay p {
+  font-size: 22px;
+  max-width: 600px;
+}
+
+#overlay { opacity: 1; }
+
+#overlay .title-header,
+#overlay .title-tap {
+  opacity: 0;
+  transition: opacity 1.1s ease;
+}
+
+#overlay .title-buttons {
+  opacity: 0;
+  transition: opacity 1.1s ease;
+  pointer-events: none;
+}
+
+#overlay.home-title .title-header,
+#overlay.home-title .title-tap { opacity: 1; }
+
+#overlay.home-buttons .title-buttons { opacity: 1; }
+
+#overlay .title-content { pointer-events: none; }
+
+#overlay.home-title .title-content { pointer-events: auto; }
+
+#overlay.home-buttons .title-buttons { pointer-events: auto; }
+
+#overlay h1 {
+  font-size: 62px;
+  margin: 0;
+  color: #fff;
+  letter-spacing: 0.5px;
+  filter: drop-shadow(0 4px 0 rgba(90, 42, 16, 0.85)) drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+}
+
+.title-word {
+  background: linear-gradient(180deg, #fff6e0 8%, #ffd166 48%, #ff6fa3 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+#overlay .tagline {
+  margin: 10px 0 2px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff3d6;
+  text-shadow: 0 2px 6px rgba(40, 16, 4, 0.65);
+}
+
+.title-content {
+  flex: 1 1 auto;
+  cursor: pointer;
+}
+
+.title-header {
+  position: absolute;
+  top: 20%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+}
+
+.title-tap {
+  position: absolute;
+  top: 62%;
+  left: 0;
+  right: 0;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: #fff3d6;
+  text-shadow: 0 2px 6px rgba(40, 16, 4, 0.6);
+}
+
+.title-tap > span {
+  display: inline-block;
+  animation: ro-hint-pulse 1.4s ease-in-out infinite;
+}
+
+#overlay .title-buttons {
+  flex: 0 0 auto;
+  margin-top: 0;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}

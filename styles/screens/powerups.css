@@ -1,0 +1,16 @@
+/* Power-ups collection grid.
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+.powerups-grid {
+  flex: 1;
+  min-height: 0;        /* let the grid SCROLL inside the capped modal instead of
+                           growing past it (and pushing Close off-screen) */
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));   /* 2-up on phones */
+  gap: 12px;
+  padding: 4px 6px;
+  margin-bottom: 14px;
+}
+
+.regulars-grid, .powerups-grid { display: block; }

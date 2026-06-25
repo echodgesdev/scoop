@@ -1,0 +1,21 @@
+/* Engine: the locked-aspect play area (#stage) + the canvas (#game).
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+#stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  background: #0b0b0f;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.5);
+}
+
+#game {
+  display: block;
+  /* Backing store is the virtual resolution; CSS stretches it to fill #stage,
+     which preserves the aspect ratio (so no distortion). */
+  width: 100%;
+  height: 100%;
+  /* Own all pointer gestures — no scroll/zoom/long-press interference on touch. */
+  touch-action: none;
+}
