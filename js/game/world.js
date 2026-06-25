@@ -307,6 +307,8 @@ export class World {
       return;
     }
     this.player.push(scoop.color);
+    // Springy cone recoil — the faster the scoop fell, the heavier the landing.
+    this.player.triggerRecoil(scoop.vy);
     if (perfect) {
       this.shop.addScore(SCORING.PERFECT_CATCH_BONUS);
       this.shop.refreshCombo();

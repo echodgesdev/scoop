@@ -272,6 +272,9 @@ export class GameFlow {
     if (i >= ATTRACT_SCOOPS.length) { this._revealHome(); return; }
     const color = /** @type {import('../types.js').ScoopColor} */ (ATTRACT_SCOOPS[i]);
     g.world.player.push(color);
+    // Same springy recoil as a real catch — no fall speed for a ghost, so let it
+    // default to the reference heft (a gentle, "normal" plop).
+    g.world.player.triggerRecoil();
     const pos = g.world.player.scoopPosition(i);
     g.effects.burst(pos.x, pos.y, [g.world.shop.hex(color), '#fff'], 9);
     g.sound.catch_();

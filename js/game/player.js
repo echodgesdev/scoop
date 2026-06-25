@@ -42,6 +42,19 @@ const HOVER_SPEED    = 3.4;  // rad/s — bob frequency (~0.5 Hz)
 const HOVER_EASE     = 6;    // amplitude ease rate (per second)
 const HOVER_MOVE_EPS = 6;    // px/s of real movement below which the cone counts as idle
 
+// Catch recoil — NOT physics. A caught scoop's weight punches the cone down, then a
+// damped spring rebounds it back up with a wobble, giving the falling scoops a weighty
+// landing. The downward kick grows SUPERLINEARLY with the scoop's fall speed (see
+// RECOIL_CURVE), so a fast scoop lands far springier than a slow one — not just a touch
+// heavier. The view adds `recoil` to the assembly's Y, so the cone AND the scoops riding
+// it bounce as one. Positive = down (canvas Y).
+const RECOIL_STIFF     = 200;   // spring stiffness (ω≈14 rad/s → ~0.44s bounce period)
+const RECOIL_DAMP      = 0.92;  // velocity kept per 1/60s tick (ζ≈0.18 → several springy bounces)
+const RECOIL_REF_SPEED = 340;   // reference fall speed the curve is anchored to; also the default kick for speed-less plops (~6px dip)
+const RECOIL_BASE_V    = 90;    // downward kick (px/s) at the reference fall speed (~6px dip)
+const RECOIL_CURVE     = 1.7;   // >1 = superlinear: faster scoops bounce disproportionately harder
+const RECOIL_MAX_V     = 440;   // cap so only the very fastest waves top out (~30px peak)
+
 /**
  * The cone the player drives. PURE MODEL: state, movement, and tray queries —
  * no rendering. The drawing lives in view/playerView.js, which reads this
@@ -94,6 +107,12 @@ export class Player {
     this.hoverT = 0;
     this.hoverAmp = 0;
     this.hoverY = 0;
+
+    // Catch recoil (presentation; see RECOIL_* above). A loose damped-spring vertical
+    // offset the view adds to the assembly: triggerRecoil() kicks `recoil` down on a
+    // catch and _tickRecoil springs it back. `recoilV` is its rate.
+    this.recoil = 0;
+    this.recoilV = 0;
   }
 
   /**
@@ -127,6 +146,8 @@ export class Player {
     this.hoverT = 0;
     this.hoverAmp = 0;
     this.hoverY = 0;
+    this.recoil = 0;
+    this.recoilV = 0;
   }
 
   /**
@@ -159,6 +180,17 @@ export class Player {
   }
 
   /**
+   * Advance the catch-recoil spring: a damped spring pulling the cone's vertical
+   * offset back to rest after a catch punched it down. Runs every frame (even while
+   * frozen) so a bounce keeps settling. @param {number} dt
+   */
+  _tickRecoil(dt) {
+    this.recoilV += -this.recoil * RECOIL_STIFF * dt;
+    this.recoilV *= Math.pow(RECOIL_DAMP, dt * 60);
+    this.recoil += this.recoilV * dt;
+  }
+
+  /**
    * @param {number} dt
    * @param {Input} input
    * @param {Bounds} bounds
@@ -185,6 +217,7 @@ export class Player {
     this._prevX = this.x;
     this._tickSlosh(dt, movedVx);
     this._tickHover(dt, movedVx);
+    this._tickRecoil(dt);
 
     if (this.frozen) {
       // Tutorial freeze: passive timers above still ran; just don't move.
@@ -285,6 +318,19 @@ export class Player {
   /** @param {number} [duration] */
   triggerFlash(duration = 0.4) {
     this.flash = duration;
+  }
+
+  /**
+   * A scoop just landed in the cone — punch the assembly down, then let _tickRecoil
+   * spring it back. The kick grows superlinearly with the scoop's fall speed
+   * (RECOIL_CURVE), so fast scoops land much springier than slow ones. Additive
+   * (rapid catches stack), capped at RECOIL_MAX_V. Speed defaults to the reference
+   * fall speed for speed-less plops (e.g. the title attract ghosts).
+   * @param {number} [speed] the caught scoop's fall speed (px/s)
+   */
+  triggerRecoil(speed = RECOIL_REF_SPEED) {
+    const kick = RECOIL_BASE_V * Math.pow(speed / RECOIL_REF_SPEED, RECOIL_CURVE);
+    this.recoilV = Math.min(this.recoilV + kick, RECOIL_MAX_V);
   }
 
   /**

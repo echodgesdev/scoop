@@ -50,7 +50,9 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
  * 1. render interpolation — everything is positioned off player.x, so shifting
  *    by (drawX − x) draws the whole assembly at the interpolated x;
  * 2. idle bob — hoverY (0 while moving) floats the assembly while standing still;
- * 3. handoff lean — a sin-bumped offset toward the customer that snaps back by
+ * 3. catch recoil — a springy vertical bounce when a scoop lands (player.recoil,
+ *    bigger for faster scoops), so the whole loaded cone reads as weighty;
+ * 4. handoff lean — a sin-bumped offset toward the customer that snaps back by
  *    the end of SERVE.HANDOFF_DURATION_S (the coordinated "reach").
  * @param {CanvasRenderingContext2D} ctx
  * @param {Player} player
@@ -58,7 +60,7 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
  */
 function applyAssemblyTransform(ctx, player, alpha) {
   let tx = player.drawX(alpha) - player.x;
-  let ty = player.hoverY;
+  let ty = player.hoverY + player.recoil;
   if (player.handoffT < SERVE.HANDOFF_DURATION_S) {
     const p = player.handoffT / SERVE.HANDOFF_DURATION_S;
     const ease = Math.sin(p * Math.PI);
