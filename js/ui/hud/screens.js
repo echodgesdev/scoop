@@ -210,8 +210,18 @@ export class Screens {
   }
 
   hideOverlay() {
-    this.overlayEl.classList.add('hidden');
+    this._clearHomeLayers();   // fade the wash / title / buttons back out
     this._setMenuVisible(false);
+  }
+
+  /** Fade the wash / title / buttons out (keeps the HUD hidden — used on tap-to-play). */
+  fadeHomeOut() {
+    this._clearHomeLayers();
+  }
+
+  /** Drop the staged-reveal classes so the wash / title / buttons fade out together. */
+  _clearHomeLayers() {
+    this.overlayEl.classList.remove('home-wash', 'home-title', 'home-buttons');
   }
 
   /**
@@ -227,6 +237,34 @@ export class Screens {
     this._setMenuVisible(true);
     this.overlayEl.classList.remove('hidden');
     this._wireMenuButtons();
+  }
+
+  /**
+   * Rebuild + wire the title screen but leave every layer faded OUT — the attract
+   * screen plops the scoops onto the cone first, then reveals the wash, title, and
+   * buttons in stages (revealHome*). Mirrors showTitle() minus the reveal.
+   */
+  beginAttract() {
+    this.hideSettings();
+    this.hidePauseMenu();
+    this.overlayEl.innerHTML = this._titleHtml;
+    this._setMenuVisible(true);
+    this._clearHomeLayers();
+    this.overlayEl.classList.remove('hidden');
+    this._wireMenuButtons();
+  }
+
+  /** Stage 1: slide the translucent wash over the screen (also enables tap-to-begin). */
+  revealHomeWash() {
+    if (this.overlayEl) this.overlayEl.classList.add('home-wash');
+  }
+  /** Stage 2: fade the title/header in (above the scoops). */
+  revealHomeTitle() {
+    if (this.overlayEl) this.overlayEl.classList.add('home-title');
+  }
+  /** Stage 3: fade the bottom buttons in (after the title) + make them clickable. */
+  revealHomeButtons() {
+    if (this.overlayEl) this.overlayEl.classList.add('home-buttons');
   }
 
   /**

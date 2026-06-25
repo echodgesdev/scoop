@@ -122,7 +122,7 @@ export class Game {
       challenges: this.world.challenges,
       regulars:   this.world.regulars,
       sound:      this.sound,
-      onStart:    () => this.start(),
+      onStart:    () => this.flow.beginPlay(),  // attract: burst the ghost scoops, then start
       onHowToPlay: () => this.start(true),  // replays the tutorial on demand
       getInGame:  () => this.running,       // disables How to Play during an active run
       getVolume:  () => this.sound.volume,
@@ -236,6 +236,11 @@ export class Game {
     // when the viewport actually changes the virtual dims. Lay out the actors and
     // paint the first frame now.
     this._applyAspect();
+
+    // Open on the title "attract" screen: the ambient beach animates, the cone
+    // plops its ghost scoops, then the title fades in (the loop runs; the sim
+    // stays frozen until the player taps to play).
+    this.flow.enterAttract();
   }
 
   /**
@@ -317,6 +322,9 @@ export class Game {
   /** @param {boolean} [forceTutorial] play the tutorial regardless of the flag (How to Play) */
   start(forceTutorial = false) {
     this.sound.resume();
+    // Leave the title attract screen (clears its flags + the cone's ghost tint);
+    // the world reset below drives the rest of the fresh-run state.
+    this.flow.exitAttract();
     this.hud.hideOverlay();
     this.effects.reset();
     this.customers.layout(this.bounds);
@@ -462,8 +470,9 @@ export class Game {
 
     // Visual-only systems run variable-step — including during the cashout /
     // night-cycle / death-sequence freezes, so particle pops keep animating while
-    // play is paused, and during game over so the death shake tapers out.
-    if (f.stepping() || f.inCashout || f.inNightCycle || f.inDeath || f.inGameOver) this.effects.update(frame);
+    // play is paused, during game over so the death shake tapers out, and on the
+    // title attract screen so the ghost-scoop plops + tap-to-play bursts animate.
+    if (f.stepping() || f.inCashout || f.inNightCycle || f.inDeath || f.inGameOver || f.inAttract) this.effects.update(frame);
 
     // During the death sequence the sim is frozen, so drive the customer slide-off
     // animation directly — angry customers walk off one by one (see flow._deathCustomersLeave).

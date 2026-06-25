@@ -1,5 +1,6 @@
 // @ts-check
 import { PICKUP_TYPE } from './game/config.js';
+import { PICKUPS } from './ui/powerupVisuals.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
@@ -11,17 +12,29 @@ import { PICKUP_TYPE } from './game/config.js';
  * @param {Game} game
  */
 export function wireReactions(game) {
+  // Fire the Sound method named in a pickup's descriptor (the table is the one
+  // place type → palette/name/sound lives). Falls back to the generic trigger.
+  /** @param {string} type a PICKUP_TYPE value */
+  const playPickupSound = (type) => {
+    const def = PICKUPS[type];
+    const fn = def && /** @type {any} */ (game.sound)[def.sound];
+    if (typeof fn === 'function') fn.call(game.sound);
+    else game.sound.powerupTrigger();
+  };
+
   game.bus.on('catch', ({ scoop, perfect }) => {
+    // The scoop is already on the stack, so its height (0-based) is the pitch
+    // step: each added scoop rings the next degree up the pentatonic scale.
+    game.sound.catch_(game.world.player.stack.length - 1);
     if (perfect) {
-      // Perfect catch: keep the burst + ding + flash, but no "Perfect!" word —
-      // floating text is reserved for the recipe name on serve.
+      // Perfect catch: layer the sparkle ding + burst + flash over the pitched
+      // note, but no "Perfect!" word — floating text is reserved for the recipe
+      // name on serve.
       const top = { x: scoop.x, y: game.world.player.stackTopY() };
       game.sound.perfect();
       game.haptics.catch_();
       game.effects.burst(top.x, top.y, ['#fff', game.world.shop.hex(scoop.color)], 10);
       game.world.player.triggerFlash(0.25);
-    } else {
-      game.sound.catch_();
     }
   });
 
@@ -62,8 +75,10 @@ export function wireReactions(game) {
   });
 
   // Accepted but the order still needs more — the "✓" tick at the customer.
+  // Plays the dedicated delivery sound, NOT the pentatonic stack tone (handing a
+  // scoop over isn't a stack pop). Completing the whole order rings match() above.
   game.bus.on('partialServe', ({ x, y }) => {
-    game.sound.catch_();
+    game.sound.deliver();
     game.effects.popText(x, y, '✓', { color: '#43aa8b', size: 22, life: 0.5 });
   });
 
@@ -72,26 +87,20 @@ export function wireReactions(game) {
     game.sound.bad();
   });
 
-  // A power-up fired (a tip or the combo breaker). Heart heal vs. a timed
-  // power-up differ only in the burst palette + which trigger ding plays.
-  // Power-up fired: a conical vortex of colored dots spiralling up around the CONE
-  // and dissipating — no text. (Names live in the Power-ups Journal tab; the
+  // A power-up fired. Palette + per-type sound come straight from the PICKUPS
+  // table (ui/powerupVisuals.js) — the one place a token's look/sound lives.
+  // Power-up fired: a conical vortex of colored shards spiralling up around the
+  // CONE and dissipating — no text. (Names live in the Power-ups Journal tab; the
   // in-play read is purely the color.)
   game.bus.on('powerup', ({ type }) => {
     const p = game.world.player;
     const cx = p.x, cy = p.y;
     const height = cy - p.scoopPosition(5).y;   // funnel fades out ~5 scoops tall
-    let palette;
-    switch (type) {
-      case PICKUP_TYPE.HEART:   palette = ['#ff4d6d', '#ff8fa3', '#ffd1dc']; break; // red
-      case PICKUP_TYPE.FEATHER: palette = ['#ffe14d', '#ffd166', '#fff3a0']; break; // yellow / lightning
-      case PICKUP_TYPE.PAUSE:   palette = ['#7ec8ff', '#bfe3ff', '#5cb8ff']; break; // blue / snow
-      case PICKUP_TYPE.RAINBOW: palette = ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff']; break;
-      default:                  palette = ['#ffd700', '#ffb703', '#ffe9a0'];        // fallback gold
-    }
+    const def = PICKUPS[type];
+    const palette = (def && def.palette) || ['#ffd700', '#ffb703', '#ffe9a0']; // fallback gold
     game.effects.vortex(cx, cy, palette, height);
     game.world.player.triggerFlash(0.2);
-    if (type === PICKUP_TYPE.HEART) game.sound.heart(); else game.sound.powerupTrigger();
+    playPickupSound(type);
     game.haptics.powerup();
   });
 
@@ -108,7 +117,9 @@ export function wireReactions(game) {
   game.bus.on('discard', ({ x, y, color }) => {
     game.world.player.launchToss(color, x, y);
     game.effects.burst(x, y, [game.world.shop.hex(color), '#fff'], 10);
-    game.sound.catch_();
+    // The scoop is already off the stack, so the remaining height equals the step
+    // the tossed scoop rang on the way up — replaying it walks the scale back down.
+    game.sound.catch_(game.world.player.stack.length);
   });
 
   // Coin tip ($): a yellow/orange vortex spiralling up around the cone — no text.
@@ -117,8 +128,8 @@ export function wireReactions(game) {
     const p = game.world.player;
     const cx = p.x, cy = p.y;
     const height = cy - p.scoopPosition(5).y;   // funnel fades out ~5 scoops tall
-    game.effects.vortex(cx, cy, ['#ffd700', '#ffb703', '#ffe9a0'], height);
-    game.sound.bubblePop();
+    game.effects.vortex(cx, cy, PICKUPS[PICKUP_TYPE.COIN].palette, height);
+    playPickupSound(PICKUP_TYPE.COIN);
   });
 
   // A challenge requirement was newly met — bottom-of-screen toast.

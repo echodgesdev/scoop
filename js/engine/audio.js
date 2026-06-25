@@ -1,6 +1,13 @@
 // @ts-check
 const VOLUME_KEY = 'scoop.volume';
 
+// Catch pitch climbs a major-pentatonic scale as the stack grows: each added
+// scoop plays the next degree, so building a tall stack rings out a rising riff.
+// Rooted at E5 (≈ the previous flat 660Hz catch), so a no-arg catch_() — used by
+// serves, discards, and the tipping mode — keeps its original pitch.
+const CATCH_ROOT_HZ = 659.25;             // E5
+const MAJOR_PENTATONIC = [0, 2, 4, 7, 9]; // semitone offsets from the root; wraps an octave per lap
+
 /**
  * Tiny WebAudio sound bank — synthesised tones, no asset files.
  * Must be unlocked from a user gesture (call resume() on Start).
@@ -64,7 +71,26 @@ export class Sound {
     osc.stop(t + dur + 0.02);
   }
 
-  catch_()  { this._tone(660, 0, 0.09, 'triangle', 0.18); }
+  /**
+   * Scoop landed on the stack. `step` is the 0-based stack height (0 = first
+   * scoop), mapped up the major-pentatonic scale so each scoop is a step higher.
+   * @param {number} [step]
+   */
+  catch_(step = 0) {
+    const n = MAJOR_PENTATONIC.length;
+    const semis = MAJOR_PENTATONIC[step % n] + 12 * Math.floor(step / n);
+    this._tone(CATCH_ROOT_HZ * Math.pow(2, semis / 12), 0, 0.09, 'triangle', 0.18);
+  }
+
+  /**
+   * A scoop handed to a customer — a soft, friendly "here you go" up-tick. Kept
+   * distinct from the catch/pop pentatonic tone so delivery never sounds like the
+   * stack; order COMPLETION still gets the bigger match() fanfare.
+   */
+  deliver() {
+    this._tone(587.33, 0,     0.05, 'sine', 0.15);  // D5
+    this._tone(880,    0.045, 0.09, 'sine', 0.16);  // A5 — quick warm rise
+  }
 
   /** A snappy descending "pop" — used for tip coins + the wave-end cashout. */
   bubblePop() {

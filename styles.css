@@ -431,11 +431,14 @@ body.day-hint #gauge::before {
 #overlay {
   position: absolute;
   inset: 0;
-  color: white;       /* background set by the parlor theme below */
+  color: white;       /* wash background is its own ::before layer (parlor theme below) */
   display: flex;
   flex-direction: column;   /* tap-to-begin content (flex:1) + bottom button bar */
   z-index: 20;
   text-align: center;
+  /* Default off + inert: the attract flow turns the layers (wash / title / buttons)
+     on in stages via the home-* classes, each of which also enables interaction. */
+  pointer-events: none;
 }
 
 #overlay h1 {
@@ -451,18 +454,31 @@ body.day-hint #gauge::before {
 /* (Title-screen buttons live in .title-buttons and pick up the .wt-buttons candy
    theme defined with the parlor styles near the end of this file.) */
 
-#overlay {
-  /* Cross-fades with the HUD when transitioning between menu and gameplay. */
-  transition: opacity 0.45s ease;
-  opacity: 1;
-}
-#overlay.hidden {
-  /* Faded out but still in the layout — pointer-events keeps it from
-     intercepting clicks. Avoids the hard cut that `display: none` would
-     give us. */
+/* The title reveals in stages over the live beach (driven by the attract flow):
+   the translucent wash slides over the whole screen (::before, below), then the
+   title/header, then the bottom buttons — each on its own slow fade. The home-*
+   classes gate the layers; removing them all fades everything back out (game
+   start). #overlay itself stays put at opacity 1 and only toggles interaction. */
+#overlay { opacity: 1; }
+#overlay .title-header,
+#overlay .title-tap {
   opacity: 0;
+  transition: opacity 1.1s ease;
+}
+#overlay .title-buttons {
+  opacity: 0;
+  transition: opacity 1.1s ease;
   pointer-events: none;
 }
+#overlay.home-title .title-header,
+#overlay.home-title .title-tap { opacity: 1; }
+#overlay.home-buttons .title-buttons { opacity: 1; }
+
+/* Interaction: tap-to-begin turns on with the wash (tap anywhere over the scene);
+   the bottom buttons become clickable once they've faded in. */
+#overlay .title-content { pointer-events: none; }
+#overlay.home-wash .title-content { pointer-events: auto; }
+#overlay.home-buttons .title-buttons { pointer-events: auto; }
 
 /* Keep every full-screen overlay's content clear of the screen edges AND the
    device safe areas (notch, rounded corners, home indicator). The page is
@@ -1860,13 +1876,22 @@ body.menu-visible #pauseBtn {
    the per-modal basics above.
    ========================================================================= */
 
-/* --- Title / game-over backdrop: golden-hour wash over the live beach scene
-       (the canvas paints the dawn beach behind this overlay now). --------- */
-#overlay {
+/* --- Title backdrop: a golden-hour wash over the live beach scene, as its OWN
+       layer (behind the title text) so it can slide over the screen on its own
+       slow fade before the title + buttons reveal. Gated by .home-wash. --------- */
+#overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background:
     radial-gradient(120% 70% at 50% 0%, rgba(255, 211, 145, 0.22), rgba(255, 211, 145, 0) 60%),
     linear-gradient(180deg, rgba(48, 26, 56, 0.45) 0%, rgba(82, 38, 24, 0.48) 55%, rgba(40, 19, 10, 0.66) 100%);
+  opacity: 0;
+  transition: opacity 1.1s ease;
+  pointer-events: none;
 }
+#overlay.home-wash::before { opacity: 1; }
 
 #overlay h1 {
   font-size: 62px;
@@ -2249,23 +2274,40 @@ body.sky-challenges #pauseBtn {
 /* === Home page (title screen) ============================================= */
 /* Tap anywhere on the content to begin; Journal · High Scores · Settings sit in a
    bottom bar (reusing the .wt-buttons candy theme), like the round-over modal. */
+/* Full-area tap target. The header + tap prompt inside are absolutely placed
+   against #overlay (the full stage) so they straddle the canvas cone — which is
+   fixed at mid-screen (GROUND_Y / BASE_HEIGHT = 50%, scoops ~39–50%). */
 .title-content {
   flex: 1 1 auto;
+  cursor: pointer;
+}
+.title-header {
+  position: absolute;
+  top: 20%;
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  padding: 24px 18px;
-  cursor: pointer;
+  padding: 0 18px;
 }
 .title-tap {
-  margin-top: 16px;
+  position: absolute;
+  top: 62%;
+  left: 0;
+  right: 0;
   font-size: 16px;
   font-weight: bold;
   letter-spacing: 0.5px;
   color: #fff3d6;
   text-shadow: 0 2px 6px rgba(40, 16, 4, 0.6);
+}
+/* The pulse lives on the inner span (opacity-based) so the outer .title-tap is
+   free to handle the staged reveal/hide fade — otherwise the infinite pulse would
+   override the reveal opacity and leave "tap to begin" stuck on screen. */
+.title-tap > span {
+  display: inline-block;
   animation: ro-hint-pulse 1.4s ease-in-out infinite;
 }
 #overlay .title-buttons {

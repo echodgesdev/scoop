@@ -157,11 +157,18 @@
     </div>
   </div>
 
+  <!-- Starts blank: the attract screen plops scoops onto the cone, then the wash,
+       title, and buttons fade in in stages (driven by the attract flow). -->
   <div id="overlay">
+    <!-- Tap anywhere to begin. The header sits ABOVE the cone's scoops and the
+         "tap to begin" prompt sits BELOW them (both placed against the full stage
+         so they line up with the canvas cone, which is fixed at mid-screen). -->
     <div class="title-content">
-      <h1><span class="title-word">Poop in a Scoop</span></h1>
-      <p class="tagline">Serve the beach’s freshest scoops!</p>
-      <div class="title-tap">tap to begin</div>
+      <div class="title-header">
+        <h1><span class="title-word">Poop in a Scoop</span></h1>
+        <p class="tagline">Serve the beach’s freshest scoops!</p>
+      </div>
+      <div class="title-tap"><span>tap to begin</span></div>
     </div>
     <div class="title-buttons wt-buttons">
       <button id="journalBtn" class="secondary">📔 Journal</button>

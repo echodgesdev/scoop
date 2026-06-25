@@ -30,6 +30,20 @@ const INTRO_HOLD_S = 2.2;
 // Waffle-cone debris palette for the game-over fracture (tan / caramel / cream chunks).
 const CONE_SHARD_COLORS = ['#e8b06a', '#d99a4e', '#c98a3c', '#fff4d6'];
 
+// Title "attract" screen: the scoop trio (bottom→top) that plops onto the centered
+// cone before the title fades in, plus the plop timing.
+const ATTRACT_SCOOPS = ['choco', 'pink', 'mint'];
+const ATTRACT_FIRST_PLOP_MS = 450;  // beat after entering before the first scoop drops
+const ATTRACT_PLOP_GAP_MS   = 360;  // gap between successive plops
+// Staged title reveal once the scoops are on (slow, separate fades): wash over the
+// screen, then the title, then the buttons.
+const HOME_WASH_TO_TITLE_MS    = 700;  // wash → title
+const HOME_TITLE_TO_BUTTONS_MS = 700;  // title → buttons
+// Tap-to-play: a short lead so the just-unlocked audio is live, then the scoops pop
+// off the cone (the end-of-round cashout beat) and the run starts.
+const ATTRACT_POP_LEAD_MS = 90;
+const ATTRACT_LAUNCH_MS   = 160;  // beat after the last pop before start() (→ the challenge list)
+
 export class GameFlow {
   /** @param {import('../game.js').Game} game the coordinator back-reference */
   constructor(game) {
@@ -65,6 +79,13 @@ export class GameFlow {
     // updating so the death shake tapers off instead of jittering forever (the
     // loop keeps rendering the ambient scene behind the panel).
     this.inGameOver = false;
+    // Title "attract" screen (the resting state between runs): the ambient beach
+    // keeps animating with the sim frozen, the cone sits centered + frozen with
+    // its ghost scoops, and the loop renders so clouds/ocean/effects move. Set by
+    // enterAttract, cleared by exitAttract (when a run starts).
+    this.inAttract = false;
+    // Guards the tap-to-play handoff so a double tap can't start two runs.
+    this._launching = false;
   }
 
   /**
@@ -83,6 +104,8 @@ export class GameFlow {
     this.dayRolling = false;
     this.inRoundIntro = false;
     this.inPauseMenu = false;
+    this.inAttract = false;
+    this._launching = false;
   }
 
   /**
@@ -113,6 +136,11 @@ export class GameFlow {
    */
   tick(frame) {
     const g = this.game;
+    // Title attract screen: the sim is frozen (running=false), so tick the cone
+    // directly — its passive timers run the ghost-scoop plop squash + slosh settle
+    // while it stays centered and frozen (no movement).
+    if (this.inAttract) g.world.player.update(frame, g.input, g.bounds);
+
     // Between-wave night cycle: a fast sunset→midnight→dawn sweep (moon arcs
     // across); when it lands the freeze lifts and the next day resumes.
     if (this.inNightCycle) {
@@ -166,20 +194,146 @@ export class GameFlow {
    */
   goHome() {
     const g = this.game;
-    this.sched.cancelAll();
-    g.running = false;
-    g.loop.stop();
-    this.inCashout = false;
-    this.inNightCycle = false;
-    this.inDeath = false;
-    this.inPauseMenu = false;
-    this.inGameOver = false;
-    g._dayHintShown = false;
-    g.hud.setDayHint(false);
     // Persist earned-but-uncommitted challenge progress before leaving (mirrors
     // _endGame; commitEarned is idempotent if the run already ended).
     g.world.challenges.commitEarned();
-    g.hud.showTitle();
+    // Drop into the title attract screen — it cancels any in-flight chain, stops
+    // the run loop, clears every phase, and replays the ghost-scoop intro.
+    this.enterAttract();
+  }
+
+  // === Title / attract screen =================================================
+
+  /**
+   * Enter the title "attract" screen — the resting state between runs and the
+   * first thing shown on boot. The ambient beach keeps animating (clouds, ocean)
+   * with the sim FROZEN; the cone sits centered + frozen with three ghost scoops
+   * that plop on one by one, then the title/header fades in. Tapping to play
+   * (beginPlay) bursts the scoops and starts the run. Idempotent.
+   */
+  enterAttract() {
+    const g = this.game;
+    this.sched.cancelAll();
+    g.loop.stop();
+    g.running = false;
+    g.paused = false;
+    // Clear every run phase — this IS the between-runs resting state.
+    this.inCashout = false;
+    this.inNightCycle = false;
+    this.inDeath = false;
+    this.inGameOver = false;
+    this.inPauseMenu = false;
+    this.inRoundIntro = false;
+    this.dayRolling = false;
+    this.nightT = 0;
+    this._launching = false;
+    // Clear any leftover actors from a finished run so the title shows a clean
+    // beach (the loop now renders live, so stale customers / falling scoops /
+    // power-up indicators would otherwise linger).
+    g.world.field.reset();
+    g.world.shop.customers.length = 0;
+    g.world.activeBubble = null;
+    g.world.puLeaving.length = 0;
+    g.world.powerups.reset();
+    // Cone: centered, frozen, empty, no death debris.
+    const p = g.world.player;
+    p.reposition(g.bounds.width / 2, CONE.Y);
+    p.clearStack();
+    p.frozen = true;
+    p.fractured = false;
+    g.effects.reset();
+    g.input.moveDelta = 0;
+    this.inAttract = true;
+    // Title starts faded out; the menu HUD fade stays on. Reveal after the plops.
+    g._dayHintShown = false;
+    g.hud.setDayHint(false);
+    g.hud.beginAttract();
+    // Render-only loop: shouldStep() is false (running=false), so the sim never
+    // advances — but _frame keeps painting the moving scene and ticking the cone
+    // (tick) + effects so the plops animate.
+    g.loop.start({
+      shouldStep: () => this.stepping(),
+      step: dt => g._step(dt),
+      render: (dt, alpha) => g._frame(dt, alpha)
+    });
+    this.sched.after(ATTRACT_FIRST_PLOP_MS, () => this._attractPlop(0));
+  }
+
+  /**
+   * Plop ghost scoop `i` onto the cone (it lands with the squash-pop), then chain
+   * to the next — or, once all three are on, fade the title in.
+   * @param {number} i
+   */
+  _attractPlop(i) {
+    const g = this.game;
+    if (!this.inAttract) return;
+    if (i >= ATTRACT_SCOOPS.length) { this._revealHome(); return; }
+    const color = /** @type {import('../types.js').ScoopColor} */ (ATTRACT_SCOOPS[i]);
+    g.world.player.push(color);
+    const pos = g.world.player.scoopPosition(i);
+    g.effects.burst(pos.x, pos.y, [g.world.shop.hex(color), '#fff'], 9);
+    g.sound.catch_();
+    this.sched.after(ATTRACT_PLOP_GAP_MS, () => this._attractPlop(i + 1));
+  }
+
+  /** Reveal the title in stages once the scoops are on: wash, then title, then buttons. */
+  _revealHome() {
+    const g = this.game;
+    if (!this.inAttract) return;
+    g.hud.revealHomeWash();
+    this.sched.after(HOME_WASH_TO_TITLE_MS, () => {
+      if (!this.inAttract) return;
+      g.hud.revealHomeTitle();
+      this.sched.after(HOME_TITLE_TO_BUTTONS_MS, () => {
+        if (this.inAttract) g.hud.revealHomeButtons();
+      });
+    });
+  }
+
+  /**
+   * Tap-to-play from the attract screen: fade the title out, pop the scoops off the
+   * cone one at a time (the same beat + sounds as the end-of-round cashout), then
+   * start the run — which raises the round's challenge list right as the cone
+   * empties. Cancels any pending plops/reveal and guards against a double tap. Off
+   * the attract screen, starts the run directly.
+   */
+  beginPlay() {
+    const g = this.game;
+    if (!this.inAttract) { g.start(); return; }
+    if (this._launching) return;
+    this._launching = true;
+    g.sound.resume();          // unlock audio (within the tap gesture) so the pops sound
+    this.sched.cancelAll();    // stop any queued plops / reveal stages
+    g.hud.fadeHomeOut();       // wash + title + buttons fade out (the scene brightens)
+    // A short lead so the just-unlocked audio is live, then run the cashout-style pop.
+    this.sched.after(ATTRACT_POP_LEAD_MS, () => this._attractPopStack());
+  }
+
+  /**
+   * Tap-to-play pop step: pop the cone's top scoop with a burst + the cashout sound,
+   * then chain down (the end-of-round teardown beat). Empty → start the run.
+   */
+  _attractPopStack() {
+    const g = this.game;
+    if (!this._launching) return;
+    const stack = g.world.player.stack;
+    if (stack.length === 0) { this.sched.after(ATTRACT_LAUNCH_MS, () => g.start()); return; }
+    const idx = stack.length - 1;
+    const pos = g.world.player.scoopPosition(idx);
+    const color = stack[idx].color;
+    g.world.player.popTop();
+    g.effects.burst(pos.x, pos.y, [g.world.shop.hex(color), '#fff'], 14);
+    g.sound.catch_();
+    this.sched.after(120, () => this._attractPopStack());
+  }
+
+  /**
+   * Leave the attract screen as a run starts (called by game.start). Clears the
+   * attract flags; start() drives the rest of the reset.
+   */
+  exitAttract() {
+    this.inAttract = false;
+    this._launching = false;
   }
 
   // === Wave-end cashout =======================================================
