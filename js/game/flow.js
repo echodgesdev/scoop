@@ -35,14 +35,10 @@ const CONE_SHARD_COLORS = ['#e8b06a', '#d99a4e', '#c98a3c', '#fff4d6'];
 const ATTRACT_SCOOPS = ['choco', 'pink', 'mint'];
 const ATTRACT_FIRST_PLOP_MS = 450;  // beat after entering before the first scoop drops
 const ATTRACT_PLOP_GAP_MS   = 360;  // gap between successive plops
-// Staged title reveal once the scoops are on (slow, separate fades): wash over the
-// screen, then the title, then the buttons.
-const HOME_WASH_TO_TITLE_MS    = 700;  // wash → title
-const HOME_TITLE_TO_BUTTONS_MS = 700;  // title → buttons
-// Tap-to-play: a short lead so the just-unlocked audio is live, then the scoops pop
-// off the cone (the end-of-round cashout beat) and the run starts.
-const ATTRACT_POP_LEAD_MS = 90;
-const ATTRACT_LAUNCH_MS   = 160;  // beat after the last pop before start() (→ the challenge list)
+// Staged title reveal once the scoops are on: the title fades in, then the buttons
+// fade in separately after it (each on its own slow fade — see styles.css).
+const HOME_TITLE_TO_BUTTONS_MS = 700;
+const ATTRACT_LAUNCH_MS = 160;  // beat after the last pop before start() (→ the challenge list)
 
 export class GameFlow {
   /** @param {import('../game.js').Game} game the coordinator back-reference */
@@ -213,6 +209,12 @@ export class GameFlow {
    */
   enterAttract() {
     const g = this.game;
+    // Wake the audio context now so the ghost-scoop plops are audible — nothing
+    // else resumes it before they fire on the title screen (it's otherwise only
+    // unlocked on a gesture / at run start). On a cold first load the browser may
+    // still hold it suspended until the first tap; the global first-gesture unlock
+    // (game.js) then covers any plops still in flight.
+    g.sound.resume();
     this.sched.cancelAll();
     g.loop.stop();
     g.running = false;
@@ -276,17 +278,13 @@ export class GameFlow {
     this.sched.after(ATTRACT_PLOP_GAP_MS, () => this._attractPlop(i + 1));
   }
 
-  /** Reveal the title in stages once the scoops are on: wash, then title, then buttons. */
+  /** Reveal the title once the scoops are on, then fade the buttons in after it. */
   _revealHome() {
     const g = this.game;
     if (!this.inAttract) return;
-    g.hud.revealHomeWash();
-    this.sched.after(HOME_WASH_TO_TITLE_MS, () => {
-      if (!this.inAttract) return;
-      g.hud.revealHomeTitle();
-      this.sched.after(HOME_TITLE_TO_BUTTONS_MS, () => {
-        if (this.inAttract) g.hud.revealHomeButtons();
-      });
+    g.hud.revealHomeTitle();
+    this.sched.after(HOME_TITLE_TO_BUTTONS_MS, () => {
+      if (this.inAttract) g.hud.revealHomeButtons();
     });
   }
 
@@ -304,9 +302,11 @@ export class GameFlow {
     this._launching = true;
     g.sound.resume();          // unlock audio (within the tap gesture) so the pops sound
     this.sched.cancelAll();    // stop any queued plops / reveal stages
-    g.hud.fadeHomeOut();       // wash + title + buttons fade out (the scene brightens)
-    // A short lead so the just-unlocked audio is live, then run the cashout-style pop.
-    this.sched.after(ATTRACT_POP_LEAD_MS, () => this._attractPopStack());
+    g.hud.fadeHomeOut();       // title + buttons fade out
+    // Pop the first scoop NOW — synchronously inside the tap gesture — so its sound
+    // actually fires (a setTimeout'd first pop plays outside the gesture and gets
+    // dropped by the autoplay policy). The rest chain on the cashout beat.
+    this._attractPopStack();
   }
 
   /**

@@ -91,21 +91,19 @@ export class Hud {
   }
   /**
    * Title attract screen: hide the journal + round-over modal and rebuild the
-   * title with every layer faded OUT (the attract flow plops the scoops, then
-   * reveals the wash/title/buttons in stages). The Home/boot entry point.
+   * title faded OUT (the attract flow plops the scoops, then fades the title in
+   * and the buttons after it). The Home/boot entry point.
    */
   beginAttract() {
     this.journal.hide();
     this.roundOver.hide();
     this.screens.beginAttract();
   }
-  // Staged title reveal (after the scoops plop): wash over the screen, then the
-  // title/header, then the bottom buttons — each on its own slow fade.
-  /** Stage 1: slide the translucent wash over the whole screen. */
-  revealHomeWash() { this.screens.revealHomeWash(); }
-  /** Stage 2: fade the title/header in. */
+  // Staged title reveal (after the scoops plop): the title/header fades in, then
+  // the bottom buttons after it — each on its own slow fade, over the clear scene.
+  /** Fade the title/header in. */
   revealHomeTitle() { this.screens.revealHomeTitle(); }
-  /** Stage 3: fade the bottom buttons in (after the title). */
+  /** Fade the bottom buttons in (after the title). */
   revealHomeButtons() { this.screens.revealHomeButtons(); }
   /** Fade the title layers back out on tap-to-play (without un-hiding the HUD). */
   fadeHomeOut() { this.screens.fadeHomeOut(); }

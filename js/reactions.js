@@ -117,9 +117,7 @@ export function wireReactions(game) {
   game.bus.on('discard', ({ x, y, color }) => {
     game.world.player.launchToss(color, x, y);
     game.effects.burst(x, y, [game.world.shop.hex(color), '#fff'], 10);
-    // The scoop is already off the stack, so the remaining height equals the step
-    // the tossed scoop rang on the way up — replaying it walks the scale back down.
-    game.sound.catch_(game.world.player.stack.length);
+    game.sound.catch_(game.world.player.stack.length - 1);
   });
 
   // Coin tip ($): a yellow/orange vortex spiralling up around the cone — no text.

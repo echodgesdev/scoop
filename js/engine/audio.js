@@ -72,13 +72,16 @@ export class Sound {
   }
 
   /**
-   * Scoop landed on the stack. `step` is the 0-based stack height (0 = first
-   * scoop), mapped up the major-pentatonic scale so each scoop is a step higher.
+   * Scoop landed on the stack. `step` is the scale degree (0 = root): catches step
+   * up the major-pentatonic, pops step down. Negative steps are valid — they dip
+   * below the root (popping the last scoop), via a floored modulo so the wrap is
+   * musical instead of NaN.
    * @param {number} [step]
    */
   catch_(step = 0) {
     const n = MAJOR_PENTATONIC.length;
-    const semis = MAJOR_PENTATONIC[step % n] + 12 * Math.floor(step / n);
+    const idx = ((step % n) + n) % n;          // floored mod — correct for negative steps too
+    const semis = MAJOR_PENTATONIC[idx] + 12 * Math.floor(step / n);
     this._tone(CATCH_ROOT_HZ * Math.pow(2, semis / 12), 0, 0.09, 'triangle', 0.18);
   }
 

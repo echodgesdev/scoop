@@ -210,18 +210,18 @@ export class Screens {
   }
 
   hideOverlay() {
-    this._clearHomeLayers();   // fade the wash / title / buttons back out
+    this._clearHomeLayers();   // fade the title / buttons back out
     this._setMenuVisible(false);
   }
 
-  /** Fade the wash / title / buttons out (keeps the HUD hidden — used on tap-to-play). */
+  /** Fade the title / buttons out (keeps the HUD hidden — used on tap-to-play). */
   fadeHomeOut() {
     this._clearHomeLayers();
   }
 
-  /** Drop the staged-reveal classes so the wash / title / buttons fade out together. */
+  /** Drop the staged-reveal classes so the title / buttons fade out together. */
   _clearHomeLayers() {
-    this.overlayEl.classList.remove('home-wash', 'home-title', 'home-buttons');
+    this.overlayEl.classList.remove('home-title', 'home-buttons');
   }
 
   /**
@@ -240,9 +240,9 @@ export class Screens {
   }
 
   /**
-   * Rebuild + wire the title screen but leave every layer faded OUT — the attract
-   * screen plops the scoops onto the cone first, then reveals the wash, title, and
-   * buttons in stages (revealHome*). Mirrors showTitle() minus the reveal.
+   * Rebuild + wire the title screen but leave it faded OUT — the attract screen
+   * plops the scoops onto the cone first, then fades the title in and the buttons
+   * after it (revealHome*). Mirrors showTitle() minus the reveal.
    */
   beginAttract() {
     this.hideSettings();
@@ -254,15 +254,11 @@ export class Screens {
     this._wireMenuButtons();
   }
 
-  /** Stage 1: slide the translucent wash over the screen (also enables tap-to-begin). */
-  revealHomeWash() {
-    if (this.overlayEl) this.overlayEl.classList.add('home-wash');
-  }
-  /** Stage 2: fade the title/header in (above the scoops). */
+  /** Fade the title/header in (above the scoops) + enable tap-to-begin. */
   revealHomeTitle() {
     if (this.overlayEl) this.overlayEl.classList.add('home-title');
   }
-  /** Stage 3: fade the bottom buttons in (after the title) + make them clickable. */
+  /** Fade the bottom buttons in (after the title) + make them clickable. */
   revealHomeButtons() {
     if (this.overlayEl) this.overlayEl.classList.add('home-buttons');
   }

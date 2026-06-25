@@ -137,6 +137,17 @@ export class Game {
     });
 
     this.sound   = new Sound();
+    // Unlock WebAudio on the FIRST user gesture anywhere (autoplay policy needs a
+    // gesture). The title screen's tap-to-play fires its cashout pops immediately,
+    // so the context must already be live by then — pointerdown precedes the click,
+    // giving it a head start. One-shot; removes itself once fired.
+    const unlockAudio = () => {
+      this.sound.resume();
+      window.removeEventListener('pointerdown', unlockAudio, true);
+      window.removeEventListener('keydown', unlockAudio, true);
+    };
+    window.addEventListener('pointerdown', unlockAudio, true);
+    window.addEventListener('keydown', unlockAudio, true);
     this.haptics = new Haptics();
     this.effects = new Effects();
     // Customer view (faces + speech bubbles). Pure presentation; the renderer

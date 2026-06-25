@@ -455,10 +455,9 @@ body.day-hint #gauge::before {
    theme defined with the parlor styles near the end of this file.) */
 
 /* The title reveals in stages over the live beach (driven by the attract flow):
-   the translucent wash slides over the whole screen (::before, below), then the
-   title/header, then the bottom buttons — each on its own slow fade. The home-*
-   classes gate the layers; removing them all fades everything back out (game
-   start). #overlay itself stays put at opacity 1 and only toggles interaction. */
+   the title/header fades in, then the bottom buttons after it — each on its own
+   slow fade, with no darkening wash over the scene. The home-* classes gate the
+   layers; removing them all fades everything back out (game start). */
 #overlay { opacity: 1; }
 #overlay .title-header,
 #overlay .title-tap {
@@ -474,10 +473,10 @@ body.day-hint #gauge::before {
 #overlay.home-title .title-tap { opacity: 1; }
 #overlay.home-buttons .title-buttons { opacity: 1; }
 
-/* Interaction: tap-to-begin turns on with the wash (tap anywhere over the scene);
+/* Interaction: tap-to-begin turns on with the title (tap anywhere over the scene);
    the bottom buttons become clickable once they've faded in. */
 #overlay .title-content { pointer-events: none; }
-#overlay.home-wash .title-content { pointer-events: auto; }
+#overlay.home-title .title-content { pointer-events: auto; }
 #overlay.home-buttons .title-buttons { pointer-events: auto; }
 
 /* Keep every full-screen overlay's content clear of the screen edges AND the
@@ -1876,22 +1875,8 @@ body.menu-visible #pauseBtn {
    the per-modal basics above.
    ========================================================================= */
 
-/* --- Title backdrop: a golden-hour wash over the live beach scene, as its OWN
-       layer (behind the title text) so it can slide over the screen on its own
-       slow fade before the title + buttons reveal. Gated by .home-wash. --------- */
-#overlay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(120% 70% at 50% 0%, rgba(255, 211, 145, 0.22), rgba(255, 211, 145, 0) 60%),
-    linear-gradient(180deg, rgba(48, 26, 56, 0.45) 0%, rgba(82, 38, 24, 0.48) 55%, rgba(40, 19, 10, 0.66) 100%);
-  opacity: 0;
-  transition: opacity 1.1s ease;
-  pointer-events: none;
-}
-#overlay.home-wash::before { opacity: 1; }
+/* (No title backdrop wash — the title + buttons fade in directly over the live
+   beach scene. Their drop-shadows carry the contrast.) */
 
 #overlay h1 {
   font-size: 62px;
