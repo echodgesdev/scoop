@@ -31,9 +31,9 @@ const REGULAR_EMPTY_COL = 0;         // column 0 = Empty white "shadow" — show
 /** @type {Map<string, number>} regular name → sprite-sheet row (animation index) */
 const REGULAR_ROW_BY_NAME = new Map(CUSTOMER_SPRITE.animations.map((a, i) => [a.name, i]));
 
-// Journal-coin tile size (a regular face crop sized to the coin) and the gauge
-// denominators per collection. (The recipe-scoop tile lives in coinTemplate.js.)
-const JCOIN_FACE_TILE = 70;
+// Gauge denominators per collection. (The journal coin's face/scoop crops are now
+// resolution-independent in CSS — see the --col/--row vars below — so there's no
+// pixel tile size to keep in step here.)
 const REGULAR_GAUGE_MAX = 50;
 const POWERUP_GAUGE_MAX = 100;
 // Ring-gauge fill colors per collection (power-ups use their own token color).
@@ -56,9 +56,33 @@ export function regularFacePos(name, unlocked, tile) {
 
 // === Collection coins (compose the shared coin component in coinTemplate.js) ==
 
-/** Regular face cropped from the customer sheet, sized to the coin. */
+// Per-character face fit. FACE_FILL is the fraction of its sheet cell each head's art
+// occupies VERTICALLY (measured from customer_sheet.png). Heads vary wildly here — a
+// bald head fills ~0.55, Chris (bald crown + full beard) fills 0.86 — so a single
+// element size makes some heads huge and others tiny. We divide TARGET_HEAD_PX by the
+// fill so EVERY head lands the same size on the coin. FACE_DY is an optional per-
+// character nudge (px). These are the art-direction knobs: LOWER a FACE_FILL to make
+// that head render bigger; set a FACE_DY to slide one up (−) or down (+).
+const TARGET_HEAD_PX = 70;
+const FACE_FILL = {
+  Annie: 0.58, Amara: 0.63, Sanjay: 0.65, Gerald: 0.55, Chad: 0.69, Missy: 0.66,
+  Karen: 0.78, Axel: 0.67, Reginald: 0.64, Chris: 0.86, Freddie: 0.75,
+  'Harvey Green': 0.65, Poop: 0.66
+};
+/** @type {Record<string, number>} per-character vertical nudge in px (default 0) */
+const FACE_DY = {};
+
+/**
+ * Regular face cropped from the customer sheet. Emits the sheet cell as --col/--row,
+ * a per-character --face-size (normalising every head to TARGET_HEAD_PX tall) and an
+ * optional --face-dy nudge; the CSS does the percentage crop + placement.
+ */
 function regularFaceInner(name, unlocked) {
-  return `<span class="jcoin-face-img${unlocked ? '' : ' locked'}" style="background-position:${regularFacePos(name, unlocked, JCOIN_FACE_TILE)}"></span>`;
+  const row = REGULAR_ROW_BY_NAME.get(name) || 0;
+  const col = unlocked ? REGULAR_FACE_COL : REGULAR_EMPTY_COL;
+  const size = Math.round(TARGET_HEAD_PX / (FACE_FILL[name] || 0.64));
+  const dy = FACE_DY[name] || 0;
+  return `<span class="jcoin-face-img${unlocked ? '' : ' locked'}" style="--col:${col};--row:${row};--face-size:${size}px;--face-dy:${dy}px"></span>`;
 }
 
 /** One regular coin's props: face crop, ring = served / REGULAR_GAUGE_MAX. */
@@ -137,7 +161,7 @@ const COIN_PROPS = {
  */
 export function coinGrid(kind, items) {
   const props = COIN_PROPS[kind];
-  return `<div class="jcoin-grid">${items.map(it => coinHtml(props(it))).join('')}</div>`;
+  return `<div class="jcoin-grid">${items.map((it, i) => coinHtml({ ...props(it), index: i })).join('')}</div>`;
 }
 
 // === Detail popups (tap a coin → the fuller info) =============================

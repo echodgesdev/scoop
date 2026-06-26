@@ -61,8 +61,6 @@
   box-shadow: inset 0 0 0 3px var(--ring, rgba(255, 255, 255, 0.6)), 0 4px 12px rgba(40, 16, 4, 0.35);
 }
 
-.wt-reveal-scoops .jcoin-scoops { gap: 4px; }
-
 #waveTransitionOverlay {
   /* absolute (not fixed) so it fills the letterboxed #stage, not the whole window. */
   position: absolute;

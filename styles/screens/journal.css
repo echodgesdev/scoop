@@ -80,26 +80,67 @@ button.flash {
 .jcoin {
   flex: 0 0 96px;   /* fixed cell so rows wrap predictably and center cleanly */
   display: flex; flex-direction: column; align-items: center; gap: 5px;
-  background: none; border: none; padding: 4px 2px; cursor: pointer; font-family: inherit;
+  /* extra top padding leaves room for the contents to pop up out of the coin */
+  background: none; border: none; padding: 14px 2px 4px; cursor: pointer; font-family: inherit;
+  /* The coin behaves like a physical, pick-up-able chip: it lifts on hover/focus and
+     presses back down on click — the affordance that says "tap me for details". */
+  transition: transform 0.12s ease;
 }
+
+.jcoin:hover, .jcoin:focus-visible { transform: translateY(-4px); outline: none; }
+
+.jcoin:active { transform: translateY(-1px); }
 
 .jcoin-gauge {
   position: relative;
   width: 86px; height: 86px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: conic-gradient(var(--ring, #ffd700) calc(var(--pct, 0) * 1%), rgba(0, 0, 0, 0.13) 0);
-  box-shadow: 0 2px 6px rgba(40, 16, 4, 0.25);
+  /* Drop shadow lifting the whole coin off the page/gauge behind it; deepens on hover. */
+  box-shadow: 0 4px 7px rgba(40, 16, 4, 0.3);
+  transition: box-shadow 0.12s ease;
+  overflow: visible;   /* let the contents pop out past the rim */
 }
 
+/* Grid coins drop into place on open, staggered by --i — a one-time "settle" that
+   makes them read as tappable objects. Scoped to .jcoin so the scaled-up detail-
+   popup gauge (.jdetail-coin .jcoin-gauge) is left alone. */
+.jcoin .jcoin-gauge {
+  animation: jcoin-drop 0.34s cubic-bezier(0.2, 0.85, 0.3, 1.1) both;
+  animation-delay: calc(var(--i, 0) * 35ms);
+}
+
+.jcoin:hover .jcoin-gauge, .jcoin:focus-visible .jcoin-gauge {
+  box-shadow: 0 11px 15px rgba(40, 16, 4, 0.34);
+}
+
+.jcoin:active .jcoin-gauge { box-shadow: 0 3px 5px rgba(40, 16, 4, 0.3); }
+
+@keyframes jcoin-drop {
+  0%   { transform: translateY(-10px) scale(0.86); }
+  60%  { transform: translateY(0) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* The cream "coin" disc the contents pop out of. Its own drop shadow lifts it off
+   the gauge ring sitting behind it; the contents then pop off this in turn. */
 .jcoin-face {
-  position: relative;
+  position: absolute; inset: 0; margin: auto;
   width: 70px; height: 70px; border-radius: 50%; overflow: hidden;
-  display: flex; align-items: center; justify-content: center;
   background: radial-gradient(circle at 50% 38%, #fffefb, #ffe9b8);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7), 0 3px 5px rgba(40, 16, 4, 0.32);
 }
 
-.jcoin-emoji { font-size: 32px; line-height: 1; }
+/* The contents layer — NOT clipped, so heads/dollops spill above the rim. The
+   drop-shadow filter casts them onto the coin below for the "popping out" depth. */
+.jcoin-pop {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(40, 16, 4, 0.4));
+}
+
+.jcoin-emoji { font-size: 34px; line-height: 1; }
 
 .jcoin-name {
   font-weight: bold; color: #6a4a2a; font-size: 12px; text-align: center;
@@ -110,27 +151,83 @@ button.flash {
 
 .jcoin.locked .jcoin-name { color: #9a8463; }
 
-.jcoin-star { position: absolute; right: -2px; top: -2px; font-size: 18px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)); }
+.jcoin-star { position: absolute; right: -2px; top: -2px; font-size: 18px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3)); z-index: 3; }
 
+/* Customer head: a resolution-independent sprite crop (--col/--row + percentage
+   background math) so the head can be sized larger than the coin and lifted, letting
+   it crown out above the rim. */
 .jcoin-face-img {
-  width: 70px; height: 70px;
+  flex: none;   /* never let the flex parent squeeze a square crop into a rectangle */
+  /* --face-size normalises every head to the same on-coin height (computed per
+     character from its art); --face-dy is an optional per-character nudge. */
+  width: var(--face-size, 112px); height: var(--face-size, 112px);
   background-image: url('../../assets/customer_sheet.png');
-  background-size: 490px 980px;   /* 7×70 by 14×70 */
+  background-size: 700% 1400%;   /* 7 cols × 14 rows */
+  background-position: calc(var(--col, 0) * 100% / 6) calc(var(--row, 0) * 100% / 13);
   background-repeat: no-repeat;
+  /* heads are centred in their cell — a small global lift so the crown crests the rim
+     and the chin rests inside; per-character --face-dy fine-tunes individuals. */
+  transform: translateY(calc(-10px + var(--face-dy, 0px)));
 }
 
 .jcoin-face-img.locked { filter: grayscale(1) brightness(0.62); }
 
-.jcoin-scoops { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-
-.jcoin-scoop {
-  width: 20px; height: 20px;
-  background-image: url('../../assets/hud_scoop_sheet.png');
-  background-size: 140px 20px;    /* 7×20, one row */
-  background-repeat: no-repeat;
+/* Recipe dollops: a spaced, bottom-aligned row that curves like a carousel. The middle
+   "hero" (odd counts) is enlarged, upright and in front; flanks are smaller, gently
+   fanned (--tilt) and RAISED (--raise) so the outer dollops sit higher on the Y axis.
+   Sizes come from --sz; a real gap keeps them separated. The group is centred. */
+.jcoin-scoops {
+  flex: none;
+  display: flex; align-items: flex-end; justify-content: center; gap: 5px;
+  transform: translateY(-2px);
 }
 
+.jcoin-scoop {
+  flex: none;   /* never let the flex parent squeeze a square crop into a rectangle */
+  position: relative;
+  width: calc(var(--sz, 40) * 1px); height: calc(var(--sz, 40) * 1px);
+  background-image: url('../../assets/hud_scoop_sheet.png');
+  background-size: 700% 100%;   /* 7 cols, one row — crop by --col */
+  background-position: calc(var(--col, 0) * 100% / 6) 0;
+  background-repeat: no-repeat;
+  transform-origin: bottom center;
+  /* raise the outer dollops (carousel arc) and apply the gentle outward fan */
+  transform: translateY(calc(var(--raise, 0) * -1px)) rotate(calc(var(--tilt, 0) * 1deg));
+}
+
+.jcoin-scoop.hero { z-index: 2; }   /* upright middle sits in front; size comes from --sz */
+
 .jcoin-scoop.empty { filter: grayscale(1) brightness(0.62); }
+
+/* Recipe coins carry a 3-wide row of spaced dollops, so give them a wider cell than
+   the single-face collections — the trio stays centred without crowding neighbours. */
+.recipes-list .jcoin { flex: 0 0 124px; }
+
+/* Idle "foil" glint: a soft highlight sweeps across each coin's face periodically,
+   staggered by --i so it ripples across the grid. This is the touch-friendly "these
+   are tappable" cue — no hover needed. Clipped to the coin circle; rests between
+   sweeps so it reads as an occasional gleam, not a constant shimmer. */
+.jcoin .jcoin-gauge::after {
+  content: '';
+  position: absolute; inset: 0; border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 38%, rgba(255, 255, 255, 0.42) 50%, transparent 62%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: 150% 0;
+  animation: jcoin-glint 5s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 0.22s);
+}
+
+@keyframes jcoin-glint {
+  0%, 14% { background-position: 150% 0; }    /* wait off to the side */
+  34%     { background-position: -60% 0; }    /* sweep across */
+  100%    { background-position: -60% 0; }    /* rest until the next cycle */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jcoin, .jcoin .jcoin-gauge, .jcoin .jcoin-gauge::after { transition: none; animation: none; }
+}
 
 #journalDetail {
   position: fixed; inset: 0; z-index: 105;
@@ -172,7 +269,7 @@ button.flash {
 
 .jdetail-coin.locked { opacity: 0.7; }
 
-.jdetail-coin .jcoin-gauge { transform: scale(1.55); margin: 28px 0 32px; }
+.jdetail-coin .jcoin-gauge { transform: scale(1.55); margin: 42px 0 34px; }
 
 .jdetail-name { font-weight: bold; color: #6a4a2a; font-size: 22px; }
 
