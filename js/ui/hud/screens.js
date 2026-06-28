@@ -240,9 +240,9 @@ export class Screens {
   }
 
   /**
-   * Rebuild + wire the title screen but leave it faded OUT — the attract screen
-   * plops the scoops onto the cone first, then fades the title in and the buttons
-   * after it (revealHome*). Mirrors showTitle() minus the reveal.
+   * Rebuild + wire the title screen but leave it faded OUT — the attract flow fades
+   * the logo sign in first, then plops the scoops onto the cone, then the tap-to-
+   * begin + buttons (revealHome*). Mirrors showTitle() minus the reveal.
    */
   beginAttract() {
     this.hideSettings();
@@ -254,11 +254,11 @@ export class Screens {
     this._wireMenuButtons();
   }
 
-  /** Fade the title/header in (above the scoops) + enable tap-to-begin. */
+  /** Fade the logo sign in (the FIRST attract beat, before the scoops) + enable tap. */
   revealHomeTitle() {
     if (this.overlayEl) this.overlayEl.classList.add('home-title');
   }
-  /** Fade the bottom buttons in (after the title) + make them clickable. */
+  /** Fade the tap-to-begin + bottom buttons in (after the scoops plop) + clickable. */
   revealHomeButtons() {
     if (this.overlayEl) this.overlayEl.classList.add('home-buttons');
   }

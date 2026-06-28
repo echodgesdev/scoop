@@ -91,8 +91,8 @@ export class Hud {
   }
   /**
    * Title attract screen: hide the journal + round-over modal and rebuild the
-   * title faded OUT (the attract flow plops the scoops, then fades the title in
-   * and the buttons after it). The Home/boot entry point.
+   * title faded OUT (the attract flow fades the logo sign in first, then plops the
+   * scoops, then the tap-to-begin + buttons). The Home/boot entry point.
    */
   beginAttract() {
     this.journal.hide();

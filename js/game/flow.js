@@ -33,11 +33,12 @@ const CONE_SHARD_COLORS = ['#e8b06a', '#d99a4e', '#c98a3c', '#fff4d6'];
 // Title "attract" screen: the scoop trio (bottom→top) that plops onto the centered
 // cone before the title fades in, plus the plop timing.
 const ATTRACT_SCOOPS = ['choco', 'pink', 'mint'];
-const ATTRACT_FIRST_PLOP_MS = 450;  // beat after entering before the first scoop drops
-const ATTRACT_PLOP_GAP_MS   = 360;  // gap between successive plops
-// Staged title reveal once the scoops are on: the title fades in, then the buttons
-// fade in separately after it (each on its own slow fade — see styles.css).
-const HOME_TITLE_TO_BUTTONS_MS = 700;
+// Attract beat order: the logo SIGN fades in FIRST, holds, THEN the scoops plop
+// onto the cone (the sign's arrow points at them), and finally the tap-to-begin +
+// buttons fade in. Each fade is a slow opacity transition — see styles.css.
+const ATTRACT_LOGO_HOLD_MS = 850;  // sign fade-in beat before the first scoop drops
+const ATTRACT_PLOP_GAP_MS  = 360;  // gap between successive plops
+const ATTRACT_BUTTONS_MS   = 300;  // beat after the last plop before tap-to-begin + buttons fade in
 const ATTRACT_LAUNCH_MS = 160;  // beat after the last pop before start() (→ the challenge list)
 
 export class GameFlow {
@@ -203,8 +204,9 @@ export class GameFlow {
   /**
    * Enter the title "attract" screen — the resting state between runs and the
    * first thing shown on boot. The ambient beach keeps animating (clouds, ocean)
-   * with the sim FROZEN; the cone sits centered + frozen with three ghost scoops
-   * that plop on one by one, then the title/header fades in. Tapping to play
+   * with the sim FROZEN; the cone sits centered + frozen. The logo sign fades in
+   * FIRST, then three ghost scoops plop onto the cone one by one (the sign's arrow
+   * points at them), then the tap-to-begin + buttons fade in. Tapping to play
    * (beginPlay) bursts the scoops and starts the run. Idempotent.
    */
   enterAttract() {
@@ -246,7 +248,7 @@ export class GameFlow {
     g.effects.reset();
     g.input.moveDelta = 0;
     this.inAttract = true;
-    // Title starts faded out; the menu HUD fade stays on. Reveal after the plops.
+    // Everything starts faded out; the menu HUD fade stays on.
     g._dayHintShown = false;
     g.hud.setDayHint(false);
     g.hud.beginAttract();
@@ -258,12 +260,14 @@ export class GameFlow {
       step: dt => g._step(dt),
       render: (dt, alpha) => g._frame(dt, alpha)
     });
-    this.sched.after(ATTRACT_FIRST_PLOP_MS, () => this._attractPlop(0));
+    // Sign FIRST: fade the logo in, hold a beat, THEN start plopping the scoops.
+    g.hud.revealHomeTitle();
+    this.sched.after(ATTRACT_LOGO_HOLD_MS, () => this._attractPlop(0));
   }
 
   /**
    * Plop ghost scoop `i` onto the cone (it lands with the squash-pop), then chain
-   * to the next — or, once all three are on, fade the title in.
+   * to the next — or, once all three are on, fade in the tap-to-begin + buttons.
    * @param {number} i
    */
   _attractPlop(i) {
@@ -281,12 +285,11 @@ export class GameFlow {
     this.sched.after(ATTRACT_PLOP_GAP_MS, () => this._attractPlop(i + 1));
   }
 
-  /** Reveal the title once the scoops are on, then fade the buttons in after it. */
+  /** Scoops are on — fade in the tap-to-begin + buttons (the sign is already up). */
   _revealHome() {
     const g = this.game;
     if (!this.inAttract) return;
-    g.hud.revealHomeTitle();
-    this.sched.after(HOME_TITLE_TO_BUTTONS_MS, () => {
+    this.sched.after(ATTRACT_BUTTONS_MS, () => {
       if (this.inAttract) g.hud.revealHomeButtons();
     });
   }

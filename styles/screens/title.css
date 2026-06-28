@@ -21,11 +21,6 @@
   pointer-events: none;
 }
 
-#overlay h1 {
-  font-size: 64px;
-  margin: 0;
-}
-
 #overlay p {
   font-size: 22px;
   max-width: 600px;
@@ -45,9 +40,12 @@
   pointer-events: none;
 }
 
-#overlay.home-title .title-header,
-#overlay.home-title .title-tap { opacity: 1; }
+/* Staged reveal: the SIGN (.title-header) fades in FIRST (home-title); the scoops
+   then plop onto the cone; the tap-to-begin + buttons fade in LAST (home-buttons).
+   Driven by game/flow.js (enterAttract → _attractPlop → _revealHome). */
+#overlay.home-title .title-header { opacity: 1; }
 
+#overlay.home-buttons .title-tap,
 #overlay.home-buttons .title-buttons { opacity: 1; }
 
 #overlay .title-content { pointer-events: none; }
@@ -56,29 +54,6 @@
 
 #overlay.home-buttons .title-buttons { pointer-events: auto; }
 
-#overlay h1 {
-  font-size: 62px;
-  margin: 0;
-  color: #fff;
-  letter-spacing: 0.5px;
-  filter: drop-shadow(0 4px 0 rgba(90, 42, 16, 0.85)) drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
-}
-
-.title-word {
-  background: linear-gradient(180deg, #fff6e0 8%, var(--gold) 48%, var(--pink) 95%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-#overlay .tagline {
-  margin: 10px 0 2px;
-  font-size: 20px;
-  font-weight: bold;
-  color: #fff3d6;
-  text-shadow: 0 2px 6px rgba(40, 16, 4, 0.65);
-}
-
 .title-content {
   flex: 1 1 auto;
   cursor: pointer;
@@ -86,7 +61,11 @@
 
 .title-header {
   position: absolute;
-  top: 20%;
+  /* High on the screen so the sign's down-pointing arrow reaches the cone, which
+     rests centered at mid-screen during the attract beat. Tuned for the portrait
+     layout — if the arrow tip drifts off the top scoop on a very different aspect,
+     nudge this `top` and the `.title-logo` width below. */
+  top: 4%;
   left: 0;
   right: 0;
   display: flex;
@@ -94,6 +73,16 @@
   align-items: center;
   gap: 8px;
   padding: 0 18px;
+}
+
+/* The wordmark IS the logo sign now (assets/logo_sheet.png, 1024×1167), its arrow
+   pointing down at the cone. `width` is the alignment knob; height follows the art
+   aspect. The sign carries its own outline/shadow, so just a soft cast here. */
+.title-logo {
+  width: min(66vw, 460px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.32));
 }
 
 .title-tap {
