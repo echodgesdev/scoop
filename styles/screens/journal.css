@@ -178,7 +178,8 @@ button.flash {
    Sizes come from --sz; a real gap keeps them separated. The group is centred. */
 .jcoin-scoops {
   flex: none;
-  display: flex; align-items: flex-end; justify-content: center; gap: 5px;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding-top: var(--pad-top, 0);   /* per scoop-count (set in coinScoops) — pushes the row down */
   transform: translateY(-2px);
 }
 
@@ -194,6 +195,10 @@ button.flash {
   /* raise the outer dollops (carousel arc) and apply the gentle outward fan */
   transform: translateY(calc(var(--raise, 0) * -1px)) rotate(calc(var(--tilt, 0) * 1deg));
 }
+
+/* Inter-dollop spacing as a margin (not flex gap) so a trio can use a NEGATIVE --gap
+   to overlap; the value is set per scoop-count in coinScoops. */
+.jcoin-scoop:not(:first-child) { margin-left: var(--gap, 5px); }
 
 .jcoin-scoop.hero { z-index: 2; }   /* upright middle sits in front; size comes from --sz */
 

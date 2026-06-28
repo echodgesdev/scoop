@@ -34,17 +34,26 @@ export function coinScoops(colors, locked, size) {
   const cols = locked ? Array.from({ length: size }, () => HUD_SCOOP_COL.empty) : colors.map(c => HUD_SCOOP_COL[c]);
   const n = cols.length;
   const centre = (n - 1) / 2;
-  // A separated, carousel-like row: on odd counts the middle dollop is the enlarged,
-  // upright "hero" sitting low and in front; the flanks are smaller, gently fanned, and
-  // RAISED on the Y axis (the further from centre, the higher) so the row curves like a
-  // carousel. Size / tilt / raise are emitted as CSS vars (applied in styles.css).
+  // Spacing differs per scoop-count (the enlarged middle dollop means a trio has to pull
+  // TIGHTER than a pair): gap = space between dollops (px; negative overlaps them),
+  // padTop = how far the row is pushed down, heroDrop = how far the middle dollop sits
+  // BELOW the flank baseline (sides stay put). These are the per-count tuning knobs.
+  const SPACING = {
+    1: { gap: 0,  padTop: 0,  heroDrop: 0 },
+    2: { gap: 5,  padTop: 20, heroDrop: 0 },
+    3: { gap: -3, padTop: 0,  heroDrop: 6 }
+  };
+  const { gap, padTop, heroDrop } = SPACING[n] || SPACING[3];
+  // A carousel-like row: on odd counts the middle dollop is the enlarged, upright "hero"
+  // sitting low and in front; the flanks are smaller, gently fanned, and RAISED on the Y
+  // axis (further from centre → higher) so the row curves. Vars are applied in styles.css.
   const scoops = cols.map((col, i) => {
     const d = i - centre;                                       // signed distance from centre
     const isHero = n % 2 === 1 && d === 0;
     const sz = isHero ? 48 : n === 1 ? 50 : n === 2 ? 40 : 30;  // flanks recede in a trio
     const tilt = Math.round(d * 6);                             // gentle outward fan
-    const raise = Math.round(Math.abs(d) * 11);                 // outer dollops sit higher
+    const raise = isHero ? -heroDrop : Math.round(Math.abs(d) * 11);   // flanks rise; hero drops
     return `<span class="jcoin-scoop${isHero ? ' hero' : ''}${locked ? ' empty' : ''}" style="--col:${col};--sz:${sz};--tilt:${tilt};--raise:${raise}"></span>`;
   }).join('');
-  return `<span class="jcoin-scoops">${scoops}</span>`;
+  return `<span class="jcoin-scoops" style="--gap:${gap}px;--pad-top:${padTop}px">${scoops}</span>`;
 }
