@@ -28,7 +28,6 @@
 
 #overlay { opacity: 1; }
 
-#overlay .title-header,
 #overlay .title-tap {
   opacity: 0;
   transition: opacity 1.1s ease;
@@ -40,11 +39,9 @@
   pointer-events: none;
 }
 
-/* Staged reveal: the SIGN (.title-header) fades in FIRST (home-title); the scoops
-   then plop onto the cone; the tap-to-begin + buttons fade in LAST (home-buttons).
-   Driven by game/flow.js (enterAttract → _attractPlop → _revealHome). */
-#overlay.home-title .title-header { opacity: 1; }
-
+/* Staged reveal: the canvas sign (titleLogoView) fades in FIRST; the scoops then
+   plop onto the cone; the tap-to-begin + buttons fade in LAST (home-buttons).
+   home-title only turns on tap-to-play. Driven by game/flow.js. */
 #overlay.home-buttons .title-tap,
 #overlay.home-buttons .title-buttons { opacity: 1; }
 
@@ -57,32 +54,6 @@
 .title-content {
   flex: 1 1 auto;
   cursor: pointer;
-}
-
-.title-header {
-  position: absolute;
-  /* High on the screen so the sign's down-pointing arrow reaches the cone, which
-     rests centered at mid-screen during the attract beat. Tuned for the portrait
-     layout — if the arrow tip drifts off the top scoop on a very different aspect,
-     nudge this `top` and the `.title-logo` width below. */
-  top: 4%;
-  left: 0;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 0 18px;
-}
-
-/* The wordmark IS the logo sign now (assets/logo_sheet.png, 1024×1167), its arrow
-   pointing down at the cone. `width` is the alignment knob; height follows the art
-   aspect. The sign carries its own outline/shadow, so just a soft cast here. */
-.title-logo {
-  width: min(66vw, 460px);
-  height: auto;
-  display: block;
-  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.32));
 }
 
 .title-tap {

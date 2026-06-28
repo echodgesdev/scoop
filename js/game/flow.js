@@ -202,6 +202,13 @@ export class GameFlow {
   // === Title / attract screen =================================================
 
   /**
+   * True while the canvas title sign (ui/view/titleLogoView.js) should be visible:
+   * on the attract screen and not yet launching a run. Flips false the instant a
+   * tap starts play, so the sign fades out as the scoops pop.
+   */
+  get showAttractLogo() { return this.inAttract && !this._launching; }
+
+  /**
    * Enter the title "attract" screen — the resting state between runs and the
    * first thing shown on boot. The ambient beach keeps animating (clouds, ocean)
    * with the sim FROZEN; the cone sits centered + frozen. The logo sign fades in
@@ -260,7 +267,9 @@ export class GameFlow {
       step: dt => g._step(dt),
       render: (dt, alpha) => g._frame(dt, alpha)
     });
-    // Sign FIRST: fade the logo in, hold a beat, THEN start plopping the scoops.
+    // Sign FIRST: the canvas logo (titleLogoView, gated by showAttractLogo) fades
+    // itself in now; revealHomeTitle just turns on tap-to-play. Hold a beat so the
+    // sign reads before the scoops, THEN start plopping them onto the cone.
     g.hud.revealHomeTitle();
     this.sched.after(ATTRACT_LOGO_HOLD_MS, () => this._attractPlop(0));
   }

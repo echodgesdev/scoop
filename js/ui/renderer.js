@@ -5,6 +5,7 @@ import { drawPlayer } from './view/playerView.js';
 import { drawActivePowerup } from './view/activePowerupView.js';
 import { drawHitboxes, drawFps } from './view/debugView.js';
 import { drawBanner, drawPauseOverlay } from './view/overlayView.js';
+import { drawTitleLogo } from './view/titleLogoView.js';
 
 /** @typedef {import('../game.js').Game} Game */
 
@@ -49,6 +50,10 @@ export function drawFrame(ctx, game, alpha = 1) {
   // Tutorial hint pills — over the scene but under the effect bursts.
   if (game.tutorial.active) game.tutorial.draw(ctx, game);
   game.effects.draw(ctx);
+
+  // Title sign (attract screen only) — drawn in cone space so its arrow points at
+  // the scoop; fades itself in/out via game.flow.showAttractLogo.
+  drawTitleLogo(ctx, game);
 
   drawHitboxes(ctx, game);
 

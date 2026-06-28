@@ -254,7 +254,7 @@ export class Screens {
     this._wireMenuButtons();
   }
 
-  /** Fade the logo sign in (the FIRST attract beat, before the scoops) + enable tap. */
+  /** Turn on tap-to-play. (The sign itself is canvas-drawn now — see titleLogoView.) */
   revealHomeTitle() {
     if (this.overlayEl) this.overlayEl.classList.add('home-title');
   }
