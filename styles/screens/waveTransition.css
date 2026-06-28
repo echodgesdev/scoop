@@ -20,7 +20,7 @@
   background-size: 840px 1680px;     /* 7×120 by 14×120 — matches REGULAR_FACE_TILE */
   background-repeat: no-repeat;
   background-color: #ffe9b8;
-  border: 3px solid #d9b285;
+  border: 3px solid var(--btn-cream-shadow);
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6), 0 4px 12px rgba(40, 16, 4, 0.35);
   backface-visibility: hidden;
 }
@@ -29,7 +29,7 @@
 
 .wt-reveal-front { transform: rotateY(180deg); }
 
-.wt-reveal-label { font-weight: bold; color: #8a4a2a; font-size: 16px; }
+.wt-reveal-label { font-weight: bold; color: var(--ink-muted); font-size: 16px; }
 
 .wt-reveal-item { animation: wt-reveal-in 0.25s ease both; }
 
@@ -41,7 +41,7 @@
   justify-content: center;
   font-size: 58px;
   line-height: 1;
-  border-color: var(--ring, #d9b285);
+  border-color: var(--ring, var(--btn-cream-shadow));
   box-shadow: inset 0 0 0 3px var(--ring, rgba(255, 255, 255, 0.6)), 0 4px 12px rgba(40, 16, 4, 0.35);
 }
 
@@ -57,7 +57,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-color: var(--ring, #d9b285);
+  border-color: var(--ring, var(--btn-cream-shadow));
   box-shadow: inset 0 0 0 3px var(--ring, rgba(255, 255, 255, 0.6)), 0 4px 12px rgba(40, 16, 4, 0.35);
 }
 
@@ -87,19 +87,19 @@
   max-width: 560px;
   width: 92%;
   text-align: center;
-  color: #3a2a1a;
+  color: var(--ink);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
 }
 
 .wt-title {
   margin: 0 0 6px 0;
   font-size: 28px;
-  color: #c1121f;
+  color: var(--danger);
 }
 
 .wt-subtitle {
   font-weight: bold;
-  color: #6a4a2a;
+  color: var(--ink);
   margin-bottom: 14px;
   font-size: 15px;
 }
@@ -123,7 +123,7 @@
 
 .wt-new-label {
   font-weight: bold;
-  color: #06d6a0;
+  color: var(--go);
   text-align: center;
   letter-spacing: 1px;
   font-size: 13px;
@@ -142,11 +142,11 @@
 #waveTransitionOverlay .wt-home-btn { grid-column: auto; justify-self: stretch; padding: 12px 8px; }
 
 .pause-modal .wt-title {
-  color: #6a4a2a;
+  color: var(--ink);
 }
 
-.wave-transition-modal .wt-title { color: #c1121f; }
+.wave-transition-modal .wt-title { color: var(--danger); }
 
-.pause-modal .wt-title { color: #8a4a2a; }
+.pause-modal .wt-title { color: var(--ink-muted); }
 
 #waveTransitionOverlay { padding: 0; background: transparent; }

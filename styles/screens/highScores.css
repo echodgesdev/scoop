@@ -4,7 +4,7 @@
 #highScoresOverlay {
   position: absolute;
   inset: 0;
-  background: rgba(32, 17, 8, 0.62);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,12 +29,12 @@
 
 .highscore-label {
   font-size: 13px; font-weight: bold; text-transform: uppercase;
-  letter-spacing: 0.6px; color: #9a7a52;
+  letter-spacing: 0.6px; color: var(--ink-faint);
 }
 
-.highscore-value { font-size: 24px; font-weight: bold; color: #3a2a1a; }
+.highscore-value { font-size: 24px; font-weight: bold; color: var(--ink); }
 
-.highscore-empty { color: #8a6a4a; font-size: 15px; padding: 14px 8px; text-align: center; }
+.highscore-empty { color: var(--ink-faint); font-size: 15px; padding: 14px 8px; text-align: center; }
 
 #closeHighScoresBtn {
   margin-top: 14px;
@@ -46,7 +46,7 @@
   border-radius: 999px;
   color: #fff;
   cursor: pointer;
-  background: linear-gradient(180deg, #d9a263, #bb7f47 60%, #a96e39);
-  box-shadow: 0 4px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  background: linear-gradient(180deg, var(--btn-bevel-top), var(--btn-bevel-mid) 60%, var(--btn-bevel-bot));
+  box-shadow: 0 4px 0 var(--btn-bevel-shadow), inset 0 2px 0 rgba(255, 255, 255, 0.35);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
 }

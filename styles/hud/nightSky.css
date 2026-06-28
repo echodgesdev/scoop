@@ -42,7 +42,7 @@
 
 #nightSky .challenge-title { color: #fff; }
 
-#nightSky .challenge-count { color: #ffd166; }
+#nightSky .challenge-count { color: var(--gold); }
 
 #nightSky .challenge-row.completed .challenge-title { color: #cfcfcf; }
 

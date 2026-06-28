@@ -4,6 +4,7 @@ import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../../game/pla
 import { SCOOP_STATE, drawScoopSprite } from '../sprites/scoopRenderer.js';
 import { drawPlayerCone, CONE_FRAME } from '../sprites/coneRenderer.js';
 import { glowCircle } from '../effects/glow.js';
+import { SEMANTIC } from '../palette.js';
 
 /** @typedef {import('../../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../../game/player.js').Player} Player */
@@ -77,7 +78,7 @@ function applyAssemblyTransform(ctx, player, alpha) {
  */
 function drawServeFlash(ctx, player) {
   if (player.flash > 0) {
-    glowCircle(ctx, player.x, player.y, CONE.WIDTH * 0.75, '#ffec5c', Math.min(1, player.flash / 0.2));
+    glowCircle(ctx, player.x, player.y, CONE.WIDTH * 0.75, SEMANTIC.goldHi, Math.min(1, player.flash / 0.2));
   }
 }
 

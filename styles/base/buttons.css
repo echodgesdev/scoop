@@ -37,8 +37,11 @@
 }
 
 .wt-buttons .wt-play-btn {
-  background: #06d6a0;
-  color: #fff;
+  background: var(--go);
+  /* Dark ink on the bright green: white-on-#06d6a0 is 1.9:1 (fails WCAG AA);
+     ink-on-go is 7.3:1 (AAA) and keeps the candy green the primary CTA reads as. */
+  color: var(--go-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
   font-size: 16px;
 }
 
@@ -56,9 +59,9 @@
   cursor: pointer;
   color: #fff;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
-  background: linear-gradient(180deg, #2fe3b4, #06d6a0 55%, #04b58a);
+  background: linear-gradient(180deg, var(--go-hi), var(--go) 55%, var(--go-deep));
   box-shadow:
-    0 5px 0 #038f6d,
+    0 5px 0 var(--go-shadow),
     0 8px 16px rgba(40, 16, 4, 0.28),
     inset 0 2px 0 rgba(255, 255, 255, 0.4);
   transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
@@ -78,19 +81,19 @@
 }
 
 .wt-buttons .secondary {
-  background: linear-gradient(180deg, #fffdf6, #ffeed2);
-  color: #7a5230;
-  border: 2px solid #e8c9a0;
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--btn-cream-bot));
+  color: var(--ink-muted);
+  border: 2px solid var(--btn-cream-edge);
   text-shadow: none;
   box-shadow:
-    0 5px 0 #d9b285,
+    0 5px 0 var(--btn-cream-shadow),
     0 8px 16px rgba(40, 16, 4, 0.2),
     inset 0 2px 0 rgba(255, 255, 255, 0.85);
 }
 
 .wt-buttons .secondary:active {
   box-shadow:
-    0 1px 0 #d9b285,
+    0 1px 0 var(--btn-cream-shadow),
     0 3px 8px rgba(40, 16, 4, 0.18),
     inset 0 2px 0 rgba(255, 255, 255, 0.7);
 }
@@ -98,8 +101,8 @@
 #closeJournalBtn,
 #closeSettingsBtn {
   border-radius: 999px;
-  background: linear-gradient(180deg, #d9a263, #bb7f47 60%, #a96e39);
-  box-shadow: 0 4px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.35);
+  background: linear-gradient(180deg, var(--btn-bevel-top), var(--btn-bevel-mid) 60%, var(--btn-bevel-bot));
+  box-shadow: 0 4px 0 var(--btn-bevel-shadow), inset 0 2px 0 rgba(255, 255, 255, 0.35);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
   transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
 }
@@ -110,16 +113,16 @@
 #closeJournalBtn:active,
 #closeSettingsBtn:active {
   transform: translateY(3px);
-  box-shadow: 0 1px 0 #7e5224, inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 1px 0 var(--btn-bevel-shadow), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }
 
 @keyframes button-flash {
-  from { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 4px #ffb703; }
-  to   { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 24px #ffb703, 0 0 12px #ff6fa3; }
+  from { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 4px var(--gold-deep); }
+  to   { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 24px var(--gold-deep), 0 0 12px var(--pink); }
 }
 
 #journalOverlay,
-#settingsOverlay { background: rgba(32, 17, 8, 0.62); }
+#settingsOverlay { background: var(--scrim); }
 
 #waveTransitionOverlay,
-#pauseOverlay { background: rgba(32, 17, 8, 0.55); }
+#pauseOverlay { background: var(--scrim-soft); }

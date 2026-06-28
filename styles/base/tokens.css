@@ -37,4 +37,45 @@
     repeating-linear-gradient(-45deg, rgba(193, 122, 30, 0.05) 0 2px, transparent 2px 16px),
     linear-gradient(180deg, rgba(255, 250, 240, 0.48) 0%, rgba(255, 239, 200, 0.44) 100%);
   --waffle-edge: #b97a42;
+
+  /* === HUD-only chrome tokens =================================================
+     Colours that live ONLY on the DOM/HUD (never on the canvas), so they stay in
+     CSS rather than in js/ui/palette.js. The brown "candy button" bevel + the
+     cream "secondary button" bevel were duplicated verbatim across buttons.css,
+     journal.css, highScores.css and settings.css — named here once. */
+  --btn-bevel-top:    #d9a263;
+  --btn-bevel-mid:    #bb7f47;
+  --btn-bevel-bot:    #a96e39;
+  --btn-bevel-shadow: #7e5224;
+  --btn-cream-top:    #fffdf6;
+  --btn-cream-bot:    #ffeed2;
+  --btn-cream-edge:   #e8c9a0;
+  --btn-cream-shadow: #d9b285;
+  --scrim:            rgba(32, 17, 8, 0.62);  /* modal backdrop over the parlor */
+  --scrim-soft:       rgba(32, 17, 8, 0.55);
+}
+
+/* === Injected palette ========================================================
+   The SEMANTIC + FLAVOUR custom properties below are NOT declared here — they are
+   written onto :root at boot by js/ui/palette.js (installPaletteVars), so the
+   canvas and the HUD share one source of truth. Referenced across the stylesheets
+   as var(--go), var(--gold), var(--danger), var(--ink), var(--pink) … :
+     --go --go-hi --go-deep --go-shadow --go-ink
+     --gold --gold-hi --gold-deep
+     --danger --danger-bright   --heat --heat-mid --heat-hi
+     --pink --pink-hi --pink-deep
+     --ink --ink-muted --ink-faint   --outline --vanilla-rim
+     --pink --mint --choco --vanilla --blueberry   (flavours)
+   If a value looks "missing" in devtools, palette.js failed to run — it is not a
+   CSS bug. */
+
+/* === Bright-text-on-light rule ==============================================
+   Gold or white text on a cream/white surface reads at ~1.4:1 raw (gold-on-cream)
+   — effectively invisible. The game rescued this ad-hoc with per-element shadows;
+   this is the ONE canonical definition. Apply `.bright-on-light` to any gold/white
+   label sitting on a light ground so the rescue is a rule, not a habit. The token
+   is exposed too, for elements that compose their own multi-layer shadow. */
+:root { --text-edge-ink: rgba(40, 16, 4, 0.85); }
+.bright-on-light {
+  text-shadow: 0 1px 0 var(--text-edge-ink), 0 0 2px var(--text-edge-ink);
 }

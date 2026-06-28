@@ -9,9 +9,9 @@
   animation: celebrate-pulse 1.4s ease-in-out infinite;
 }
 
-.celebration.unlock { color: #ff6fa3; }
+.celebration.unlock { color: var(--pink); }
 
-.celebration.master { color: #ffb703; }
+.celebration.master { color: var(--gold-deep); }
 
 @keyframes celebrate-pulse {
   0%, 100% { transform: scale(1); }
@@ -39,7 +39,7 @@
   padding: 6px 10px;
   font-size: 13px;
   font-weight: bold;
-  color: #ffe27a;
+  color: var(--gold-hi);
   text-align: center;
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
   animation: ch-done-pulse 1.8s ease-in-out infinite;
@@ -84,7 +84,7 @@
 
 .challenge-title {
   font-weight: bold;
-  color: #3a2a1a;
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -93,18 +93,18 @@
 .challenge-count {
   font-size: 12px;
   font-weight: bold;
-  color: #6a4a2a;
+  color: var(--ink);
   text-align: right;
 }
 
 .challenge-row.completed .challenge-count {
-  color: #06d6a0;
+  color: var(--go);
   font-size: 18px;
 }
 
 .challenge-row.check-pop .challenge-count {
   animation: cc-check-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  color: #06d6a0;
+  color: var(--go);
   font-size: 22px;
   text-shadow: 0 0 10px rgba(6, 214, 160, 0.7);
 }

@@ -22,13 +22,15 @@
  * @property {string} sound     Sound (engine/audio.js) method name fired on trigger
  */
 
+import { SEMANTIC } from './palette.js';
+
 /** @type {Record<string, PickupDef>} */
 export const PICKUPS = {
   heart: {
     name: 'Heart',
     desc: 'Patches you up — restores some health instantly.',
     icon: '❤️',
-    ring: '#ff6fa3',
+    ring: SEMANTIC.pink,
     palette: ['#ff4d6d', '#ff8fa3', '#ffd1dc'],
     sound: 'heart'
   },
@@ -52,7 +54,7 @@ export const PICKUPS = {
     name: 'Rainbow',
     desc: 'Every scoop counts as any color — serve any order for a few seconds.',
     icon: '🌈',
-    ring: '#ffd166',
+    ring: SEMANTIC.gold,
     palette: ['#ff5b5b', '#ffb15c', '#fff36a', '#7fe3c4', '#6a8cff', '#c067ff'],
     sound: 'rainbowPickup'
   },

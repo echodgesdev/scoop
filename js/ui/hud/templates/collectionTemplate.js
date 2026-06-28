@@ -14,6 +14,7 @@ import CUSTOMER_SPRITE from '../../sprites/customerSprite.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME, PICKUP_DESC } from '../../powerupVisuals.js';
 import { coinVisual, coinHtml, coinScoops } from './coinTemplate.js';
 import { challengeRow } from './challengeTemplate.js';
+import { SEMANTIC } from '../../palette.js';
 
 /**
  * The journal's coin kinds. Doubles as the `data-kind` on each coin button (which
@@ -37,9 +38,9 @@ const REGULAR_ROW_BY_NAME = new Map(CUSTOMER_SPRITE.animations.map((a, i) => [a.
 const REGULAR_GAUGE_MAX = 50;
 const POWERUP_GAUGE_MAX = 100;
 // Ring-gauge fill colors per collection (power-ups use their own token color).
-const REGULAR_RING = '#06d6a0';
-export const RECIPE_RING = '#ffb703';
-const CHALLENGE_RING = '#ff6fa3';
+const REGULAR_RING = SEMANTIC.go;
+export const RECIPE_RING = SEMANTIC.goldDeep;
+const CHALLENGE_RING = SEMANTIC.pink;
 
 /**
  * CSS background-position locating a regular's face on the customer sheet: the

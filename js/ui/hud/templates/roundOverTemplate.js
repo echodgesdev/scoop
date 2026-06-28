@@ -12,6 +12,7 @@ import { GROUP_BY_ID } from '../../../game/recipes.js';
 import { PICKUP_ICONS, PICKUP_RING_COLOR, PICKUP_NAME } from '../../powerupVisuals.js';
 import { coinScoops } from './coinTemplate.js';
 import { regularFacePos, RECIPE_RING } from './collectionTemplate.js';
+import { SEMANTIC } from '../../palette.js';
 
 // The unlock-reveal face tile (px) — larger than the journal coin's; matches styles.css.
 const REGULAR_FACE_TILE = 120;
@@ -51,13 +52,13 @@ export function rewardToCard(r) {
     return {
       kind: 'powerup',
       emoji: PICKUP_ICONS[r.value] || '⚡',
-      ring: PICKUP_RING_COLOR[r.value] || '#ffd166',
+      ring: PICKUP_RING_COLOR[r.value] || SEMANTIC.gold,
       label: `New Power-up — ${PICKUP_NAME[r.value] || r.value}!`
     };
   }
   if (r.type === 'unlock_section') {
     const g = GROUP_BY_ID.get(r.value);
-    return { kind: 'section', emoji: g ? g.emoji : '🍨', ring: '#ffd166', label: `New Recipes — ${g ? g.name : r.value}!` };
+    return { kind: 'section', emoji: g ? g.emoji : '🍨', ring: SEMANTIC.gold, label: `New Recipes — ${g ? g.name : r.value}!` };
   }
   return null;
 }
@@ -92,7 +93,7 @@ export function unlockCardHtml(item) {
         <div class="wt-reveal-label">New Flavor — <b>${item.name}</b>!</div>
       </div>`;
   }
-  const ring = item.ring || '#ffd166';
+  const ring = item.ring || SEMANTIC.gold;
   return `<div class="wt-reveal-item">
       <div class="wt-reveal-coin"><div class="wt-reveal-inner">
         <div class="wt-reveal-face wt-reveal-back wt-reveal-emoji" style="--ring:${ring}">?</div>

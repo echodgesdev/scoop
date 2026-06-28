@@ -33,9 +33,15 @@ import { Loop } from './engine/loop.js';
 import { World } from './game/world.js';
 import { GameFlow } from './game/flow.js';
 import { TouchControls } from './engine/touch.js';
+import { installPaletteVars } from './ui/palette.js';
 
 /** @typedef {import('./types.js').GameEventMap} GameEventMap */
 /** @typedef {import('./types.js').PickupTypeName} PickupTypeName */
+
+// Mirror the shared colour palette (js/ui/palette.js) into the document :root as
+// CSS custom properties, so the HUD stylesheets and the canvas draw from ONE source.
+// Runs at module load, before the Game is constructed or anything paints.
+installPaletteVars();
 
 // Physics step: deterministic per-frame integration. The render loop accumulates
 // real time and runs as many fixed steps as fit. Effects are visual-only and

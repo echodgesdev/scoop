@@ -28,7 +28,7 @@
 }
 
 #challengeToast .toast-check {
-  color: #06d6a0;
+  color: var(--go);
   font-size: 22px;
 }
 
@@ -36,5 +36,5 @@
 
 #challengeToast {
   background: rgba(58, 36, 18, 0.92);
-  border: 2px solid #ffd166;
+  border: 2px solid var(--gold);
 }

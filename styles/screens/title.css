@@ -3,7 +3,7 @@
 
 #overlay .record {
   font-size: 30px;
-  color: #ffd166;
+  color: var(--gold);
   text-shadow: 0 0 12px rgba(255, 200, 0, 0.7);
   margin: 4px 0;
 }
@@ -65,7 +65,7 @@
 }
 
 .title-word {
-  background: linear-gradient(180deg, #fff6e0 8%, #ffd166 48%, #ff6fa3 95%);
+  background: linear-gradient(180deg, #fff6e0 8%, var(--gold) 48%, var(--pink) 95%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

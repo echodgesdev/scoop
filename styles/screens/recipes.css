@@ -14,7 +14,7 @@
   align-items: baseline;
   font-weight: bold;
   margin: 12px 0 4px 0;
-  color: #6a4a2a;
+  color: var(--ink);
   border-bottom: 1px solid rgba(0, 0, 0, 0.15);
   padding-bottom: 4px;
 }
@@ -23,7 +23,7 @@
 
 .recipe-section-total {
   font-size: 12px;
-  color: #8a6a4a;
+  color: var(--ink-faint);
   font-weight: bold;
 }
 

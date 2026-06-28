@@ -23,7 +23,7 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  color: #3a2a1a;
+  color: var(--ink);
 }
 
 .settings-modal h2 {
@@ -47,10 +47,10 @@
   font-weight: bold;
   border-radius: 999px;
   cursor: pointer;
-  color: #7a5230;
-  background: linear-gradient(180deg, #fffdf6, #ffeed2);
-  border: 2px solid #e8c9a0;
-  box-shadow: 0 5px 0 #d9b285, 0 8px 16px rgba(40, 16, 4, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.85);
+  color: var(--ink-muted);
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--btn-cream-bot));
+  border: 2px solid var(--btn-cream-edge);
+  box-shadow: 0 5px 0 var(--btn-cream-shadow), 0 8px 16px rgba(40, 16, 4, 0.2), inset 0 2px 0 rgba(255, 255, 255, 0.85);
   transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
 }
 
@@ -58,7 +58,7 @@
 
 .settings-howto-btn:active {
   transform: translateY(4px);
-  box-shadow: 0 1px 0 #d9b285, 0 3px 8px rgba(40, 16, 4, 0.18), inset 0 2px 0 rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 0 var(--btn-cream-shadow), 0 3px 8px rgba(40, 16, 4, 0.18), inset 0 2px 0 rgba(255, 255, 255, 0.7);
 }
 
 .settings-howto-btn:disabled {
@@ -73,7 +73,7 @@
 
 .settings-row > label {
   font-weight: bold;
-  color: #6a4a2a;
+  color: var(--ink);
 }
 
 .settings-row-check {
@@ -115,15 +115,15 @@
   font-weight: bold;
   font-size: 14px;
   padding: 10px;
-  border: 2px solid #c1121f;
+  border: 2px solid var(--danger);
   background: #fff;
-  color: #c1121f;
+  color: var(--danger);
   border-radius: 8px;
   cursor: pointer;
 }
 
 #resetProgressBtn:hover {
-  background: #c1121f;
+  background: var(--danger);
   color: #fff;
 }
 

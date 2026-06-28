@@ -8,7 +8,7 @@
   flex-direction: column;
   /* 80% opacity so the scene shows faintly through the modal. */
   background: linear-gradient(180deg, rgba(255, 248, 214, 0.8) 0%, rgba(255, 228, 166, 0.8) 100%);
-  color: #3a2a1a;
+  color: var(--ink);
 }
 
 .ro-content {
@@ -35,7 +35,7 @@
   font-size: 14px;
   font-weight: bold;
   letter-spacing: 0.5px;
-  color: #9a7a52;
+  color: var(--ink-faint);
   animation: ro-hint-pulse 1.4s ease-in-out infinite;
 }
 
@@ -72,10 +72,10 @@
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  color: #9a7a52;
+  color: var(--ink-faint);
 }
 
-.ro-score-value { font-size: 20px; font-weight: bold; color: #3a2a1a; }
+.ro-score-value { font-size: 20px; font-weight: bold; color: var(--ink); }
 
 .ro-carousel {
   position: relative;

@@ -1,6 +1,7 @@
 // @ts-check
 import { PICKUP_TYPE } from './game/config.js';
 import { PICKUPS } from './ui/powerupVisuals.js';
+import { SEMANTIC, FLAVOR } from './ui/palette.js';
 
 /** @typedef {import('./game.js').Game} Game */
 
@@ -79,7 +80,7 @@ export function wireReactions(game) {
   // scoop over isn't a stack pop). Completing the whole order rings match() above.
   game.bus.on('partialServe', ({ x, y }) => {
     game.sound.deliver();
-    game.effects.popText(x, y, '✓', { color: '#43aa8b', size: 22, life: 0.5 });
+    game.effects.popText(x, y, '✓', { color: SEMANTIC.go, size: 22, life: 0.5 });
   });
 
   // The combo chain decayed (patience timeout) — a soft "lost it" beep.
@@ -97,7 +98,7 @@ export function wireReactions(game) {
     const cx = p.x, cy = p.y;
     const height = cy - p.scoopPosition(5).y;   // funnel fades out ~5 scoops tall
     const def = PICKUPS[type];
-    const palette = (def && def.palette) || ['#ffd700', '#ffb703', '#ffe9a0']; // fallback gold
+    const palette = (def && def.palette) || [SEMANTIC.gold, SEMANTIC.goldDeep, SEMANTIC.goldHi]; // fallback gold
     game.effects.vortex(cx, cy, palette, height);
     game.world.player.triggerFlash(0.2);
     playPickupSound(type);
@@ -109,7 +110,7 @@ export function wireReactions(game) {
   game.bus.on('comboBreak', ({ x, y }) => {
     game.sound.perfect();
     game.effects.addShake(12);
-    game.effects.burst(x, y, ['#ffec5c', '#ff6fa3', '#7fe3c4', '#6a8cff', '#fff'], 36);
+    game.effects.burst(x, y, [SEMANTIC.goldHi, FLAVOR.pink, FLAVOR.mint, FLAVOR.blueberry, '#fff'], 36);
   });
 
   // Toss-top (upward gesture): launch a stretch-and-fade ghost of the popped
@@ -149,7 +150,7 @@ export function wireReactions(game) {
     game.haptics.phaseUp();
     game.effects.addShake(4);
     const c = game.hud.gaugeCenter();
-    if (c) game.effects.burst(c.x, c.y, ['#ffd166', '#fff'], 14);
+    if (c) game.effects.burst(c.x, c.y, [SEMANTIC.gold, '#fff'], 14);
   });
 
   game.bus.on('waveUp', () => {
@@ -160,6 +161,6 @@ export function wireReactions(game) {
     game.haptics.wave();
     game.effects.addShake(14);
     const c = game.hud.gaugeCenter();
-    if (c) game.effects.burst(c.x, c.y, ['#ffec5c', '#ffd166', '#ff6fa3', '#7fe3c4'], 60);
+    if (c) game.effects.burst(c.x, c.y, [SEMANTIC.goldHi, SEMANTIC.gold, FLAVOR.pink, FLAVOR.mint], 60);
   });
 }

@@ -7,6 +7,7 @@
 
 import { glowRoundRect } from '../effects/glow.js';
 import { drawHudScoop, HUD_SCOOP_COL } from '../sprites/hudScoopRenderer.js';
+import { SEMANTIC } from '../palette.js';
 
 /** @typedef {import('../../types.js').Customer} Customer */
 
@@ -96,11 +97,11 @@ function coneProximityAlpha(c, cx, coneX) {
  * @param {{ cx: number, bubbleBottom: number, left: number, top: number, bubbleW: number, active: boolean, servable: boolean }} g
  */
 function drawBubbleShell(ctx, { cx, bubbleBottom, left, top, bubbleW, active, servable }) {
-  const outline = active ? '#ffb703' : (servable ? '#06d6a0' : '#666');
+  const outline = active ? SEMANTIC.goldDeep : (servable ? SEMANTIC.go : '#666');
   ctx.save();
   // Baked halo behind the whole bubble (replaces the per-frame shadowBlur).
-  if (active) glowRoundRect(ctx, left, top, bubbleW, BUBBLE_H, 14, '#ffd166', 18);
-  else if (servable) glowRoundRect(ctx, left, top, bubbleW, BUBBLE_H, 14, '#06d6a0', 14);
+  if (active) glowRoundRect(ctx, left, top, bubbleW, BUBBLE_H, 14, SEMANTIC.gold, 18);
+  else if (servable) glowRoundRect(ctx, left, top, bubbleW, BUBBLE_H, 14, SEMANTIC.go, 14);
   // Tail first, so the body fill + border draw cleanly over its root.
   ctx.beginPath();
   ctx.moveTo(cx - 10, bubbleBottom - 1);
@@ -153,7 +154,7 @@ function drawPatienceBar(ctx, left, top, bubbleW, patience) {
   ctx.beginPath();
   ctx.roundRect(barX, barY, barW, 8, 4);
   ctx.fill();
-  ctx.fillStyle = patience < 0.3 ? '#e63946' : '#43aa8b';
+  ctx.fillStyle = patience < 0.3 ? SEMANTIC.danger : SEMANTIC.go;
   ctx.beginPath();
   ctx.roundRect(barX, barY, barW * Math.max(0, patience), 8, 4);
   ctx.fill();

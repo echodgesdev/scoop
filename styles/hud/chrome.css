@@ -15,7 +15,7 @@
   justify-content: center;
   border: 2px solid var(--waffle-edge);
   border-radius: 14px;
-  color: #3a2a1a;
+  color: var(--ink);
   /* Waffle card — see :root --waffle-surface. */
   background: var(--waffle-surface);
   cursor: pointer;
@@ -40,7 +40,7 @@
   justify-content: center;
   border: 2px solid var(--waffle-edge);
   border-radius: 14px;
-  color: #3a2a1a;
+  color: var(--ink);
   /* Waffle card — see :root --waffle-surface. */
   background: var(--waffle-surface);
   cursor: pointer;
