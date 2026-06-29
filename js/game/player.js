@@ -21,6 +21,11 @@ export const LAND_TIME = 0.22;
 export const TOSS_GHOST_S = 0.22;  // launched-scoop ghost lifetime (snappy fade)
 export const TOSS_BUMP_S  = 0.30;  // squash-back bounce duration
 
+// Cone entrance (presentation, read by the view). When the cone (re)appears — on the
+// title screen, and after the game-over fracture — it fades + bounces DOWN from above.
+// This is the bounce duration; playerView reads the timer + the easing curve.
+export const CONE_ENTER_S = 0.85;
+
 // Fake scoop "slosh" — NOT physics. A single loose damped-spring scalar leans
 // the scoop column opposite to the cone's motion (drag), then settles with a
 // soft wobble. The lean is derived from the cone's real per-frame displacement
@@ -93,6 +98,12 @@ export class Player {
     // Presentation-only: when the cone fractures on game over, the view stops
     // drawing it (the debris lives in Effects). Cleared on reset.
     this.fractured = false;
+
+    // Cone entrance (presentation; see CONE_ENTER_S). The cone fades + bounces down
+    // from above when it (re)appears. conePending hides it until triggerConeEntrance()
+    // fires; coneEnterT then counts 0 → CONE_ENTER_S while the view animates the drop.
+    this.conePending = false;
+    this.coneEnterT = CONE_ENTER_S;   // start "done" (fully present, no entrance)
 
     // Toss feedback (presentation; see TOSS_* above). `tossed` holds launched-
     // scoop ghosts (each stores its launch point + age; the view derives the
@@ -210,6 +221,7 @@ export class Player {
     for (const s of this.stack) {
       if (s.land > 0) s.land = Math.max(0, s.land - dt);
     }
+    if (this.coneEnterT < CONE_ENTER_S) this.coneEnterT += dt;   // cone bounce-in entrance
 
     // Slosh runs every frame (before any early return) off the cone's real
     // displacement last frame, so it keeps settling even while frozen.
@@ -331,6 +343,22 @@ export class Player {
   triggerRecoil(speed = RECOIL_REF_SPEED) {
     const kick = RECOIL_BASE_V * Math.pow(speed / RECOIL_REF_SPEED, RECOIL_CURVE);
     this.recoilV = Math.min(this.recoilV + kick, RECOIL_MAX_V);
+  }
+
+  /**
+   * The cone (re)appears — fade + bounce DOWN from above. Used on the title screen and
+   * after the game-over fracture. Clears the pending-hide and starts the timer the view
+   * reads (playerView.drawPlayer).
+   */
+  triggerConeEntrance() {
+    this.conePending = false;
+    this.coneEnterT = 0;
+  }
+
+  /** Force the cone fully present (no entrance) — e.g. a run starts mid-entrance. */
+  finishConeEntrance() {
+    this.conePending = false;
+    this.coneEnterT = CONE_ENTER_S;
   }
 
   /**

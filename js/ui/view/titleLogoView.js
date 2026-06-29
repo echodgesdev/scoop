@@ -12,6 +12,7 @@
 import { SpriteSheet } from '../../engine/spriteSheet.js';
 import LOGO_SPRITE from '../sprites/logoSprite.js';
 import { CONE } from '../../game/config.js';
+import { easeOutBack } from '../ease.js';
 
 const logoSheet = new SpriteSheet(LOGO_SPRITE);
 
@@ -39,9 +40,14 @@ const FADE_PER_S = 3.2;
 // pulsed size), so the tip stays glued to the cone as it breathes.
 const PULSE_AMP = 0.009;   // ±~0.9% scale
 const PULSE_SPEED = 1.7;   // rad/s → ~3.7s period
+// Entrance: the sign bounce-fades DOWN from above (drops in from the top, springy
+// settle). RISE = px it starts above its resting spot; DUR = entrance time (s).
+const ENTER_RISE = 180;
+const ENTER_DUR = 0.5;
 // ================================================================================
 
 let _alpha = 0;
+let _enter = 0;
 /** @type {number | null} */
 let _lastClock = null;
 
@@ -60,14 +66,19 @@ export function drawTitleLogo(ctx, game) {
   const dt = _lastClock == null ? 0 : Math.min(0.05, Math.max(0, game.clock - _lastClock));
   _lastClock = game.clock;
   _alpha += ((showing ? 1 : 0) - _alpha) * Math.min(1, dt * FADE_PER_S);
+  // Advance the entrance only while showing; HOLD it during the fade-out (so the sign
+  // doesn't snap back up as it fades on tap), then reset once fully hidden.
+  if (showing) _enter = Math.min(1, _enter + dt / ENTER_DUR);
 
-  if (_alpha < 0.01) { if (!showing) _alpha = 0; return; }   // fully hidden — skip
+  if (_alpha < 0.01) { if (!showing) { _alpha = 0; _enter = 0; } return; }   // fully hidden — reset for next time
 
   const pulse = 1 + PULSE_AMP * Math.sin(game.clock * PULSE_SPEED);
   const scale = (LOGO_W * pulse) / logoSheet.frameW;   // sheet px → world px
   const w = logoSheet.frameW * scale, h = logoSheet.frameH * scale;
   const targetX = game.world.player.x + TARGET_DX;     // cone is centered at player.x on attract
-  const targetY = CONE.Y + TARGET_DY;
+  // Entrance: start ENTER_RISE above the resting spot, bounce DOWN to it (overshoot
+  // via easeOutBack) — the sign drops in from the top as it fades.
+  const targetY = CONE.Y + TARGET_DY - ENTER_RISE * (1 - easeOutBack(_enter));
   // SpriteSheet.draw centers the frame on the anchor, so offset the anchor by the
   // tip's distance from the frame center — landing the arrow tip on (targetX, targetY).
   const ax = targetX - (TIP_NX - 0.5) * w;

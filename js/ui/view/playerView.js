@@ -1,10 +1,11 @@
 // @ts-check
 import { CONE, SCOOP, SERVE } from '../../game/config.js';
-import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S } from '../../game/player.js';
+import { LAND_TIME, SLOSH_HIST, TOSS_GHOST_S, TOSS_BUMP_S, CONE_ENTER_S } from '../../game/player.js';
 import { SCOOP_STATE, drawScoopSprite } from '../sprites/scoopRenderer.js';
 import { drawPlayerCone, CONE_FRAME } from '../sprites/coneRenderer.js';
 import { glowCircle } from '../effects/glow.js';
 import { SEMANTIC } from '../palette.js';
+import { easeOutBack } from '../ease.js';
 
 /** @typedef {import('../../types.js').ScoopColor} ScoopColor */
 /** @typedef {import('../../game/player.js').Player} Player */
@@ -15,6 +16,10 @@ import { SEMANTIC } from '../palette.js';
 // top — so the column reads as one graceful swoosh trailing behind.
 const SLOSH_LAG = 2.4;  // ticks of extra delay per scoop above the bottom
 const SLOSH_ARC = 6;    // log-arc curvature (higher = sharper bow near the top)
+
+// Cone entrance: px the cone drops from (above) on its fade + bounce-down-from-top
+// (the title screen + the after-fracture reappear; player.coneEnterT drives it).
+const CONE_ENTER_RISE = 280;
 
 /**
  * Draw the cone + its tray. Reads the Player model's position, stack, slosh
@@ -30,8 +35,17 @@ export function drawPlayer(ctx, player, rainbow = false, alpha = 1) {
   // Cone fractured on game over — it's gone (the debris lives in Effects), so draw
   // nothing: no cone, no tray, no toss ghosts.
   if (player.fractured) return;
+  // Hidden until its entrance is triggered (title screen / after-fracture reappear).
+  if (player.conePending) return;
 
   ctx.save();
+  // Entrance: fade + bounce DOWN from above (mirrors the buttons' bounce, but from the
+  // top). Plays on the title screen and whenever the cone reappears after the fracture.
+  const ep = player.coneEnterT < CONE_ENTER_S ? player.coneEnterT / CONE_ENTER_S : 1;
+  if (ep < 1) {
+    ctx.globalAlpha = Math.min(1, ep / 0.6);                       // fade in over the first 60%
+    ctx.translate(0, -CONE_ENTER_RISE * (1 - easeOutBack(ep)));    // above → overshoot down → settle
+  }
   applyAssemblyTransform(ctx, player, alpha);
 
   drawServeFlash(ctx, player);

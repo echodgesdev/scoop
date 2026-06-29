@@ -33,12 +33,12 @@ const CONE_SHARD_COLORS = ['#e8b06a', '#d99a4e', '#c98a3c', '#fff4d6'];
 // Title "attract" screen: the scoop trio (bottom→top) that plops onto the centered
 // cone before the title fades in, plus the plop timing.
 const ATTRACT_SCOOPS = ['choco', 'pink', 'mint'];
-// Attract beat order: the logo SIGN fades in FIRST, holds, THEN the scoops plop
-// onto the cone (the sign's arrow points at them), and finally the tap-to-begin +
-// buttons fade in. Each fade is a slow opacity transition — see styles.css.
-const ATTRACT_LOGO_HOLD_MS = 850;  // sign fade-in beat before the first scoop drops
+// Attract beat order: (1) the logo SIGN bounce-fades in from the top; (2) the buttons
+// bounce up from the bottom AND the cone bounce-fades down from the top, together;
+// (3) the scoops plop onto the cone. (The entrance springs live in the views.)
+const ATTRACT_LOGO_HOLD_MS = 650;  // (1) sign lands, THEN the buttons + cone enter
+const ATTRACT_CONE_HOLD_MS = 850;  // (2) cone lands, THEN the scoops plop
 const ATTRACT_PLOP_GAP_MS  = 360;  // gap between successive plops
-const ATTRACT_BUTTONS_MS   = 300;  // beat after the last plop before tap-to-begin + buttons fade in
 const ATTRACT_LAUNCH_MS = 160;  // beat after the last pop before start() (→ the challenge list)
 
 export class GameFlow {
@@ -252,6 +252,7 @@ export class GameFlow {
     p.clearStack();
     p.frozen = true;
     p.fractured = false;
+    p.conePending = true;   // hidden until step (2) — the cone bounces in after the sign
     g.effects.reset();
     g.input.moveDelta = 0;
     this.inAttract = true;
@@ -267,22 +268,29 @@ export class GameFlow {
       step: dt => g._step(dt),
       render: (dt, alpha) => g._frame(dt, alpha)
     });
-    // Sign FIRST: the canvas logo (titleLogoView, gated by showAttractLogo) fades
-    // itself in now; revealHomeTitle just turns on tap-to-play. Hold a beat so the
-    // sign reads before the scoops, THEN start plopping them onto the cone.
+    // (1) The canvas logo bounce-fades itself in now (gated by showAttractLogo);
+    // revealHomeTitle just turns on tap-to-play. The cone stays hidden (conePending).
     g.hud.revealHomeTitle();
-    this.sched.after(ATTRACT_LOGO_HOLD_MS, () => this._attractPlop(0));
+    // (2) After the sign lands: the buttons bounce up from the bottom AND the cone
+    // bounce-fades down from the top, together. (3) Then the scoops plop onto the cone.
+    this.sched.after(ATTRACT_LOGO_HOLD_MS, () => {
+      if (!this.inAttract) return;
+      g.hud.revealHomeButtons();
+      g.world.player.triggerConeEntrance();
+      this.sched.after(ATTRACT_CONE_HOLD_MS, () => this._attractPlop(0));
+    });
   }
 
   /**
-   * Plop ghost scoop `i` onto the cone (it lands with the squash-pop), then chain
-   * to the next — or, once all three are on, fade in the tap-to-begin + buttons.
+   * Plop ghost scoop `i` onto the cone (it lands with the squash-pop), then chain to
+   * the next. The tap-to-begin + buttons are already up (revealed with the cone in
+   * enterAttract), so the last plop simply ends the chain.
    * @param {number} i
    */
   _attractPlop(i) {
     const g = this.game;
     if (!this.inAttract) return;
-    if (i >= ATTRACT_SCOOPS.length) { this._revealHome(); return; }
+    if (i >= ATTRACT_SCOOPS.length) return;
     const color = /** @type {import('../types.js').ScoopColor} */ (ATTRACT_SCOOPS[i]);
     g.world.player.push(color);
     // Same springy recoil as a real catch — no fall speed for a ghost, so let it
@@ -292,15 +300,6 @@ export class GameFlow {
     g.effects.burst(pos.x, pos.y, [g.world.shop.hex(color), '#fff'], 9);
     g.sound.catch_();
     this.sched.after(ATTRACT_PLOP_GAP_MS, () => this._attractPlop(i + 1));
-  }
-
-  /** Scoops are on — fade in the tap-to-begin + buttons (the sign is already up). */
-  _revealHome() {
-    const g = this.game;
-    if (!this.inAttract) return;
-    this.sched.after(ATTRACT_BUTTONS_MS, () => {
-      if (this.inAttract) g.hud.revealHomeButtons();
-    });
   }
 
   /**
@@ -349,6 +348,9 @@ export class GameFlow {
   exitAttract() {
     this.inAttract = false;
     this._launching = false;
+    // A run is starting — make sure the cone is fully present even if the player tapped
+    // before/during its title-screen entrance.
+    this.game.world.player.finishConeEntrance();
   }
 
   // === Wave-end cashout =======================================================
