@@ -76,6 +76,77 @@
 #overlay .title-buttons {
   flex: 0 0 auto;
   margin-top: 0;
-  grid-template-columns: 1fr 1fr 1fr;
+  /* Narrow PORTRAIT chiclets (taller than wide): fixed-width columns centered as a
+     group, not stretched across the row. `76px` is the width knob — bump it up for
+     wider chiclets / down for narrower. */
+  grid-template-columns: repeat(3, 76px);
+  justify-content: center;
+  gap: 14px;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+/* === Home menu buttons — SCOOP-tile rebrand ================================
+   Journal / High Scores / Settings restyled as the logo's marquee tiles: a solid
+   3D "block" extrusion + alternating mint/cream fills + dark-ink labels. (The
+   logo's hard black contour was TRIED and dropped — it read clunky at button
+   scale; the extrusion alone carries the tile depth. Same lesson applies to the
+   HUD: skip the contour there.) Scoped to the home screen (#overlay .title-buttons)
+   so the same .secondary class on the pause / wave-transition screens is untouched.
+   First instance of the shared "sign tile" recipe — extract into a reusable kit
+   when the HUD adopts it. */
+#overlay .title-buttons .secondary {
+  box-sizing: border-box;
+  /* Vertical chiclet: icon stacked over the label. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1.1;
+  border: none;
+  border-radius: 3px;            /* near-square, like the logo's SCOOP tiles */
+  padding: 16px 6px;
+  min-height: 108px;             /* taller-than-wide portrait chiclet (width is 76px) */
+  /* Emoji fallback: Comic Neue carries no emoji glyphs, so 📔/🏆/⚙️ rendered as
+     tofu under `font: inherit`. The OS emoji font picks them up per-glyph. */
+  font-family: 'Comic Sans MS', "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-weight: 800;
+  /* Dark-ink label with a soft top-highlight — no hard outline. */
+  color: var(--ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+#overlay .title-buttons .btn-ico { font-size: 28px; line-height: 1; }
+#overlay .title-buttons .btn-lbl { font-size: 12px; }
+
+/* Marquee rhythm across the row: mint (1) · cream (2) · mint (3). */
+#overlay .title-buttons .secondary:nth-child(odd) {
+  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
+  /* Oblique 3D block via a stacked "long shadow": the darker shade offset in 1px
+     diagonal steps smears the tile down-right, so the right + bottom faces meet in a
+     filled CORNER TRIANGLE (true dimensionality) — a single offset drop only made a
+     flat L-corner. */
+  box-shadow:
+    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 3px 3px 0 var(--mint-deep),
+    4px 4px 0 var(--mint-deep), 5px 5px 0 var(--mint-deep), 6px 6px 0 var(--mint-deep),
+    7px 7px 0 var(--mint-deep),
+    0 11px 14px rgba(40, 16, 4, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5);
+}
+#overlay .title-buttons .secondary:nth-child(even) {
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--btn-cream-bot));
+  box-shadow:
+    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
+    4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
+    7px 7px 0 var(--vanilla-deep),
+    0 11px 14px rgba(40, 16, 4, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* Press: sink onto the block (drop collapses). */
+#overlay .title-buttons .secondary:active { transform: translate(5px, 5px); }   /* sink onto the block (down-right) */
+#overlay .title-buttons .secondary:nth-child(odd):active {
+  box-shadow: 1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+#overlay .title-buttons .secondary:nth-child(even):active {
+  box-shadow: 1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.55);
 }

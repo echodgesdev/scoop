@@ -53,6 +53,12 @@
   --btn-cream-shadow: #d9b285;
   --scrim:            rgba(32, 17, 8, 0.62);  /* modal backdrop over the parlor */
   --scrim-soft:       rgba(32, 17, 8, 0.55);
+  /* Sign-kit tile shades — gloss top + the 3D side/drop colour for each tile, taken
+     from the logo's actual SCOOP-tile side faces. --mint is the flavour (injected by
+     palette.js); --vanilla-deep is the yellow side of the cream/vanilla tile. */
+  --mint-hi:          #aef0dd;
+  --mint-deep:        #3ed6a6;   /* mint tile 3D side (from the logo) */
+  --vanilla-deep:     #ffe26b;   /* cream/vanilla tile 3D side (from the logo) */
 }
 
 /* === Injected palette ========================================================
