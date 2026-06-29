@@ -188,7 +188,7 @@ function bakeFaceShadow(character, tint) {
  * @param {number} [alpha]
  */
 export function drawFaceShadow(ctx, customer, cx, faceY, tint, alpha = 0.38) {
-  if (tint !== _shadowTint) { _shadowCache.clear(); _shadowTint = tint; }
+  /*if (tint !== _shadowTint) { _shadowCache.clear(); _shadowTint = tint; }
   const character = customer.character || '';
   let stamp = _shadowCache.get(character);
   if (!stamp) {
@@ -199,5 +199,5 @@ export function drawFaceShadow(ctx, customer, cx, faceY, tint, alpha = 0.38) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.drawImage(stamp.canvas, cx + stamp.dx, faceY + stamp.dy);
-  ctx.restore();
+  ctx.restore();*/
 }
