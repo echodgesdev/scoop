@@ -1,6 +1,30 @@
 /* Design tokens — fonts + CSS custom properties (the shared parlor palette).
    Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
 
+/* The primary UI/display face — Cousine: a monospaced SERIF (Courier-metric), so every
+   glyph shares one advance width, echoing the equal-width SCOOP letter tiles. Bundled OFL
+   (license: assets/fonts/cousine-OFL.txt) so it ships to every device, phone included.
+   Unlike Cutive Mono it has a REAL bold, so two faces — the 700 is declared across the
+   700–900 range so the buttons' `font-weight: 800` uses the true bold (no faux-bolding).
+   (Gloucester + Cutive Mono are now unused and can be deleted.) 'Comic Sans MS' (the
+   Comic Neue alias below) is the last-resort fallback.
+   NOTE: the full TTFs are ~290 KB each (broad charset) — before shipping, subset to Latin
+   and convert to woff2 to shrink to tens of KB (cf. the 19 KB Comic Neue woff2s). */
+@font-face {
+  font-family: 'Cousine';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../assets/fonts/cousine-400.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Cousine';
+  font-style: normal;
+  font-weight: 700 900;
+  font-display: swap;
+  src: url('../../assets/fonts/cousine-700.ttf') format('truetype');
+}
+
 @font-face {
   font-family: 'Comic Sans MS';
   font-style: normal;

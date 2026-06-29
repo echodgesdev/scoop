@@ -19,7 +19,38 @@
 }
 
 .pause-modal {
-  /* Slightly tighter than the wave-transition modal since there's no
-     challenge list — keeps the visual weight balanced. */
   max-width: 460px;
+  position: relative;       /* anchor for the overhanging button tabs */
+  padding-bottom: 72px;     /* clearance so the tabs' top half sits over the panel */
 }
+
+/* The shared card sets overflow:hidden to clip the scalloped awning to the rounded
+   corners — but that also clips the overhanging button tabs. Free the overflow on the
+   pause panel (scoped to beat cards.css) and round the awning's OWN top corners so it
+   stays clipped without the parent. (18px radius − 3px border = 15px inner.) */
+#pauseOverlay .pause-modal {
+  overflow: visible;
+  border-color: #230c00;   /* the SCOOP sign contour, replacing the soft brown edge */
+}
+#pauseOverlay .pause-modal::before {
+  border-top-left-radius: 15px;
+  border-top-right-radius: 15px;
+}
+
+/* The button row hangs off the panel's bottom edge like tabs — half inside the panel,
+   half out (onto the scrim). Absolutely positioned + translated down 50% of its height. */
+#pauseOverlay .scoop-tiles {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: translateY(50%);
+}
+
+/* The pause-menu buttons reuse the home chiclet kit verbatim — see the shared
+   `#overlay .title-buttons, #pauseOverlay .scoop-tiles …` rules in title.css (one
+   row of icon-over-word tiles). Nothing button-specific lives here.
+
+   The "Week N: <name>" header is the pause modal's main subhead now (the
+   "Tap Resume…" line was removed) — give it more presence. */
+.pause-modal .wt-new-label { font-size: 20px; }

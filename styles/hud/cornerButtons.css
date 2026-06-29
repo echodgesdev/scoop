@@ -1,0 +1,59 @@
+/* Persistent in-game chrome buttons (pause, fullscreen).
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
+
+/* Mini SCOOP tiles in the home-button style: small skewed parallelograms, taller than
+   wide, anchored bottom-right. The icon sits in a counter-skewed <span> so it stays
+   upright; the #230c00 outline + hard drop follow the skewed shape (filter, not
+   box-shadow). Pause = mint, fullscreen = cream, echoing the home marquee. */
+#pauseBtn,
+#fullscreenBtn {
+  position: absolute;
+  bottom: 16px;
+  z-index: 30;
+  width: 40px;
+  height: 52px;                  /* taller than wide */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cousine', 'Comic Sans MS', "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 20px;
+  color: var(--ink);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transform: skewX(9deg);
+  filter:
+    drop-shadow(1.5px 0 0 #230c00) drop-shadow(-1.5px 0 0 #230c00)
+    drop-shadow(0 1.5px 0 #230c00) drop-shadow(0 -1.5px 0 #230c00)
+    drop-shadow(0 4px 0 #230c00);
+  transition: transform 0.08s ease, opacity 0.2s ease;
+}
+#pauseBtn > span,
+#fullscreenBtn > span { display: inline-block; transform: skewX(-9deg); }
+
+#pauseBtn {
+  right: 16px;
+  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
+  box-shadow:
+    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep),
+    3px 3px 0 var(--mint-deep), 4px 4px 0 var(--mint-deep),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5);
+  pointer-events: auto;
+}
+#fullscreenBtn {
+  right: 64px;
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--btn-cream-bot));
+  box-shadow:
+    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep),
+    3px 3px 0 var(--vanilla-deep), 4px 4px 0 var(--vanilla-deep),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7);
+  opacity: 0.85;
+}
+#fullscreenBtn:hover { opacity: 1; }
+#pauseBtn:active,
+#fullscreenBtn:active { transform: translate(3px, 3px) skewX(9deg); }
+
+body.menu-visible #pauseBtn {
+  opacity: 0;
+  pointer-events: none;
+}

@@ -58,6 +58,8 @@ export class Game {
     // text — bubbles, banners, the countdown — never flashes a fallback before it
     // arrives. The DOM menu would trigger it anyway; this just front-runs it.
     if (typeof document !== 'undefined' && document.fonts && document.fonts.load) {
+      document.fonts.load("400 16px 'Cousine'");
+      document.fonts.load("700 16px 'Cousine'");
       document.fonts.load("400 16px 'Comic Sans MS'");
       document.fonts.load("700 16px 'Comic Sans MS'");
     }

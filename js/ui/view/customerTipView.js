@@ -99,7 +99,7 @@ function drawTipCoin(ctx, bx, by, r, ring, tip) {
  * @param {number} bx @param {number} by badge center @param {number} r badge radius
  */
 function drawTipLabel(ctx, bx, by, r) {
-  ctx.font = "bold 12px 'Comic Sans MS', sans-serif";
+  ctx.font = "bold 12px 'Cousine', 'Comic Sans MS', sans-serif";
   ctx.lineWidth = 3;
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
   ctx.fillStyle = '#fff';

@@ -7,7 +7,7 @@
 
 /** @typedef {import('../../game.js').Game} Game */
 
-const TITLE_FONT = "'Comic Sans MS', sans-serif";
+const TITLE_FONT = "'Cousine', 'Comic Sans MS', sans-serif";
 const PLAIN_FONT = 'sans-serif';
 const boldFont = (px, family = TITLE_FONT) => `bold ${px}px ${family}`;
 

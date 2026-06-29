@@ -526,7 +526,7 @@ class TippingTutorial extends TutorialBase {
       // Keep the pill on-screen: measure it and clamp its center so an edge-slot
       // customer's bubble doesn't run off the canvas (the caret follows the clamp).
       ctx.save();
-      ctx.font = "bold 27px 'Comic Sans MS', sans-serif";
+      ctx.font = "bold 27px 'Cousine', 'Comic Sans MS', sans-serif";
       const halfW = (ctx.measureText(b.text).width + 42) / 2 + 8;
       ctx.restore();
       const x = Math.max(halfW, Math.min(game.bounds.width - halfW, b.x));

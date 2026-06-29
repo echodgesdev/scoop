@@ -240,19 +240,18 @@
   <div id="pauseOverlay" class="hidden">
     <div class="wave-transition-modal pause-modal">
       <h2 class="wt-title">Paused</h2>
-      <div class="wt-subtitle">Tap Resume or press Esc to continue</div>
       <div class="pause-challenges wt-challenges"></div>
-      <div class="wt-buttons">
-        <button class="wt-journal-btn secondary" id="pauseJournalBtn">📔 Journal</button>
-        <button class="wt-play-btn" id="pauseResumeBtn">▶ Resume</button>
-        <button class="secondary" id="pauseSettingsBtn">⚙️ Settings</button>
-        <button class="wt-home-btn secondary" id="pauseHomeBtn">🏠 Home</button>
+      <div class="scoop-tiles">
+        <button id="pauseJournalBtn"><span class="btn-ico">📔</span><span class="btn-lbl">Journal</span></button>
+        <button id="pauseResumeBtn"><span class="btn-ico">▶</span><span class="btn-lbl">Resume</span></button>
+        <button id="pauseSettingsBtn"><span class="btn-ico">⚙️</span><span class="btn-lbl">Settings</span></button>
+        <button id="pauseHomeBtn"><span class="btn-ico">🏠</span><span class="btn-lbl">Home</span></button>
       </div>
     </div>
   </div>
 
-  <button id="pauseBtn" title="Pause (Esc)">⏸</button>
-  <button id="fullscreenBtn" title="Fullscreen">⛶</button>
+  <button id="pauseBtn" title="Pause (Esc)"><span>⏸</span></button>
+  <button id="fullscreenBtn" title="Fullscreen"><span>⛶</span></button>
   <div id="settingsOverlay" class="hidden">
     <div class="settings-modal">
       <h2>⚙️ Settings</h2>

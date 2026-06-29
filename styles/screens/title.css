@@ -73,13 +73,17 @@
   animation: ro-hint-pulse 1.4s ease-in-out infinite;
 }
 
-#overlay .title-buttons {
+#overlay .title-buttons,
+#pauseOverlay .scoop-tiles {
   flex: 0 0 auto;
   margin-top: 0;
-  /* Narrow PORTRAIT chiclets (taller than wide): fixed-width columns centered as a
-     group, not stretched across the row. `76px` is the width knob — bump it up for
-     wider chiclets / down for narrower. */
-  grid-template-columns: repeat(3, 76px);
+  /* Narrow PORTRAIT chiclets (taller than wide) as one centered row. `76px` is the
+     width knob. grid-auto-columns (not a fixed template) so this one rule lays out
+     the home row (3 tiles) AND the pause row (4) identically. */
+  display: grid;
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 76px;
   justify-content: center;
   /* Gap = the tiles' 7px 3D-extrusion depth, so each tile's dark side (teal / yellow)
      FILLS the seam and kisses the next tile's edge — the seam is the 3D face, not
@@ -106,7 +110,8 @@
    so the same .secondary class on the pause / wave-transition screens is untouched.
    First instance of the shared "sign tile" recipe — extract into a reusable kit
    when the HUD adopts it. */
-#overlay .title-buttons .secondary {
+#overlay .title-buttons .secondary,
+#pauseOverlay .scoop-tiles button {
   box-sizing: border-box;
   /* Skewed into a parallelogram, matching the logo's SCOOP tiles. One knob; the
      icon/label counter-skew below to stay upright. (Baked into the bounce keyframes
@@ -126,18 +131,21 @@
   min-height: 108px;             /* taller-than-wide portrait chiclet (width is 76px) */
   /* Emoji fallback: Comic Neue carries no emoji glyphs, so 📔/🏆/⚙️ rendered as
      tofu under `font: inherit`. The OS emoji font picks them up per-glyph. */
-  font-family: 'Comic Sans MS', "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+  font-family: 'Cousine', 'Comic Sans MS', "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
   font-weight: 800;
   /* Dark-ink label with a soft top-highlight — no hard outline. */
   color: var(--ink);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 /* Counter-skew the contents so the icon + label stay upright on the skewed tile. */
-#overlay .title-buttons .btn-ico { font-size: 28px; line-height: 1; transform: skewX(calc(-1 * var(--tile-skew))); }
-#overlay .title-buttons .btn-lbl { font-size: 12px; transform: skewX(calc(-1 * var(--tile-skew))); }
+#overlay .title-buttons .btn-ico,
+#pauseOverlay .scoop-tiles .btn-ico { font-size: 28px; line-height: 1; transform: skewX(calc(-1 * var(--tile-skew))); }
+#overlay .title-buttons .btn-lbl,
+#pauseOverlay .scoop-tiles .btn-lbl { font-size: 12px; transform: skewX(calc(-1 * var(--tile-skew))); }
 
 /* Marquee rhythm across the row: mint (1) · cream (2) · mint (3). */
-#overlay .title-buttons .secondary:nth-child(odd) {
+#overlay .title-buttons .secondary:nth-child(odd),
+#pauseOverlay .scoop-tiles button:nth-child(odd) {
   background: linear-gradient(180deg, var(--mint-hi), var(--mint));
   /* Marquee stagger: the teal tiles ride higher than the vanilla one, like the logo.
      Uses position (not transform) so it doesn't fight the bounce-in's transform. */
@@ -153,7 +161,8 @@
     7px 7px 0 var(--mint-deep),
     inset 0 2px 0 rgba(255, 255, 255, 0.5);
 }
-#overlay .title-buttons .secondary:nth-child(even) {
+#overlay .title-buttons .secondary:nth-child(even),
+#pauseOverlay .scoop-tiles button:nth-child(even) {
   background: linear-gradient(180deg, var(--btn-cream-top), var(--btn-cream-bot));
   box-shadow:
     1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
@@ -163,11 +172,14 @@
 }
 
 /* Press: sink onto the block (drop collapses). */
-#overlay .title-buttons .secondary:active { transform: translate(5px, 5px) skewX(var(--tile-skew)); }   /* sink onto the block (down-right) */
-#overlay .title-buttons .secondary:nth-child(odd):active {
+#overlay .title-buttons .secondary:active,
+#pauseOverlay .scoop-tiles button:active { transform: translate(5px, 5px) skewX(var(--tile-skew)); }   /* sink onto the block (down-right) */
+#overlay .title-buttons .secondary:nth-child(odd):active,
+#pauseOverlay .scoop-tiles button:nth-child(odd):active {
   box-shadow: 1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.4);
 }
-#overlay .title-buttons .secondary:nth-child(even):active {
+#overlay .title-buttons .secondary:nth-child(even):active,
+#pauseOverlay .scoop-tiles button:nth-child(even):active {
   box-shadow: 1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.55);
 }
 

@@ -107,7 +107,7 @@ export class TutorialBase {
     const bob = Math.sin(t * 3) * 4;        // float for life
     const cy = y + bob;
     ctx.save();
-    ctx.font = "bold 27px 'Comic Sans MS', sans-serif";
+    ctx.font = "bold 27px 'Cousine', 'Comic Sans MS', sans-serif";
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const w = ctx.measureText(text).width + 42;

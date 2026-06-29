@@ -299,7 +299,7 @@ export class Effects {
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, t.life / t.maxLife * 1.4));
       ctx.fillStyle = t.color;
-      ctx.font = `bold ${t.size}px 'Comic Sans MS', sans-serif`;
+      ctx.font = `bold ${t.size}px 'Cousine', 'Comic Sans MS', sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.lineWidth = 4;
