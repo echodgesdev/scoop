@@ -81,8 +81,20 @@
      wider chiclets / down for narrower. */
   grid-template-columns: repeat(3, 76px);
   justify-content: center;
-  gap: 14px;
+  /* Gap = the tiles' 7px 3D-extrusion depth, so each tile's dark side (teal / yellow)
+     FILLS the seam and kisses the next tile's edge — the seam is the 3D face, not
+     empty space. Keep in step with the 7px long-shadow on the tiles below. */
+  gap: 7px;
   padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  /* The "outline effect" from the logo, but UNIFYING — one dark contour around all
+     three tiles as a single unit (no internal lines), plus a soft shadow behind.
+     filter:drop-shadow (NOT box-shadow) so it follows the group's actual skewed +
+     staggered silhouette; box-shadow would only trace a rectangle. The stacked
+     #230c00 passes build the outline; the last blurred pass is the shadow behind. */
+  filter:
+    drop-shadow(2px 0 0 #230c00) drop-shadow(-2px 0 0 #230c00)
+    drop-shadow(0 2px 0 #230c00) drop-shadow(0 -2px 0 #230c00)
+    drop-shadow(0 2px 0 #230c00);
 }
 
 /* === Home menu buttons — SCOOP-tile rebrand ================================
@@ -139,7 +151,6 @@
     1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 3px 3px 0 var(--mint-deep),
     4px 4px 0 var(--mint-deep), 5px 5px 0 var(--mint-deep), 6px 6px 0 var(--mint-deep),
     7px 7px 0 var(--mint-deep),
-    0 11px 14px rgba(40, 16, 4, 0.22),
     inset 0 2px 0 rgba(255, 255, 255, 0.5);
 }
 #overlay .title-buttons .secondary:nth-child(even) {
@@ -148,7 +159,6 @@
     1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
     4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
     7px 7px 0 var(--vanilla-deep),
-    0 11px 14px rgba(40, 16, 4, 0.22),
     inset 0 2px 0 rgba(255, 255, 255, 0.7);
 }
 
