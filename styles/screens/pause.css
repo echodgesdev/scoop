@@ -76,6 +76,40 @@
   gap: 0;
 }
 
+/* Invert the marquee on the pause row (the home row keeps the default). Journal + Settings
+   (odd) become the LOW vanilla tiles; Home (even, middle) becomes the RAISED mint tile — so
+   the Resume ribbon anchors on two yellow tiles with the teal one peaking up in the middle.
+   The extra `.pause-actions` in the selector outranks the shared tile rule in title.css. */
+#pauseOverlay .pause-actions .scoop-tiles button:nth-child(odd) {
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
+  top: 0;
+  box-shadow:
+    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
+    4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
+    7px 7px 0 var(--vanilla-deep),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+#pauseOverlay .pause-actions .scoop-tiles button:nth-child(even) {
+  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
+  position: relative;
+  top: -18px;
+  box-shadow:
+    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 3px 3px 0 var(--mint-deep),
+    4px 4px 0 var(--mint-deep), 5px 5px 0 var(--mint-deep), 6px 6px 0 var(--mint-deep),
+    7px 7px 0 var(--mint-deep),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5);
+}
+#pauseOverlay .pause-actions .scoop-tiles button:nth-child(odd):active {
+  box-shadow:
+    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep),
+    0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.55);
+}
+#pauseOverlay .pause-actions .scoop-tiles button:nth-child(even):active {
+  box-shadow:
+    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep),
+    0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
 /* Resume = the logo's blue "Catch & Serve" ribbon: a wide blue trapezoid (wide top,
    narrower bottom), with the same 3D side + #230c00 contour treatment as the tiles. */
 /* Resume = the logo's blue "Catch & Serve" ribbon. A trapezoid can't be made with skew
