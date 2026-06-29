@@ -20,22 +20,19 @@
 
 .pause-modal {
   max-width: 460px;
-  position: relative;       /* anchor for the overhanging button tabs */
-  padding-bottom: 72px;     /* clearance so the tabs' top half sits over the panel */
+  position: relative;   /* anchor for the overhanging banner + button tabs */
 }
 
-/* The shared card sets overflow:hidden to clip the scalloped awning to the rounded
-   corners — but that also clips the overhanging button tabs. Free the overflow on the
-   pause panel (scoped to beat cards.css) and round the awning's OWN top corners so it
-   stays clipped without the parent. (18px radius − 3px border = 15px inner.) */
+/* Free the overflow (scoped to beat cards.css) so the button tabs can overhang the
+   bottom, give the panel the dark SCOOP sign contour, and trim the top padding now that
+   the awning is gone — the brown title banner caps the panel instead. */
 #pauseOverlay .pause-modal {
   overflow: visible;
   border-color: #230c00;   /* the SCOOP sign contour, replacing the soft brown edge */
+  padding: 0;              /* the .modal-body wrapper owns content padding; banner + tabs overhang */
 }
-#pauseOverlay .pause-modal::before {
-  border-top-left-radius: 15px;
-  border-top-right-radius: 15px;
-}
+/* Remove the ice-cream scallop awning on the pause panel — the brown banner replaces it. */
+#pauseOverlay .pause-modal::before { display: none; }
 
 /* The button row hangs off the panel's bottom edge like tabs — half inside the panel,
    half out (onto the scrim). Absolutely positioned + translated down 50% of its height. */
@@ -47,10 +44,43 @@
   transform: translateY(50%);
 }
 
+/* "PAUSED" as the logo's title banner — a TALL, NARROW brown trapezoid whose bottom edge
+   is dramatically narrower than its (wide) top, hung off the panel's top edge so its top
+   half overhangs onto the scrim (a mirror of the button tabs at the bottom). Solid brown
+   (no gradient — matches the flat logo). The stacked drop-shadows give it the buttons'
+   exact treatment: a hard brown 3D extrusion down-right, then the #230c00 contour around
+   the whole block; the cream letters carry their own #230c00 outline (like "Poop in a"). */
+/* The "PAUSED" banner is a baked vector asset (assets/pause-banner.svg) — the brown
+   trapezoid + 3D side + the Freestyle-Script lettering, traced from the mockup so it's a
+   1:1 match and font-independent. We only POSITION it here and add the unifying #230c00
+   sign contour via drop-shadow (the SVG carries the shape + the letters' own shadow, but
+   not the outline around the trapezoid — that lived on the unified sign path). */
+#pauseOverlay .pause-banner {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 92%;
+  max-width: 380px;
+  height: auto;
+  transform: translate(-50%, -70%);   /* center + hang most of the banner above the top edge */
+  pointer-events: none;
+  filter:
+    drop-shadow(2px 0 0 #230c00) drop-shadow(-2px 0 0 #230c00)
+    drop-shadow(0 2px 0 #230c00) drop-shadow(0 -2px 0 #230c00);
+}
+
 /* The pause-menu buttons reuse the home chiclet kit verbatim — see the shared
    `#overlay .title-buttons, #pauseOverlay .scoop-tiles …` rules in title.css (one
    row of icon-over-word tiles). Nothing button-specific lives here.
 
    The "Week N: <name>" header is the pause modal's main subhead now (the
    "Tap Resume…" line was removed) — give it more presence. */
+/* Content-region clearance for the pause panel: keep the challenge list clear of the
+   banner overhanging the top and the button tabs overhanging the bottom. (Side padding
+   comes from the reusable .modal-body base in cards.css.) */
+#pauseOverlay .modal-body {
+  padding-top: 72px;
+  padding-bottom: 92px;
+}
+
 .pause-modal .wt-new-label { font-size: 20px; }

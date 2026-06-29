@@ -40,3 +40,9 @@
   letter-spacing: 0.5px;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
 }
+
+/* Reusable modal content region — wraps whatever a modal renders (a challenge list,
+   settings rows, etc.) and gives it breathing room inside the card frame, clear of any
+   overhanging chrome (e.g. the pause panel's title banner + button tabs). Per-modal rules
+   add extra top/bottom padding where chrome overhangs. */
+.modal-body { padding: 18px 20px; }

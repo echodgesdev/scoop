@@ -163,7 +163,7 @@
 }
 #overlay .title-buttons .secondary:nth-child(even),
 #pauseOverlay .scoop-tiles button:nth-child(even) {
-  background: linear-gradient(180deg, var(--btn-cream-top), var(--btn-cream-bot));
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
   box-shadow:
     1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
     4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
