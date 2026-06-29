@@ -22,7 +22,7 @@ const logoSheet = new SpriteSheet(LOGO_SPRITE);
 // phone, ~1140px on a desktop column), so a width-fraction made the sign ~2× bigger
 // on desktop than phone (and a too-small phone sign sat low enough to overlap the
 // scoops). A world-px width reads identically on every device, like the cone/scoops.
-const LOGO_W = 450;
+const LOGO_W = 513;
 // The arrow TIP's position within the art, normalized 0..1 (x from left, y from top).
 // Dialed in LIVE. Profiling the pink arrow region put the geometric arrowhead point
 // near ~0.43/0.89; 0.57/0.93 composes better in-game — pinning a touch PAST the tip
