@@ -12,59 +12,59 @@
 
 #journalOverlay.hidden { display: none; }
 
-.journal-modal {
-  max-width: 640px;
-  width: 92%;
-  max-height: 86vh;
-  display: flex;
-  flex-direction: column;
+/* Journal migrated to the sign-panel kit (signKit.css): a wider, FIXED-size panel so it
+   doesn't resize between collections; a pink sub-header for the current collection; the four
+   collection tabs as the chiclet tile row + a Close ribbon, both overhanging the bottom. */
+#journalOverlay .journal-sign {
+  max-width: 600px;          /* wider than the default kit panel — "moderately large" */
+  padding-bottom: 100px;     /* clear the overhanging tabs + Close cluster */
 }
 
-.journal-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-bottom: 10px;
-}
+/* Sub-header uses the shared .sign-subhead (signKit.css) — no bespoke rule here. */
 
-.journal-tab {
-  font-family: inherit;
-  font-weight: bold;
-  font-size: 14px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  color: var(--ink-muted);
-  background: rgba(255, 255, 255, 0.55);
-  border: 2px solid var(--btn-cream-edge);
-  transition: filter 0.15s ease, transform 0.08s ease;
-}
-
-.journal-tab:hover { filter: brightness(1.04); }
-
-.journal-tab.active {
-  color: #fff;
-  background: linear-gradient(180deg, var(--go-hi), var(--go) 55%, var(--go-deep));
-  border-color: var(--go-deep);
-}
-
+/* FIXED content height so switching collections never resizes the window; the active
+   collection scrolls within. */
 .journal-body {
-  flex: 1;
-  min-height: 0;
+  height: 440px;
   display: flex;
   flex-direction: column;
 }
 
 .journal-panel { display: none; flex: 1; min-height: 0; }
 
-.journal-panel.active { display: flex; flex-direction: column; }
+.journal-panel.active { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 
 button.flash {
   animation: button-flash 0.7s ease-in-out infinite alternate;
 }
 
-.journal-modal h2 { margin: 0 0 4px 0; text-align: center; }
+/* Bottom action cluster: the four collection tabs (chiclet tiles, reusing the kit — see
+   title.css) + the Close ribbon, overhanging the panel's bottom edge like the pause menu. */
+#journalOverlay .journal-actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: translateY(54%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+/* Four tabs with longer names → narrower columns + a smaller label, and shorter tiles than
+   the 3-up pause row (4 full-height tiles would be too tall a stack). */
+#journalOverlay .scoop-tiles { grid-auto-columns: 66px; }
+#journalOverlay .scoop-tiles button { min-height: 84px; }
+#journalOverlay .scoop-tiles .btn-lbl { font-size: 10px; }
+/* The Close ribbon sits IN the flex cluster (not absolutely overhanging on its own). */
+#journalOverlay .journal-actions .sign-ribbon {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  transform: none;
+  margin-top: -2px;
+}
+#journalOverlay .journal-actions .sign-ribbon:active { transform: translate(0, 2px); }
 
 .jcoin-grid {
   /* Flex (not grid) so a partial last row CENTERS: 5 tokens wrapping to 3 + 2

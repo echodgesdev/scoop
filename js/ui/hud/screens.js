@@ -336,7 +336,7 @@ export class Screens {
     if (listEl) {
       const cur = this.challenges && this.challenges.getCurrentSet();
       listEl.innerHTML = cur
-        ? `<div class="wt-new-label">Week ${cur.index + 1}: ${cur.name}</div>` + challengeListHtml(cur)
+        ? `<div class="sign-subhead">Week ${cur.index + 1}: ${cur.name}</div>` + challengeListHtml(cur)
         : '';
     }
     this.pauseOverlayEl.classList.remove('hidden');

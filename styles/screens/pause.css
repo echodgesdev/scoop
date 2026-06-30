@@ -243,13 +243,8 @@
   padding-bottom: 110px;
 }
 
-/* The week / goal title (e.g. "Week 5: Local Legend") — pink with the same hard drop shadow
-   as the PAUSED title, echoing the logo's pink "Week 1: ABCD" mockup. */
-.pause-modal .wt-new-label {
-  font-size: 20px;
-  color: var(--pink);                          /* #ff6fa3 */
-  text-shadow: 2px 2px 0 var(--sign-outline);
-}
+/* The week / goal title now uses the shared .sign-subhead (signKit.css) — injected with that
+   class in screens.js (showPauseMenu). */
 
 /* Challenge rows as the sign kit's "tickets" — PAUSE ONLY (the night-sky / recap / journal
    versions keep the neutral pill). Cream face + dark sign contour + squarer corners; completed

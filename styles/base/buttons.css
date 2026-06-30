@@ -1,18 +1,7 @@
 /* Shared candy buttons, close buttons, warm backdrops, CTA flash. Loaded late so it wins the cascade.
    Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
 
-#closeJournalBtn {
-  font-family: inherit;
-  font-size: 16px;
-  font-weight: bold;
-  padding: 8px;
-  width: 100%;
-  border: none;
-  border-radius: 10px;
-  background: #b85;
-  color: #fff;
-  cursor: pointer;
-}
+/* #closeJournalBtn now uses the shared .sign-ribbon (signKit.css) — see signKit + journal.css. */
 
 .wt-buttons {
   display: grid;
@@ -98,22 +87,7 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.7);
 }
 
-/* #closeSettingsBtn now uses the shared .sign-ribbon (signKit.css) — only the Journal's
-   close keeps this candy-bevel pill until that modal is migrated. */
-#closeJournalBtn {
-  border-radius: 999px;
-  background: linear-gradient(180deg, var(--btn-bevel-top), var(--btn-bevel-mid) 60%, var(--btn-bevel-bot));
-  box-shadow: 0 4px 0 var(--btn-bevel-shadow), inset 0 2px 0 rgba(255, 255, 255, 0.35);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
-  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
-}
-
-#closeJournalBtn:hover { filter: brightness(1.06); }
-
-#closeJournalBtn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--btn-bevel-shadow), inset 0 2px 0 rgba(255, 255, 255, 0.25);
-}
+/* #closeSettingsBtn + #closeJournalBtn both use the shared .sign-ribbon now (signKit.css). */
 
 @keyframes button-flash {
   from { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 4px var(--gold-deep); }

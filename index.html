@@ -182,14 +182,9 @@
        original inner container class so the existing Hud render methods are reused
        verbatim. -->
   <div id="journalOverlay" class="hidden">
-    <div class="journal-modal">
-      <h2>📔 Journal</h2>
-      <div class="journal-tabs" role="tablist">
-        <button class="journal-tab active" data-tab="recipes">📖 Recipes</button>
-        <button class="journal-tab" data-tab="regulars">😀 Regulars</button>
-        <button class="journal-tab" data-tab="powerups">⚡ Power-ups</button>
-        <button class="journal-tab" data-tab="challenges">🎯 Challenges</button>
-      </div>
+    <div class="sign-panel journal-sign">
+      <div class="sign-title"><span class="pb-shape"></span><span class="pb-label">Journal</span></div>
+      <div class="sign-subhead">Recipes</div>
       <div class="journal-body">
         <div class="journal-panel active" data-tab="recipes">
           <div class="recipes-list"></div>
@@ -205,7 +200,18 @@
           <div class="challenges-list"></div>
         </div>
       </div>
-      <button id="closeJournalBtn">Close</button>
+      <div class="journal-actions">
+        <div class="journal-tabs scoop-tiles" role="tablist">
+          <button class="journal-tab active" data-tab="recipes"><span class="btn-ico">📖</span><span class="btn-lbl">Recipes</span></button>
+          <button class="journal-tab" data-tab="regulars"><span class="btn-ico">😀</span><span class="btn-lbl">Regulars</span></button>
+          <button class="journal-tab" data-tab="powerups"><span class="btn-ico">⚡</span><span class="btn-lbl">Power-ups</span></button>
+          <button class="journal-tab" data-tab="challenges"><span class="btn-ico">🎯</span><span class="btn-lbl">Challenges</span></button>
+        </div>
+        <button id="closeJournalBtn" class="sign-ribbon">
+          <img class="ribbon-shape" src="assets/resume-ribbon.svg" alt="">
+          <span class="ribbon-label">Close</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -241,7 +247,7 @@
     <div class="wave-transition-modal pause-modal">
       <div class="pause-banner">
         <span class="pb-shape"></span>
-        <span class="pb-label">PAUSED</span>
+        <span class="pb-label">Paused</span>
       </div>
       <div class="modal-body">
         <div class="pause-challenges wt-challenges"></div>

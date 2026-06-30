@@ -15,7 +15,7 @@
   gap: 14px;
   width: 92%;
   max-width: 380px;
-  padding: 62px 20px 48px;   /* top clears the banner; bottom clears the overhanging ribbon CTA */
+  padding: 74px 20px 60px;   /* top clears the banner; bottom clears the overhanging ribbon CTA */
   /* One em ROOT for the whole panel — child sizes are `em` off this, so the panel's text
      scales from a single knob (and `transform: scale(--ui-scale)` below scales it on phones). */
   font-size: 16px;
@@ -39,16 +39,24 @@
   background: var(--waffle-surface);
   -webkit-mask: none;
   mask: none;
+  /* Cheap outline + gloss — a box-shadow spread ring, NOT a filter. The big panel is the
+     largest surface, so a drop-shadow filter here was the main render cost on phones; the
+     ring is near-free. The 3D depth now lives only on the chrome (banner / tiles / ribbon). */
   box-shadow:
-    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
-    4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
-    7px 7px 0 var(--vanilla-deep),
+    0 0 0 3px var(--sign-outline),
     inset 0 2px 0 rgba(255, 255, 255, 0.6);
-  filter:
-    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline));
   pointer-events: none;
+}
+
+/* Shared modal sub-header (current collection / week) — pink, NO drop shadow. Reused by the
+   journal + pause instead of a bespoke per-modal class. */
+.sign-subhead {
+  margin: 0 0 2px;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.3em;
+  letter-spacing: 1px;
+  color: var(--pink);
 }
 
 /* === The overhanging brown trapezoid title banner ========================== */
@@ -59,7 +67,7 @@
   width: 90%;
   max-width: 340px;
   aspect-ratio: 2.6 / 1;
-  transform: translate(-50%, -58%);   /* hang most of it above the panel's top edge */
+  transform: translate(-50%, -68%);   /* hang most of it above the panel's top edge */
   pointer-events: none;
 }
 /* Solid deep-brown 3D side stepped down-right (fills the diagonal, like the tiles) + the
@@ -70,11 +78,9 @@
   filter:
     drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
     drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
-    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
     drop-shadow(1px 1px 0 var(--choco-deep))
     drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline));
+    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline));
 }
 .sign-title .pb-shape::before {
   content: "";
@@ -152,8 +158,7 @@
   /* #230c00 contour — the SVG carries the blue face + 3D side; no clip-path so it survives. */
   filter:
     drop-shadow(3px 0 0 var(--sign-outline)) drop-shadow(-3px 0 0 var(--sign-outline))
-    drop-shadow(0 3px 0 var(--sign-outline)) drop-shadow(0 -3px 0 var(--sign-outline))
-    drop-shadow(0 3px 0 var(--sign-outline));
+    drop-shadow(0 3px 0 var(--sign-outline)) drop-shadow(0 -3px 0 var(--sign-outline));
 }
 .sign-ribbon .ribbon-label {
   position: absolute;
