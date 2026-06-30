@@ -34,7 +34,7 @@
   isolation: isolate;      /* keep the ::before face layer (z-index:-1) contained */
 }
 /* The panel rendered as a big tile: cream waffle face + a hard vanilla-deep 3D extrusion,
-   with the #230c00 contour wrapping the WHOLE thing INCLUDING the extrusion — same recipe as
+   with the var(--sign-outline) contour wrapping the WHOLE thing INCLUDING the extrusion — same recipe as
    the buttons. On ::before (no children → the filter never ghosts the content; no clip-path →
    the filter isn't erased), sitting behind the content (z-index:-1). This also replaces the
    old ice-cream scallop awning that ::before used to draw. */
@@ -55,9 +55,9 @@
     7px 7px 0 var(--vanilla-deep),
     inset 0 2px 0 rgba(255, 255, 255, 0.6);
   filter:
-    drop-shadow(2px 0 0 #230c00) drop-shadow(-2px 0 0 #230c00)
-    drop-shadow(0 2px 0 #230c00) drop-shadow(0 -2px 0 #230c00)
-    drop-shadow(0 2px 0 #230c00);
+    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline));
   pointer-events: none;
 }
 
@@ -111,13 +111,13 @@
 }
 
 /* Resume = the logo's blue "Catch & Serve" ribbon: a wide blue trapezoid (wide top,
-   narrower bottom), with the same 3D side + #230c00 contour treatment as the tiles. */
+   narrower bottom), with the same 3D side + var(--sign-outline) contour treatment as the tiles. */
 /* Resume = the logo's blue "Catch & Serve" ribbon. A trapezoid can't be made with skew
    (skew leans both sides the SAME way → parallelogram; a trapezoid leans them opposite), so
    it needs clip-path. But CSS applies effects paint → filter → CLIP, so clip-path runs LAST
    and erases any box-shadow / drop-shadow that falls outside the polygon — which flattened
    every attempt. Fix (same as the PAUSED banner): bake the shape (blue face + 3D side) as an
-   SVG with NO clip-path, add the #230c00 contour via drop-shadow on the <img> (nothing clips
+   SVG with NO clip-path, add the var(--sign-outline) contour via drop-shadow on the <img> (nothing clips
    it away), and float the label on top. */
 #pauseOverlay .resume-banner {
   position: relative;
@@ -135,11 +135,11 @@
   display: block;
   width: 100%;
   height: auto;
-  /* thicker #230c00 contour (3px) so it reads heavier and overlaps the tile row's outline */
+  /* thicker var(--sign-outline) contour (3px) so it reads heavier and overlaps the tile row's outline */
   filter:
-    drop-shadow(3px 0 0 #230c00) drop-shadow(-3px 0 0 #230c00)
-    drop-shadow(0 3px 0 #230c00) drop-shadow(0 -3px 0 #230c00)
-    drop-shadow(0 3px 0 #230c00);
+    drop-shadow(3px 0 0 var(--sign-outline)) drop-shadow(-3px 0 0 var(--sign-outline))
+    drop-shadow(0 3px 0 var(--sign-outline)) drop-shadow(0 -3px 0 var(--sign-outline))
+    drop-shadow(0 3px 0 var(--sign-outline));
 }
 #pauseOverlay .resume-label {
   position: absolute;
@@ -152,34 +152,67 @@
   font-weight: 800;
   letter-spacing: 1px;
   line-height: 1;
-  text-shadow: 2px 2px 0 #230c00;
+  text-shadow: 2px 2px 0 var(--sign-outline);
   pointer-events: none;
 }
 #pauseOverlay .resume-banner:active { transform: translate(2px, 2px); }
 
-/* "PAUSED" as the logo's title banner — a TALL, NARROW brown trapezoid whose bottom edge
-   is dramatically narrower than its (wide) top, hung off the panel's top edge so its top
-   half overhangs onto the scrim (a mirror of the button tabs at the bottom). Solid brown
-   (no gradient — matches the flat logo). The stacked drop-shadows give it the buttons'
-   exact treatment: a hard brown 3D extrusion down-right, then the #230c00 contour around
-   the whole block; the cream letters carry their own #230c00 outline (like "Poop in a"). */
-/* The "PAUSED" banner is a baked vector asset (assets/pause-banner.svg) — the brown
-   trapezoid + 3D side + the Freestyle-Script lettering, traced from the mockup so it's a
-   1:1 match and font-independent. We only POSITION it here and add the unifying #230c00
-   sign contour via drop-shadow (the SVG carries the shape + the letters' own shadow, but
-   not the outline around the trapezoid — that lived on the unified sign path). */
+/* The "PAUSED" title card as a PURE-CSS quad (no SVG). Same wall as the ribbon — CSS clips
+   AFTER filtering, so a filter on a clip-path'd element gets erased. Fix: put the var(--sign-outline)
+   contour filter on a NON-clipped wrapper (.pb-shape), and underneath it stack two clip-path'd
+   trapezoids — the brown face (::after) over the deep-brown 3D side (::before, offset
+   down-right). The wrapper isn't clipped, so its filter survives and traces face + side. The
+   label floats on top, outside the filter, so it stays crisp.
+   NOTE: this drops the Freestyle-Script lettering that was baked into the SVG — the title is
+   now Cousine, matching the Resume label. */
 #pauseOverlay .pause-banner {
   position: absolute;
   top: 0;
   left: 50%;
   width: 92%;
   max-width: 380px;
-  height: auto;
-  transform: translate(-50%, -70%);   /* center + hang most of the banner above the top edge */
+  aspect-ratio: 2.5 / 1;
+  transform: translate(-50%, -70%);   /* center + hang most of it above the panel's top edge */
   pointer-events: none;
+}
+#pauseOverlay .pb-shape {
+  position: absolute;
+  inset: 0;
+  /* On this NON-clipped layer (so the clip can't erase the filter): a SOLID deep-brown 3D
+     side stepped 7px down-right — each repeat adds 1px, FILLING the diagonal corner exactly
+     like the tiles' stacked box-shadow (a single offset would read as a flat slab) — then the
+     var(--sign-outline) contour wrapping the face + the extrusion. */
   filter:
-    drop-shadow(2px 0 0 #230c00) drop-shadow(-2px 0 0 #230c00)
-    drop-shadow(0 2px 0 #230c00) drop-shadow(0 -2px 0 #230c00);
+    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline));
+}
+/* Just the brown FACE — the 3D side is the stepped extrusion in the filter above. */
+#pauseOverlay .pb-shape::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--choco);   /* #7b4a2a */
+  /* irregular trapezoid traced from the mockup: top slopes down-right, narrower bottom */
+  clip-path: polygon(0 0, 100% 39%, 89% 100%, 17% 100%);
+}
+#pauseOverlay .pb-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end center;          /* sit at the BOTTOM of the quad, not centered */
+  padding-bottom: 18px;             /* lift off the narrow, clipped bottom edge */
+  color: var(--vanilla);            /* #fff3c0 */
+  font-family: 'Yellowtail', cursive;   /* retro brush script — the handwritten title */
+  font-size: 63px;                  /* script caps read smaller per em, so size up */
+  font-weight: 400;                 /* single-weight script — avoid faux-bold */
+  letter-spacing: 1px;
+  line-height: 1;
+  text-shadow: 2px 2px 0 var(--sign-outline);
 }
 
 /* The pause-menu buttons reuse the home chiclet kit verbatim — see the shared

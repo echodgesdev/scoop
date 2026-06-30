@@ -3,7 +3,7 @@
 
 /* Mini SCOOP tiles in the home-button style: small skewed parallelograms, taller than
    wide, anchored bottom-right. The icon sits in a counter-skewed <span> so it stays
-   upright; the #230c00 outline + hard drop follow the skewed shape (filter, not
+   upright; the var(--sign-outline) outline + hard drop follow the skewed shape (filter, not
    box-shadow). Pause = mint, fullscreen = cream, echoing the home marquee. */
 #pauseBtn,
 #fullscreenBtn {
@@ -23,9 +23,9 @@
   cursor: pointer;
   transform: skewX(9deg);
   filter:
-    drop-shadow(1.5px 0 0 #230c00) drop-shadow(-1.5px 0 0 #230c00)
-    drop-shadow(0 1.5px 0 #230c00) drop-shadow(0 -1.5px 0 #230c00)
-    drop-shadow(0 4px 0 #230c00);
+    drop-shadow(1.5px 0 0 var(--sign-outline)) drop-shadow(-1.5px 0 0 var(--sign-outline))
+    drop-shadow(0 1.5px 0 var(--sign-outline)) drop-shadow(0 -1.5px 0 var(--sign-outline))
+    drop-shadow(0 4px 0 var(--sign-outline));
   transition: transform 0.08s ease, opacity 0.2s ease;
 }
 #pauseBtn > span,

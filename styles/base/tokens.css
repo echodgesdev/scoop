@@ -6,7 +6,7 @@
    (license: assets/fonts/cousine-OFL.txt) so it ships to every device, phone included.
    Unlike Cutive Mono it has a REAL bold, so two faces — the 700 is declared across the
    700–900 range so the buttons' `font-weight: 800` uses the true bold (no faux-bolding).
-   (Gloucester + Cutive Mono are now unused and can be deleted.) 'Comic Sans MS' (the
+   'Comic Sans MS' (the
    Comic Neue alias below) is the last-resort fallback.
    NOTE: the full TTFs are ~290 KB each (broad charset) — before shipping, subset to Latin
    and convert to woff2 to shrink to tens of KB (cf. the 19 KB Comic Neue woff2s). */
@@ -23,6 +23,17 @@
   font-weight: 700 900;
   font-display: swap;
   src: url('../../assets/fonts/cousine-700.ttf') format('truetype');
+}
+
+/* Yellowtail — a retro brush script (Apache-2.0, license: assets/fonts/yellowtail-LICENSE.txt),
+   used ONLY for the handwritten "PAUSED" title, echoing the logo's Freestyle-Script wordmark.
+   Single static face; declared 400–900 so any weight request renders it as-is (no faux-bold). */
+@font-face {
+  font-family: 'Yellowtail';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('../../assets/fonts/yellowtail.ttf') format('truetype');
 }
 
 @font-face {
@@ -85,6 +96,8 @@
   --vanilla-deep:     #ffe26b;   /* cream/vanilla tile 3D side (from the logo) */
   --choco-deep:       #623b21;   /* brown sign-banner 3D side (from the logo) */
   --blueberry-deep:   #2356ff;   /* blue Resume-ribbon 3D side (from the logo) */
+  --sign-outline:     #230c00;   /* unifying dark contour around every sign-kit shape (tiles,
+                                    banners, ribbon); distinct from --outline (the sprite contour) */
 }
 
 /* === Injected palette ========================================================
