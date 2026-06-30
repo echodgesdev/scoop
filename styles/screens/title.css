@@ -140,8 +140,18 @@
 /* Counter-skew the contents so the icon + label stay upright on the skewed tile. */
 #overlay .title-buttons .btn-ico,
 #pauseOverlay .scoop-tiles .btn-ico { font-size: 28px; line-height: 1; transform: skewX(calc(-1 * var(--tile-skew))); }
+/* Icon stays centered in the tile (it's the only in-flow flex child now); the label is
+   pulled out of flow and anchored to the BOTTOM with healthy padding underneath. */
 #overlay .title-buttons .btn-lbl,
-#pauseOverlay .scoop-tiles .btn-lbl { font-size: 12px; transform: skewX(calc(-1 * var(--tile-skew))); }
+#pauseOverlay .scoop-tiles .btn-lbl {
+  position: absolute;
+  bottom: 14px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 12px;
+  transform: skewX(calc(-1 * var(--tile-skew)));
+}
 
 /* Marquee rhythm across the row: mint (1) · cream (2) · mint (3). */
 #overlay .title-buttons .secondary:nth-child(odd),

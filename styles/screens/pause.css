@@ -32,6 +32,10 @@
   background: none;        /* the cream face moves to ::before too */
   padding: 0;              /* the .modal-body wrapper owns content padding; banner + tabs overhang */
   isolation: isolate;      /* keep the ::before face layer (z-index:-1) contained */
+  /* Scale the whole sign (panel + overhanging banner + tabs) as ONE unit to a steady fraction
+     of the play column, so it doesn't read oversized on a narrow phone. --ui-scale is set from
+     surface.js fit(); transform-origin is centre, so it stays centred in the overlay. */
+  transform: scale(var(--ui-scale, 1));
 }
 /* The panel rendered as a big tile: cream waffle face + a hard vanilla-deep 3D extrusion,
    with the var(--sign-outline) contour wrapping the WHOLE thing INCLUDING the extrusion — same recipe as
@@ -45,7 +49,7 @@
   inset: 0;
   height: auto;            /* override the awning's fixed 27px height */
   z-index: -1;
-  border-radius: 18px;
+  border-radius: 5px;            /* squarer — reads as a sign panel, not a soft note card */
   background: var(--waffle-surface);
   -webkit-mask: none;      /* drop the inherited scallop mask */
   mask: none;
@@ -123,7 +127,7 @@
   position: relative;
   width: 280px;
   max-width: 88%;
-  margin-top: -10px;   /* pull up so its contour overlaps the tile row's (gap can't go negative) */
+  margin-top: -3px;    /* slight pull-up so only the contours kiss — not the tiles' 3D layer */
   border: none;
   background: none;
   padding: 0;
@@ -144,16 +148,26 @@
 #pauseOverlay .resume-label {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;                /* space between the play icon and the word */
   padding-bottom: 6px;      /* ride above the narrowing bottom + 3D side */
   color: var(--vanilla);    /* #fff3c0 */
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 1px;
   line-height: 1;
   text-shadow: 2px 2px 0 var(--sign-outline);
   pointer-events: none;
+}
+#pauseOverlay .resume-play-ico {
+  font-family: sans-serif;  /* clean geometric ▶ triangle, takes the cream text colour */
+  font-size: 18px;
+  line-height: 1;
+}
+#pauseOverlay .resume-play-txt {
+  font-size: 24px;          /* back to Cousine — the brush script didn't read in caps here */
+  font-weight: 800;
+  letter-spacing: 1px;
+  line-height: 1;
 }
 #pauseOverlay .resume-banner:active { transform: translate(2px, 2px); }
 
@@ -229,4 +243,26 @@
   padding-bottom: 110px;
 }
 
-.pause-modal .wt-new-label { font-size: 20px; }
+/* The week / goal title (e.g. "Week 5: Local Legend") — pink with the same hard drop shadow
+   as the PAUSED title, echoing the logo's pink "Week 1: ABCD" mockup. */
+.pause-modal .wt-new-label {
+  font-size: 20px;
+  color: var(--pink);                          /* #ff6fa3 */
+  text-shadow: 2px 2px 0 var(--sign-outline);
+}
+
+/* Challenge rows as the sign kit's "tickets" — PAUSE ONLY (the night-sky / recap / journal
+   versions keep the neutral pill). Cream face + dark sign contour + squarer corners; completed
+   rows go mint. Dark ink on cream/mint keeps them readable. */
+#pauseOverlay .challenge-row {
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
+  border: 2px solid var(--sign-outline);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);   /* faint gloss, like the tiles */
+}
+#pauseOverlay .challenge-row.completed {
+  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
+  border-color: var(--sign-outline);
+}
+#pauseOverlay .challenge-row.completed .challenge-title { color: var(--ink); }       /* readable on mint */
+#pauseOverlay .challenge-row.completed .challenge-count { color: var(--sign-outline); } /* dark check on mint */
