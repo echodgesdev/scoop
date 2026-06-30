@@ -263,8 +263,8 @@
   <button id="pauseBtn" title="Pause (Esc)"><span>⏸</span></button>
   <button id="fullscreenBtn" title="Fullscreen"><span>⛶</span></button>
   <div id="settingsOverlay" class="hidden">
-    <div class="settings-modal">
-      <h2>⚙️ Settings</h2>
+    <div class="sign-panel settings-panel">
+      <div class="sign-title"><span class="pb-shape"></span><span class="pb-label">Settings</span></div>
       <button id="howBtn" class="settings-howto-btn">📋 How to Play</button>
       <div class="settings-row">
         <label for="volumeSlider">Sound Effects</label>
@@ -284,15 +284,21 @@
         <button id="resetProgressBtn" class="danger">Reset All Progress</button>
         <p class="settings-danger-note">Wipes challenges, recipes, power-ups &amp; unlocked regulars. This cannot be undone.</p>
       </div>
-      <button id="closeSettingsBtn">Close</button>
+      <button id="closeSettingsBtn" class="sign-ribbon">
+        <img class="ribbon-shape" src="assets/resume-ribbon.svg" alt="">
+        <span class="ribbon-label">Close</span>
+      </button>
     </div>
   </div>
 
   <div id="highScoresOverlay" class="hidden">
-    <div class="settings-modal highscores-modal">
-      <h2>🏆 High Scores</h2>
+    <div class="sign-panel highscores-modal">
+      <div class="sign-title"><span class="pb-shape"></span><span class="pb-label">High Scores</span></div>
       <div class="highscores-body"></div>
-      <button id="closeHighScoresBtn">Close</button>
+      <button id="closeHighScoresBtn" class="sign-ribbon">
+        <img class="ribbon-shape" src="assets/resume-ribbon.svg" alt="">
+        <span class="ribbon-label">Close</span>
+      </button>
     </div>
   </div>
   </div><!-- #stage -->

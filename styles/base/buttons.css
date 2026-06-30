@@ -98,8 +98,9 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.7);
 }
 
-#closeJournalBtn,
-#closeSettingsBtn {
+/* #closeSettingsBtn now uses the shared .sign-ribbon (signKit.css) — only the Journal's
+   close keeps this candy-bevel pill until that modal is migrated. */
+#closeJournalBtn {
   border-radius: 999px;
   background: linear-gradient(180deg, var(--btn-bevel-top), var(--btn-bevel-mid) 60%, var(--btn-bevel-bot));
   box-shadow: 0 4px 0 var(--btn-bevel-shadow), inset 0 2px 0 rgba(255, 255, 255, 0.35);
@@ -107,11 +108,9 @@
   transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
 }
 
-#closeJournalBtn:hover,
-#closeSettingsBtn:hover { filter: brightness(1.06); }
+#closeJournalBtn:hover { filter: brightness(1.06); }
 
-#closeJournalBtn:active,
-#closeSettingsBtn:active {
+#closeJournalBtn:active {
   transform: translateY(3px);
   box-shadow: 0 1px 0 var(--btn-bevel-shadow), inset 0 2px 0 rgba(255, 255, 255, 0.25);
 }

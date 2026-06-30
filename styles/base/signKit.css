@@ -1,0 +1,172 @@
+/* The "sign-panel" kit — the generic, reusable version of the pause menu's atomic-sign look,
+   for ANY modal to adopt: a cream waffle face + hard 3D extrusion + #230c00 contour (squared
+   corners), an overhanging brown trapezoid title banner, outlined content "tickets", and a
+   sign-styled button. Scales as one unit via --ui-scale.
+   Loaded after the per-modal screen files (see styles.css) so a modal opts in by adding
+   `.sign-panel` (+ `.sign-title` markup) and dropping its old card classes.
+   NOTE: the pause menu is the original and still carries its own bespoke #pauseOverlay rules;
+   it can be deduped onto this kit later (pure refactor). */
+
+/* === The card ============================================================== */
+.sign-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 92%;
+  max-width: 380px;
+  padding: 62px 20px 48px;   /* top clears the banner; bottom clears the overhanging ribbon CTA */
+  /* One em ROOT for the whole panel — child sizes are `em` off this, so the panel's text
+     scales from a single knob (and `transform: scale(--ui-scale)` below scales it on phones). */
+  font-size: 16px;
+  overflow: visible;
+  isolation: isolate;        /* contain the ::before face layer (z-index:-1) */
+  border: none;
+  background: none;          /* the face moves to ::before */
+  color: var(--ink);
+  transform: scale(var(--ui-scale, 1));   /* scale the whole sign as one unit (responsive) */
+}
+/* Cream waffle face + hard vanilla-deep 3D extrusion + the #230c00 contour wrapping the WHOLE
+   block (filter on this non-clipped layer, so the contour wraps the extrusion and isn't
+   erased by any clip). Sits behind the content. */
+.sign-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  height: auto;
+  border-radius: 5px;        /* squared — a sign panel, not a soft note card */
+  background: var(--waffle-surface);
+  -webkit-mask: none;
+  mask: none;
+  box-shadow:
+    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
+    4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
+    7px 7px 0 var(--vanilla-deep),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6);
+  filter:
+    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline));
+  pointer-events: none;
+}
+
+/* === The overhanging brown trapezoid title banner ========================== */
+.sign-title {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 90%;
+  max-width: 340px;
+  aspect-ratio: 2.6 / 1;
+  transform: translate(-50%, -58%);   /* hang most of it above the panel's top edge */
+  pointer-events: none;
+}
+/* Solid deep-brown 3D side stepped down-right (fills the diagonal, like the tiles) + the
+   #230c00 contour wrapping it. On this non-clipped layer so the filter survives the clip. */
+.sign-title .pb-shape {
+  position: absolute;
+  inset: 0;
+  filter:
+    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(1px 1px 0 var(--choco-deep))
+    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
+    drop-shadow(0 2px 0 var(--sign-outline));
+}
+.sign-title .pb-shape::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--choco);
+  /* irregular trapezoid: top slopes down-right, narrower bottom (traced from the logo). */
+  clip-path: polygon(0 0, 100% 39%, 89% 100%, 17% 100%);
+}
+.sign-title .pb-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: end center;            /* the handwritten title rides the bottom of the quad */
+  padding-bottom: 12px;
+  color: var(--vanilla);
+  font-family: 'Yellowtail', cursive; /* the brush script — em off the panel base, override per-modal */
+  font-size: 3.2em;
+  line-height: 1;
+  text-shadow: 2px 2px 0 var(--sign-outline);
+}
+
+/* === Content tickets (outlined cream rows for lists) ======================= */
+.sign-ticket {
+  background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
+  border: 2px solid var(--sign-outline);
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  color: var(--ink);
+}
+
+/* === A sign-styled button (Close / Done / secondary actions) =============== */
+.sign-btn {
+  align-self: center;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 1em;
+  letter-spacing: 0.5px;
+  padding: 9px 26px;
+  border: none;
+  border-radius: 4px;
+  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
+  color: var(--ink);
+  cursor: pointer;
+  box-shadow:
+    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 3px 3px 0 var(--mint-deep),
+    inset 0 2px 0 rgba(255, 255, 255, 0.5);
+  filter:
+    drop-shadow(1.5px 0 0 var(--sign-outline)) drop-shadow(-1.5px 0 0 var(--sign-outline))
+    drop-shadow(0 1.5px 0 var(--sign-outline)) drop-shadow(0 -1.5px 0 var(--sign-outline));
+  transition: transform 0.08s ease;
+}
+.sign-btn:active { transform: translate(3px, 3px); }
+
+/* === The primary CTA ribbon (Close / Done) — the blue "Catch & Serve" ribbon, snapped to
+   overhang the panel's bottom edge by half (mirrors the pause Play button). =============== */
+.sign-ribbon {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 240px;
+  max-width: 80%;
+  transform: translate(-50%, 50%);   /* centre + overhang the bottom edge by 50% */
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;                     /* inherit the panel's em base for the label */
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+.sign-ribbon .ribbon-shape {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* #230c00 contour — the SVG carries the blue face + 3D side; no clip-path so it survives. */
+  filter:
+    drop-shadow(3px 0 0 var(--sign-outline)) drop-shadow(-3px 0 0 var(--sign-outline))
+    drop-shadow(0 3px 0 var(--sign-outline)) drop-shadow(0 -3px 0 var(--sign-outline))
+    drop-shadow(0 3px 0 var(--sign-outline));
+}
+.sign-ribbon .ribbon-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: 0.3em;
+  color: var(--vanilla);
+  font-weight: 800;
+  font-size: 1.5em;
+  letter-spacing: 1px;
+  line-height: 1;
+  text-shadow: 2px 2px 0 var(--sign-outline);
+  pointer-events: none;
+}
+.sign-ribbon:active { transform: translate(-50%, calc(50% + 2px)); }

@@ -37,6 +37,11 @@
   opacity: 0;
   transition: opacity 0.6s ease;   /* the group "fade"; each chiclet also bounces up (below) */
   pointer-events: none;
+  /* Same responsive scale as the pause menu — shrink the button row to a steady fraction of
+     the play column so it isn't oversized on a narrow phone. Anchored to the bottom bar so it
+     stays seated there as it scales. (--ui-scale is set from surface.js fit().) */
+  transform: scale(var(--ui-scale, 1));
+  transform-origin: bottom center;
 }
 
 /* Staged reveal: the canvas sign (titleLogoView) fades in FIRST; the scoops then
