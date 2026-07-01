@@ -204,9 +204,6 @@ button.flash {
 
 .jcoin-scoop.empty { filter: grayscale(1) brightness(0.62); }
 
-/* Recipe coins carry a 3-wide row of spaced dollops, so give them a wider cell than
-   the single-face collections — the trio stays centred without crowding neighbours. */
-.recipes-list .jcoin { flex: 0 0 124px; }
 
 /* Idle "foil" glint: a soft highlight sweeps across each coin's face periodically,
    staggered by --i so it ripples across the grid. This is the touch-friendly "these
