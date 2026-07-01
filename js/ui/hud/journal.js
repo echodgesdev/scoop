@@ -114,8 +114,8 @@ export class Journal {
     if (!valid.includes(tab)) tab = 'recipes';
     // Name the current collection in the sub-header (the pink goal-title line).
     const TAB_NAMES = { recipes: 'Recipes', regulars: 'Regulars', powerups: 'Power-ups', challenges: 'Challenges' };
-    const subhead = this.journalOverlayEl.querySelector('.sign-subhead');
-    if (subhead) subhead.textContent = TAB_NAMES[tab];
+    const label = this.journalOverlayEl.querySelector('.console-section-label');
+    if (label) label.textContent = TAB_NAMES[tab];
     this.journalOverlayEl.querySelectorAll('.journal-tab').forEach(t =>
       t.classList.toggle('active', t.getAttribute('data-tab') === tab));
     this.journalOverlayEl.querySelectorAll('.journal-panel').forEach(p =>

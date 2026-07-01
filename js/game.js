@@ -62,6 +62,9 @@ export class Game {
       document.fonts.load("700 16px 'Cousine'");
       document.fonts.load("400 16px 'Comic Sans MS'");
       document.fonts.load("700 16px 'Comic Sans MS'");
+      // The modal titles use Yellowtail — front-run it so the menus don't flash a
+      // fallback face on first open.
+      document.fonts.load("400 16px 'Yellowtail'");
     }
     // The drawing surface (engine): owns the canvas backing store, the #stage it
     // scales to fill the viewport, and the virtual play-area `bounds`. A viewport

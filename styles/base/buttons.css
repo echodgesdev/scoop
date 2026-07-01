@@ -1,7 +1,15 @@
 /* Shared candy buttons, close buttons, warm backdrops, CTA flash. Loaded late so it wins the cascade.
    Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
 
-/* #closeJournalBtn now uses the shared .sign-ribbon (signKit.css) — see signKit + journal.css. */
+/* #closeJournalBtn now uses the shared .console-cta (consoleKit.css) — see journal.css. */
+
+/* Inline SVG icons (Font Awesome Free 6.7 — Icons CC BY 4.0, Code MIT; sprite in index.html).
+   Replace the old emoji glyphs on menu buttons and take the button's text colour via
+   currentColor. Sized per context here + in consoleKit.css (.knob-ring .ico). */
+.ico { display: inline-block; width: 1em; height: 1em; fill: currentColor; vertical-align: -0.13em; flex: none; }
+.btn-ico .ico { width: 28px; height: 28px; vertical-align: 0; }
+.wt-buttons .ico { width: 18px; height: 18px; margin-right: 5px; }
+.settings-howto-btn .ico { width: 17px; height: 17px; margin-right: 6px; }
 
 .wt-buttons {
   display: grid;

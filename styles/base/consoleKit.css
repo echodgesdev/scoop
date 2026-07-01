@@ -1,0 +1,162 @@
+/* consoleKit.css — the atomic-age "console" modal kit.
+   Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there.
+
+   Replaces the sign-collage look (signKit.css) with a self-contained Populuxe object: a
+   rounded googie capsule (cream waffle face + the #230c00 rim), a Yellowtail title over an
+   atomic starburst, a section heading riding a two-tone boomerang, atomic "knob" tabs (a
+   Font Awesome line icon in a circle, the word beneath), and ONE labelled verb button
+   (Close / Resume / Done) — the word does the job the bare × couldn't.
+
+   Deliberately FLAT: gradients + borders + one cheap conic-gradient burst, no drop-shadow
+   filter stacks and NO `transform: scale(--ui-scale)` — those were the phone render lag.
+   Sizing is clamp()/max-width instead, so nothing scale-transforms a filtered subtree.
+
+   A modal opts in with `.console` + the markup below; the coin grid drops in verbatim and
+   is left untouched. */
+
+/* === The panel ============================================================= */
+.console {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  width: min(92vw, 340px);
+  max-height: 96vh;                    /* never taller than the viewport (was --ui-scale's job) */
+  padding: 18px 18px 20px;
+  /* Cousine — the game's established mono UI face; the modal body reads in it (titles
+     stay Yellowtail on .console-title). */
+  font-family: 'Cousine', 'Comic Sans MS', system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--waffle-surface);
+  border: 3px solid var(--sign-outline);
+  border-radius: 22px;                 /* rounded googie capsule, not a boxy sign */
+  box-shadow:
+    0 16px 34px rgba(10, 8, 4, 0.5),
+    inset 0 2px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* === Header: Yellowtail title over an atomic starburst ===================== */
+.console-head {
+  position: relative;
+  text-align: center;
+  padding: 8px 0 2px;
+  isolation: isolate;                  /* keep the burst (z-index:-1) tucked behind the title */
+}
+/* The sunburst — a cheap repeating-conic-gradient masked to a soft disc (no filter). */
+.console-head::before {
+  content: "";
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 190px; height: 190px;
+  transform: translate(-50%, -52%);
+  z-index: -1;
+  background: repeating-conic-gradient(from 6deg, var(--gold-deep) 0 5deg, transparent 5deg 22deg);
+  -webkit-mask: radial-gradient(circle, #000 22%, transparent 66%);
+  mask: radial-gradient(circle, #000 22%, transparent 66%);
+  opacity: 0.4;
+  pointer-events: none;
+}
+.console-title {
+  margin: 0;
+  font-family: 'Yellowtail', cursive;
+  font-weight: 400;                    /* single-weight script — no faux-bold */
+  font-size: 46px;
+  line-height: 0.9;
+  color: var(--choco-deep);
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7);
+}
+
+/* === Section heading: the current collection (a clean pink label, no shape) === */
+.console-section {
+  text-align: center;
+  margin: 2px auto 8px;
+}
+.console-section-label {
+  margin: 0;                             /* font inherits the panel's Cousine */
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--pink);
+}
+
+/* === Atomic "knob" tabs: a line icon in a circle, the word beneath ========= */
+.console-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+.console-tabs > button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.console-tabs > button .knob-ring {
+  width: 52px; height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--choco-deep);
+  border: 2.5px solid var(--sign-outline);
+  background: radial-gradient(circle at 38% 30%, #fffefb, var(--vanilla));
+  box-shadow: 0 3px 0 rgba(90, 58, 30, 0.42), inset 0 0 0 3px rgba(255, 255, 255, 0.55);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.console-tabs > button .knob-ring .ico { width: 24px; height: 24px; }
+.console-tabs > button .knob-lbl {
+  font-family: 'Cousine', monospace;   /* the small label keeps the mono "data" voice */
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ink-muted);
+}
+/* The live collection: the knob lights up mint and glows. */
+.console-tabs > button.active .knob-ring {
+  color: var(--choco-deep);
+  background: radial-gradient(circle at 38% 30%, var(--mint-hi), var(--mint-deep));
+  box-shadow: 0 3px 0 #2fae86, inset 0 0 0 3px rgba(255, 255, 255, 0.5), 0 0 10px rgba(63, 214, 166, 0.6);
+}
+.console-tabs > button.active .knob-lbl { color: var(--ink); }
+.console-tabs > button:active .knob-ring {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(90, 58, 30, 0.42), inset 0 0 0 3px rgba(255, 255, 255, 0.55);
+}
+.console-tabs > button:focus-visible { outline: none; }
+.console-tabs > button:focus-visible .knob-ring { outline: 3px solid var(--blueberry-deep); outline-offset: 2px; }
+
+/* === The single verb button (Close / Resume / Done) ======================== */
+.console-cta {
+  align-self: center;
+  margin-top: 12px;
+  padding: 10px 34px;
+  border: 3px solid var(--sign-outline);
+  border-radius: 999px;
+  cursor: pointer;
+  font-weight: 800;                      /* font inherits the panel's Cousine */
+  font-size: 16px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #fff;
+  background: linear-gradient(180deg, #93acff, var(--blueberry));
+  box-shadow: 0 4px 0 var(--blueberry-deep), inset 0 2px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.console-cta:hover { filter: brightness(1.04); }
+.console-cta:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--blueberry-deep), inset 0 2px 0 rgba(255, 255, 255, 0.45);
+}
+.console-cta:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .console-tabs > button .knob-ring, .console-cta { transition: none; }
+}

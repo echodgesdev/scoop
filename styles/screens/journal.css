@@ -12,59 +12,74 @@
 
 #journalOverlay.hidden { display: none; }
 
-/* Journal migrated to the sign-panel kit (signKit.css): a wider, FIXED-size panel so it
-   doesn't resize between collections; a pink sub-header for the current collection; the four
-   collection tabs as the chiclet tile row + a Close ribbon, both overhanging the bottom. */
-#journalOverlay .journal-sign {
-  max-width: 600px;          /* wider than the default kit panel — "moderately large" */
-  padding-bottom: 100px;     /* clear the overhanging tabs + Close cluster */
+/* Journal on the console kit (consoleKit.css): a wider panel that fits the coin grid, a
+   fixed-height body so switching collections never resizes the window, and the four
+   collections as the knob-tab row. The coins below are untouched. */
+#journalOverlay .journal-console {
+  width: min(94vw, 560px);   /* wider than the default kit panel so ~5 coins fit a row on desktop */
 }
-
-/* Sub-header uses the shared .sign-subhead (signKit.css) — no bespoke rule here. */
 
 /* FIXED content height so switching collections never resizes the window; the active
    collection scrolls within. */
 .journal-body {
-  height: 440px;
+  position: relative;   /* anchor the edge-fade overlays */
+  /* Fixed per-viewport height so switching collections never resizes the window, but
+     capped to a fraction of a short screen so the (now unscaled) panel fits a phone. */
+  height: min(520px, 62vh);
   display: flex;
   flex-direction: column;
+  margin-top: 2px;
 }
+/* Fade the scrolling content into the cream card at both edges. Done as gradient
+   OVERLAYS, NOT a CSS mask: a mask on the scroller (or any ancestor of it) makes
+   Chromium drop the custom pill scrollbar and fall back to the native one WITH the end
+   arrows — that was the bug. Overlays leave the scrollbar untouched; inset from the
+   right so the pill stays crisp. Colours track the waffle (lighter top, warmer bottom). */
+.journal-body::before,
+.journal-body::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 12px;                /* clear the scrollbar gutter */
+  height: 46px;
+  z-index: 5;                          /* above coin stars (z-index:3) */
+  pointer-events: none;
+}
+.journal-body::before { top: 0;    background: linear-gradient(to bottom, #fff6db, rgba(255, 246, 219, 0)); }
+.journal-body::after  { bottom: 0; background: linear-gradient(to top,    #ffefc8, rgba(255, 239, 200, 0)); }
 
 .journal-panel { display: none; flex: 1; min-height: 0; }
 
-.journal-panel.active { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+/* Slim warm PILL — two engines, two mechanisms, kept apart so neither cancels the other.
+   • Chromium/Safari: the ::-webkit-scrollbar rules below → warm pill, arrows hidden.
+   • Firefox (ignores the webkit pseudos): the standard scrollbar-* props, in the @supports
+     block — scoped so Chromium never sees them (there they'd override the pseudos and
+     re-show the OS arrows). NOTE: Firefox exposes NO CSS to hide scrollbar arrow buttons;
+     `thin` is arrow-less on modern builds, but if one still draws them, CSS can't remove
+     them — that needs a custom-drawn scrollbar. */
+.journal-panel.active {
+  display: flex; flex-direction: column; min-height: 0; overflow-y: auto;
+}
+.journal-panel.active::-webkit-scrollbar { width: 8px; }
+.journal-panel.active::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.journal-panel.active::-webkit-scrollbar-track { background: transparent; }
+.journal-panel.active::-webkit-scrollbar-thumb {
+  background: rgba(123, 74, 42, 0.45);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.journal-panel.active::-webkit-scrollbar-thumb:hover { background: rgba(123, 74, 42, 0.65); }
+@supports not selector(::-webkit-scrollbar) {
+  .journal-panel.active { scrollbar-width: thin; scrollbar-color: rgba(123, 74, 42, 0.55) transparent; }
+}
 
 button.flash {
   animation: button-flash 0.7s ease-in-out infinite alternate;
 }
 
-/* Bottom action cluster: the four collection tabs (chiclet tiles, reusing the kit — see
-   title.css) + the Close ribbon, overhanging the panel's bottom edge like the pause menu. */
-#journalOverlay .journal-actions {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  transform: translateY(54%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-/* Four tabs with longer names → narrower columns + a smaller label, and shorter tiles than
-   the 3-up pause row (4 full-height tiles would be too tall a stack). */
-#journalOverlay .scoop-tiles { grid-auto-columns: 66px; }
-#journalOverlay .scoop-tiles button { min-height: 84px; }
-#journalOverlay .scoop-tiles .btn-lbl { font-size: 10px; }
-/* The Close ribbon sits IN the flex cluster (not absolutely overhanging on its own). */
-#journalOverlay .journal-actions .sign-ribbon {
-  position: relative;
-  bottom: auto;
-  left: auto;
-  transform: none;
-  margin-top: -2px;
-}
-#journalOverlay .journal-actions .sign-ribbon:active { transform: translate(0, 2px); }
+/* Power-ups / Challenges labels are longer than the 52px knob — let them wrap tight
+   under the ring rather than forcing the whole tab row wider. */
+#journalOverlay .console-tabs .knob-lbl { max-width: 62px; text-align: center; line-height: 1.1; }
 
 .jcoin-grid {
   /* Flex (not grid) so a partial last row CENTERS: 5 tokens wrapping to 3 + 2
