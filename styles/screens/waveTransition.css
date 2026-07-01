@@ -79,18 +79,6 @@
   pointer-events: none;
 }
 
-.wave-transition-modal {
-  background: linear-gradient(180deg, #fff8d6 0%, #fff3c0 100%);
-  border: 4px solid #b85;
-  border-radius: 16px;
-  padding: 24px 28px;
-  max-width: 560px;
-  width: 92%;
-  text-align: center;
-  color: var(--ink);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-}
-
 .wt-title {
   margin: 0 0 6px 0;
   font-size: 28px;
@@ -140,13 +128,5 @@
 #waveTransitionOverlay .wt-play-btn { font-size: 20px; padding: 16px 10px; }
 
 #waveTransitionOverlay .wt-home-btn { grid-column: auto; justify-self: stretch; padding: 12px 8px; }
-
-.pause-modal .wt-title {
-  color: var(--ink);
-}
-
-.wave-transition-modal .wt-title { color: var(--danger); }
-
-.pause-modal .wt-title { color: var(--ink-muted); }
 
 #waveTransitionOverlay { padding: 0; background: transparent; }

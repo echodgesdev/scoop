@@ -49,28 +49,27 @@
 
 .journal-panel { display: none; flex: 1; min-height: 0; }
 
-/* Slim warm PILL — two engines, two mechanisms, kept apart so neither cancels the other.
-   • Chromium/Safari: the ::-webkit-scrollbar rules below → warm pill, arrows hidden.
-   • Firefox (ignores the webkit pseudos): the standard scrollbar-* props, in the @supports
-     block — scoped so Chromium never sees them (there they'd override the pseudos and
-     re-show the OS arrows). NOTE: Firefox exposes NO CSS to hide scrollbar arrow buttons;
-     `thin` is arrow-less on modern builds, but if one still draws them, CSS can't remove
-     them — that needs a custom-drawn scrollbar. */
-.journal-panel.active {
-  display: flex; flex-direction: column; min-height: 0; overflow-y: auto;
-}
-.journal-panel.active::-webkit-scrollbar { width: 8px; }
-.journal-panel.active::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-.journal-panel.active::-webkit-scrollbar-track { background: transparent; }
-.journal-panel.active::-webkit-scrollbar-thumb {
+.journal-panel.active { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+
+/* The ACTUAL scroll container is each per-collection list — `.jscroll` (= .recipes-list /
+   .regulars-grid / .powerups-grid / .challenges-list), each flex:1 + overflow-y:auto — NOT
+   the panel. So the pill styling has to live on THEM (styling .journal-panel did nothing
+   because it never scrolls). Slim warm PILL, no end arrows:
+   • Chromium/Safari: ::-webkit-scrollbar, arrow buttons hidden via display:none.
+   • Firefox: the standard scrollbar-* props in the @supports block, scoped so Chromium
+     never sees them (there they'd override the pseudos and bring the OS arrows back). */
+.jscroll::-webkit-scrollbar { width: 8px; }
+.jscroll::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+.jscroll::-webkit-scrollbar-track { background: transparent; }
+.jscroll::-webkit-scrollbar-thumb {
   background: rgba(123, 74, 42, 0.45);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
-.journal-panel.active::-webkit-scrollbar-thumb:hover { background: rgba(123, 74, 42, 0.65); }
+.jscroll::-webkit-scrollbar-thumb:hover { background: rgba(123, 74, 42, 0.65); }
 @supports not selector(::-webkit-scrollbar) {
-  .journal-panel.active { scrollbar-width: thin; scrollbar-color: rgba(123, 74, 42, 0.55) transparent; }
+  .jscroll { scrollbar-width: thin; scrollbar-color: rgba(123, 74, 42, 0.55) transparent; }
 }
 
 button.flash {

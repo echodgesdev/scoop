@@ -188,10 +188,10 @@
            the tap prompt + the bottom button bar. -->
       <div class="title-tap"><span>tap to begin</span></div>
     </div>
-    <div class="title-buttons wt-buttons">
-      <button id="journalBtn" class="secondary"><span class="btn-ico"><svg class="ico" aria-hidden="true"><use href="#ic-book"/></svg></span><span class="btn-lbl">Journal</span></button>
-      <button id="highScoresBtn" class="secondary"><span class="btn-ico"><svg class="ico" aria-hidden="true"><use href="#ic-trophy"/></svg></span><span class="btn-lbl">High Scores</span></button>
-      <button id="settingsBtn" class="secondary"><span class="btn-ico"><svg class="ico" aria-hidden="true"><use href="#ic-gear"/></svg></span><span class="btn-lbl">Settings</span></button>
+    <div class="title-buttons">
+      <button id="journalBtn" class="knob-btn"><span class="knob-ring"><svg class="ico" aria-hidden="true"><use href="#ic-book"/></svg></span><span class="knob-lbl">Journal</span></button>
+      <button id="highScoresBtn" class="knob-btn"><span class="knob-ring"><svg class="ico" aria-hidden="true"><use href="#ic-trophy"/></svg></span><span class="knob-lbl">High Scores</span></button>
+      <button id="settingsBtn" class="knob-btn"><span class="knob-ring"><svg class="ico" aria-hidden="true"><use href="#ic-gear"/></svg></span><span class="knob-lbl">Settings</span></button>
     </div>
   </div>
 
@@ -209,17 +209,17 @@
       </div>
       <div class="journal-body">
         <div class="journal-panel active" data-tab="recipes">
-          <div class="recipes-list"></div>
+          <div class="recipes-list jscroll"></div>
         </div>
         <div class="journal-panel" data-tab="regulars">
           <div class="regulars-count"></div>
-          <div class="regulars-grid"></div>
+          <div class="regulars-grid jscroll"></div>
         </div>
         <div class="journal-panel" data-tab="powerups">
-          <div class="powerups-grid"></div>
+          <div class="powerups-grid jscroll"></div>
         </div>
         <div class="journal-panel" data-tab="challenges">
-          <div class="challenges-list"></div>
+          <div class="challenges-list jscroll"></div>
         </div>
       </div>
       <nav class="console-tabs" role="tablist">
@@ -261,33 +261,24 @@
   </div>
 
   <div id="pauseOverlay" class="hidden">
-    <div class="wave-transition-modal pause-modal">
-      <div class="pause-banner">
-        <span class="pb-shape"></span>
-        <span class="pb-label">Paused</span>
-      </div>
-      <div class="modal-body">
-        <div class="pause-challenges wt-challenges"></div>
-      </div>
-      <div class="pause-actions">
-        <div class="scoop-tiles">
-          <button id="pauseJournalBtn"><span class="btn-ico"><svg class="ico" aria-hidden="true"><use href="#ic-book"/></svg></span><span class="btn-lbl">Journal</span></button>
-          <button id="pauseHomeBtn"><span class="btn-ico"><svg class="ico" aria-hidden="true"><use href="#ic-house"/></svg></span><span class="btn-lbl">Home</span></button>
-          <button id="pauseSettingsBtn"><span class="btn-ico"><svg class="ico" aria-hidden="true"><use href="#ic-gear"/></svg></span><span class="btn-lbl">Settings</span></button>
-        </div>
-        <button id="pauseResumeBtn" class="resume-banner">
-          <img class="resume-shape" src="assets/resume-ribbon.svg" alt="">
-          <span class="resume-label"><span class="resume-play-ico">▶</span><span class="resume-play-txt">PLAY</span></span>
-        </button>
-      </div>
+    <div class="console pause-console">
+      <div class="console-head"><h2 class="console-title">Paused</h2></div>
+      <div class="console-section"><h3 class="console-section-label"></h3></div>
+      <div class="pause-challenges jscroll"></div>
+      <nav class="console-tabs">
+        <button id="pauseJournalBtn"><span class="knob-ring"><svg class="ico" aria-hidden="true"><use href="#ic-book"/></svg></span><span class="knob-lbl">Journal</span></button>
+        <button id="pauseHomeBtn"><span class="knob-ring"><svg class="ico" aria-hidden="true"><use href="#ic-house"/></svg></span><span class="knob-lbl">Home</span></button>
+        <button id="pauseSettingsBtn"><span class="knob-ring"><svg class="ico" aria-hidden="true"><use href="#ic-gear"/></svg></span><span class="knob-lbl">Settings</span></button>
+      </nav>
+      <button id="pauseResumeBtn" class="console-cta"><svg class="ico" aria-hidden="true"><use href="#ic-play"/></svg>Resume</button>
     </div>
   </div>
 
   <button id="pauseBtn" title="Pause (Esc)"><span>⏸</span></button>
   <button id="fullscreenBtn" title="Fullscreen"><span>⛶</span></button>
   <div id="settingsOverlay" class="hidden">
-    <div class="sign-panel settings-panel">
-      <div class="sign-title"><span class="pb-shape"></span><span class="pb-label">Settings</span></div>
+    <div class="console settings-console">
+      <div class="console-head"><h2 class="console-title">Settings</h2></div>
       <button id="howBtn" class="settings-howto-btn"><svg class="ico" aria-hidden="true"><use href="#ic-help"/></svg>How to Play</button>
       <div class="settings-row">
         <label for="volumeSlider">Sound Effects</label>
@@ -307,21 +298,15 @@
         <button id="resetProgressBtn" class="danger">Reset All Progress</button>
         <p class="settings-danger-note">Wipes challenges, recipes, power-ups &amp; unlocked regulars. This cannot be undone.</p>
       </div>
-      <button id="closeSettingsBtn" class="sign-ribbon">
-        <img class="ribbon-shape" src="assets/resume-ribbon.svg" alt="">
-        <span class="ribbon-label">Close</span>
-      </button>
+      <button id="closeSettingsBtn" class="console-cta">Close</button>
     </div>
   </div>
 
   <div id="highScoresOverlay" class="hidden">
-    <div class="sign-panel highscores-modal">
-      <div class="sign-title"><span class="pb-shape"></span><span class="pb-label">High Scores</span></div>
+    <div class="console highscores-console">
+      <div class="console-head"><h2 class="console-title">High Scores</h2></div>
       <div class="highscores-body"></div>
-      <button id="closeHighScoresBtn" class="sign-ribbon">
-        <img class="ribbon-shape" src="assets/resume-ribbon.svg" alt="">
-        <span class="ribbon-label">Close</span>
-      </button>
+      <button id="closeHighScoresBtn" class="console-cta">Close</button>
     </div>
   </div>
   </div><!-- #stage -->

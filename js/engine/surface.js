@@ -92,12 +92,6 @@ export class Surface {
     this.stage.style.top = `${r.top}px`;
     this.stage.style.width = `${r.width}px`;
     this.stage.style.height = `${r.height}px`;
-    // Expose the play-column width as a UI scale for the fixed-px DOM overlays (the pause
-    // menu), which would otherwise read oversized on a narrow phone. It scales the overlay to
-    // a steady fraction of the column; capped at 1 so a wide desktop column stays design-size.
-    // 580 = the column width at which the px design reads 1:1 (tune here if desktop shrinks).
-    const uiScale = Math.max(0.6, Math.min(1, r.width / 580));
-    document.documentElement.style.setProperty('--ui-scale', String(uiScale));
     this._stageRect = null;
   }
 

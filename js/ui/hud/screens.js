@@ -332,13 +332,12 @@ export class Screens {
     if (!this.pauseOverlayEl) return;
     // Surface the current week's challenges (with live % progress) so the player
     // can check what they're working toward without leaving the run.
+    const cur = this.challenges && this.challenges.getCurrentSet();
+    // Week name → the console's pink section label; the challenge rows → the body.
+    const labelEl = this.pauseOverlayEl.querySelector('.console-section-label');
+    if (labelEl) labelEl.textContent = cur ? `Week ${cur.index + 1}: ${cur.name}` : '';
     const listEl = this.pauseOverlayEl.querySelector('.pause-challenges');
-    if (listEl) {
-      const cur = this.challenges && this.challenges.getCurrentSet();
-      listEl.innerHTML = cur
-        ? `<div class="sign-subhead">Week ${cur.index + 1}: ${cur.name}</div>` + challengeListHtml(cur)
-        : '';
-    }
+    if (listEl) listEl.innerHTML = cur ? challengeListHtml(cur) : '';
     this.pauseOverlayEl.classList.remove('hidden');
   }
 

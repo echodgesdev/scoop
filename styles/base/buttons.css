@@ -7,7 +7,6 @@
    Replace the old emoji glyphs on menu buttons and take the button's text colour via
    currentColor. Sized per context here + in consoleKit.css (.knob-ring .ico). */
 .ico { display: inline-block; width: 1em; height: 1em; fill: currentColor; vertical-align: -0.13em; flex: none; }
-.btn-ico .ico { width: 28px; height: 28px; vertical-align: 0; }
 .wt-buttons .ico { width: 18px; height: 18px; margin-right: 5px; }
 .settings-howto-btn .ico { width: 17px; height: 17px; margin-right: 6px; }
 
@@ -95,7 +94,7 @@
     inset 0 2px 0 rgba(255, 255, 255, 0.7);
 }
 
-/* #closeSettingsBtn + #closeJournalBtn both use the shared .sign-ribbon now (signKit.css). */
+/* Modal Close / Resume actions use the shared .console-cta (consoleKit.css). */
 
 @keyframes button-flash {
   from { box-shadow: 0 5px 0 rgba(0, 0, 0, 0.22), 0 0 4px var(--gold-deep); }

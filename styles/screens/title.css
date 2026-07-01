@@ -33,15 +33,20 @@
   transition: opacity 1.1s ease;
 }
 
+/* The bottom menu is a centered row of atomic KNOBS (shared .knob-btn / .knob-ring /
+   .knob-lbl from consoleKit.css — same component as the modal tabs). Starts faded + inert;
+   the attract flow's home-buttons class fades it in while each knob flies up (keyframes
+   below). No --ui-scale transform — the knobs are small enough to fit a narrow phone. */
 #overlay .title-buttons {
   opacity: 0;
-  transition: opacity 0.6s ease;   /* the group "fade"; each chiclet also bounces up (below) */
+  transition: opacity 0.6s ease;
   pointer-events: none;
-  /* Same responsive scale as the pause menu — shrink the button row to a steady fraction of
-     the play column so it isn't oversized on a narrow phone. Anchored to the bottom bar so it
-     stays seated there as it scales. (--ui-scale is set from surface.js fit().) */
-  transform: scale(var(--ui-scale, 1));
-  transform-origin: bottom center;
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 22px;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 
 /* Staged reveal: the canvas sign (titleLogoView) fades in FIRST; the scoops then
@@ -78,144 +83,26 @@
   animation: ro-hint-pulse 1.4s ease-in-out infinite;
 }
 
-#overlay .title-buttons,
-#pauseOverlay .scoop-tiles,
-#journalOverlay .scoop-tiles {
-  flex: 0 0 auto;
-  margin-top: 0;
-  /* Narrow PORTRAIT chiclets (taller than wide) as one centered row. `76px` is the
-     width knob. grid-auto-columns (not a fixed template) so this one rule lays out
-     the home row (3 tiles) AND the pause row (4) identically. */
-  display: grid;
-  grid-template-columns: none;
-  grid-auto-flow: column;
-  grid-auto-columns: 76px;
-  justify-content: center;
-  /* Gap = the tiles' 7px 3D-extrusion depth, so each tile's dark side (teal / yellow)
-     FILLS the seam and kisses the next tile's edge — the seam is the 3D face, not
-     empty space. Keep in step with the 7px long-shadow on the tiles below. */
-  gap: 7px;
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
-  /* The "outline effect" from the logo, but UNIFYING — one dark contour around all
-     three tiles as a single unit (no internal lines), plus a soft shadow behind.
-     filter:drop-shadow (NOT box-shadow) so it follows the group's actual skewed +
-     staggered silhouette; box-shadow would only trace a rectangle. The stacked
-     var(--sign-outline) passes build the outline; the last blurred pass is the shadow behind. */
-  filter:
-    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline));
+/* The home knobs sit on the live scene (not a card), so their labels get a light colour +
+   a dark halo to stay legible against the beach behind them. */
+#overlay .title-buttons .knob-lbl {
+  color: #fff3d6;
+  font-size: 10px;
+  max-width: 70px;
+  text-shadow: 0 1px 3px rgba(40, 16, 4, 0.85);
 }
 
-/* === Home menu buttons — SCOOP-tile rebrand ================================
-   Journal / High Scores / Settings restyled as the logo's marquee tiles: a solid
-   3D "block" extrusion + alternating mint/cream fills + dark-ink labels. (The
-   logo's hard black contour was TRIED and dropped — it read clunky at button
-   scale; the extrusion alone carries the tile depth. Same lesson applies to the
-   HUD: skip the contour there.) Scoped to the home screen (#overlay .title-buttons)
-   so the same .secondary class on the pause / wave-transition screens is untouched.
-   First instance of the shared "sign tile" recipe — extract into a reusable kit
-   when the HUD adopts it. */
-#overlay .title-buttons .secondary,
-#pauseOverlay .scoop-tiles button,
-#journalOverlay .scoop-tiles button {
-  box-sizing: border-box;
-  /* Skewed into a parallelogram, matching the logo's SCOOP tiles. One knob; the
-     icon/label counter-skew below to stay upright. (Baked into the bounce keyframes
-     and :active too, so the shape holds through those transforms.) */
-  --tile-skew: 9deg;
-  transform: skewX(var(--tile-skew));
-  /* Vertical chiclet: icon stacked over the label. */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  line-height: 1.1;
-  border: none;
-  border-radius: 3px;            /* near-square, like the logo's SCOOP tiles */
-  padding: 16px 6px;
-  min-height: 108px;             /* taller-than-wide portrait chiclet (width is 76px) */
-  /* Emoji fallback: Comic Neue carries no emoji glyphs, so 📔/🏆/⚙️ rendered as
-     tofu under `font: inherit`. The OS emoji font picks them up per-glyph. */
-  font-family: 'Cousine', 'Comic Sans MS', "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-  font-weight: 800;
-  /* Dark-ink label with a soft top-highlight — no hard outline. */
-  color: var(--ink);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+/* Entrance: when the buttons stage opens (home-buttons, after the scoops plop), each knob
+   flies UP from below, one after another, while the group fades. `backwards` fill holds each
+   off-screen through its stagger delay; NOT filling forwards, so the resting transform stays
+   free for :active (the knob press-sink). Back-out easing overshoots then settles — the bounce. */
+#overlay.home-buttons .title-buttons .knob-btn {
+  animation: home-knob-in 0.55s cubic-bezier(0.34, 1.62, 0.62, 1) backwards;
 }
-/* Counter-skew the contents so the icon + label stay upright on the skewed tile. */
-#overlay .title-buttons .btn-ico,
-#pauseOverlay .scoop-tiles .btn-ico,
-#journalOverlay .scoop-tiles .btn-ico { font-size: 28px; line-height: 1; transform: skewX(calc(-1 * var(--tile-skew))); }
-/* Icon stays centered in the tile (it's the only in-flow flex child now); the label is
-   pulled out of flow and anchored to the BOTTOM with healthy padding underneath. */
-#overlay .title-buttons .btn-lbl,
-#pauseOverlay .scoop-tiles .btn-lbl,
-#journalOverlay .scoop-tiles .btn-lbl {
-  position: absolute;
-  bottom: 14px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  font-size: 12px;
-  transform: skewX(calc(-1 * var(--tile-skew)));
-}
+#overlay.home-buttons .title-buttons .knob-btn:nth-child(2) { animation-delay: 0.13s; }
+#overlay.home-buttons .title-buttons .knob-btn:nth-child(3) { animation-delay: 0.26s; }
 
-/* Marquee rhythm across the row: mint (1) · cream (2) · mint (3). */
-#overlay .title-buttons .secondary:nth-child(odd),
-#pauseOverlay .scoop-tiles button:nth-child(odd),
-#journalOverlay .scoop-tiles button:nth-child(odd) {
-  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
-  /* Marquee stagger: the teal tiles ride higher than the vanilla one, like the logo.
-     Uses position (not transform) so it doesn't fight the bounce-in's transform. */
-  position: relative;
-  top: -18px;
-  /* Oblique 3D block via a stacked "long shadow": the darker shade offset in 1px
-     diagonal steps smears the tile down-right, so the right + bottom faces meet in a
-     filled CORNER TRIANGLE (true dimensionality) — a single offset drop only made a
-     flat L-corner. */
-  box-shadow:
-    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 3px 3px 0 var(--mint-deep),
-    4px 4px 0 var(--mint-deep), 5px 5px 0 var(--mint-deep), 6px 6px 0 var(--mint-deep),
-    7px 7px 0 var(--mint-deep),
-    inset 0 2px 0 rgba(255, 255, 255, 0.5);
-}
-#overlay .title-buttons .secondary:nth-child(even),
-#pauseOverlay .scoop-tiles button:nth-child(even),
-#journalOverlay .scoop-tiles button:nth-child(even) {
-  background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
-  box-shadow:
-    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
-    4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
-    7px 7px 0 var(--vanilla-deep),
-    inset 0 2px 0 rgba(255, 255, 255, 0.7);
-}
-
-/* Press: sink onto the block (drop collapses). */
-#overlay .title-buttons .secondary:active,
-#pauseOverlay .scoop-tiles button:active { transform: translate(5px, 5px) skewX(var(--tile-skew)); }   /* sink onto the block (down-right) */
-#overlay .title-buttons .secondary:nth-child(odd):active,
-#pauseOverlay .scoop-tiles button:nth-child(odd):active {
-  box-shadow: 1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.4);
-}
-#overlay .title-buttons .secondary:nth-child(even):active,
-#pauseOverlay .scoop-tiles button:nth-child(even):active {
-  box-shadow: 1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.55);
-}
-
-/* Entrance: when the buttons stage opens (home-buttons, after the scoops plop), each
-   chiclet bounces UP from below the screen, one after another, while the group fades.
-   `backwards` fill holds each off-screen through its stagger delay; NOT filling
-   forwards so the resting transform stays free for :active (the press-sink). The
-   back-out easing overshoots past the resting spot, then settles — the bounce. */
-#overlay.home-buttons .title-buttons .secondary {
-  animation: chiclet-bounce-in 0.55s cubic-bezier(0.34, 1.62, 0.62, 1) backwards;
-}
-#overlay.home-buttons .title-buttons .secondary:nth-child(2) { animation-delay: 0.13s; }
-#overlay.home-buttons .title-buttons .secondary:nth-child(3) { animation-delay: 0.26s; }
-
-@keyframes chiclet-bounce-in {
-  from { opacity: 0; transform: translateY(150px) skewX(var(--tile-skew)); }
-  to   { opacity: 1; transform: translateY(0) skewX(var(--tile-skew)); }
+@keyframes home-knob-in {
+  from { opacity: 0; transform: translateY(150px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

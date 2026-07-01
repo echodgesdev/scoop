@@ -23,7 +23,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 18px;
-  /* sign-kit ticket (mirrors .sign-ticket; rows are JS-generated with this class) */
+  /* cream ticket row (JS-generated with this class) */
   background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
   border: 2px solid var(--sign-outline);
   border-radius: 4px;
@@ -39,6 +39,5 @@
 
 .highscore-empty { color: var(--ink-faint); font-size: 15px; padding: 14px 8px; text-align: center; }
 
-/* Close button now uses the shared .sign-btn (signKit.css). "High Scores" is two words, so
-   shrink the banner script a touch so it fits the trapezoid. */
-.highscores-modal .pb-label { font-size: 2.3em; }   /* "High Scores" is long — smaller than the 1-word default */
+/* Title is the shared .console-title, Close the shared .console-cta (consoleKit.css). The
+   .highscore-row rows below keep their cream-ticket look, which reads fine on the console. */

@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2.5 -341.6 58 16">
-  <!-- The "Catch & Serve" ribbon shape from the logo: blue face (#6a8cff) over its darker
-       3D side (#2356ff), which peeks down-right. No clip-path/text — the #230c00 contour is
-       added in CSS via drop-shadow on the <img> (no clip-path there, so it isn't erased). -->
-  <path fill="#2356ff" d="m -1.7950484,-340.91854 5.11261,12.25029 2.38588,2.38587 H 49.984412 l 5.1126,-12.25028 -2.38588,-2.38588 z"/>
-  <path fill="#6a8cff" d="M -1.7930284,-340.9205 H 52.713092 l -5.1126,12.25024 H 3.3195816 Z"/>
-</svg>

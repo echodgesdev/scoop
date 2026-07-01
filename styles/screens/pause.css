@@ -1,10 +1,12 @@
-/* Pause overlay.
+/* Pause overlay — on the console kit (consoleKit.css). The week name is injected into
+   .console-section-label and the current week's challenge rows into .pause-challenges (see
+   screens.js showPauseMenu); the panel, starburst title, action knobs and the Resume verb
+   button all come from the shared kit. The scrim colour is set in base/buttons.css.
    Auto-grouped from styles.css. Load order is fixed in ../../styles.css — see notes there. */
 
 #pauseOverlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18,246 +20,14 @@
   pointer-events: none;
 }
 
-.pause-modal {
-  max-width: 460px;
-  position: relative;   /* anchor for the overhanging banner + button tabs */
-}
-
-/* Free the overflow (scoped to beat cards.css) so the button tabs can overhang the
-   bottom, give the panel the dark SCOOP sign contour, and trim the top padding now that
-   the awning is gone — the brown title banner caps the panel instead. */
-#pauseOverlay .pause-modal {
-  overflow: visible;
-  border: none;            /* the contour moves to ::before so it can wrap the 3D extrusion */
-  background: none;        /* the cream face moves to ::before too */
-  padding: 0;              /* the .modal-body wrapper owns content padding; banner + tabs overhang */
-  isolation: isolate;      /* keep the ::before face layer (z-index:-1) contained */
-  /* Scale the whole sign (panel + overhanging banner + tabs) as ONE unit to a steady fraction
-     of the play column, so it doesn't read oversized on a narrow phone. --ui-scale is set from
-     surface.js fit(); transform-origin is centre, so it stays centred in the overlay. */
-  transform: scale(calc(var(--ui-scale, 1) * 1.2));
-}
-/* The panel rendered as a big tile: cream waffle face + a hard vanilla-deep 3D extrusion,
-   with the var(--sign-outline) contour wrapping the WHOLE thing INCLUDING the extrusion — same recipe as
-   the buttons. On ::before (no children → the filter never ghosts the content; no clip-path →
-   the filter isn't erased), sitting behind the content (z-index:-1). This also replaces the
-   old ice-cream scallop awning that ::before used to draw. */
-#pauseOverlay .pause-modal::before {
-  content: "";
-  display: block;
-  position: absolute;
-  inset: 0;
-  height: auto;            /* override the awning's fixed 27px height */
-  z-index: -1;
-  border-radius: 5px;            /* squarer — reads as a sign panel, not a soft note card */
-  background: var(--waffle-surface);
-  -webkit-mask: none;      /* drop the inherited scallop mask */
-  mask: none;
-  box-shadow:
-    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
-    4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
-    7px 7px 0 var(--vanilla-deep),
-    inset 0 2px 0 rgba(255, 255, 255, 0.6);
-  filter:
-    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline));
-  pointer-events: none;
-}
-
-/* The action cluster hangs off the panel's bottom edge: a row of three square tiles
-   (Journal · Home · Settings) with the wide blue Resume ribbon tucked underneath. The
-   whole cluster overhangs — tune translateY so the tile row straddles the bottom edge. */
-#pauseOverlay .pause-actions {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  transform: translateY(66%);   /* hang the cluster further off the panel */
+/* The week's challenge rows sit between the section label and the action knobs; scrolls
+   (styled pill via .jscroll) only if a week ever carries more goals than fit. */
+#pauseOverlay .pause-challenges {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0;
-}
-
-/* Invert the marquee on the pause row (the home row keeps the default). Journal + Settings
-   (odd) become the LOW vanilla tiles; Home (even, middle) becomes the RAISED mint tile — so
-   the Resume ribbon anchors on two yellow tiles with the teal one peaking up in the middle.
-   The extra `.pause-actions` in the selector outranks the shared tile rule in title.css. */
-#pauseOverlay .pause-actions .scoop-tiles button:nth-child(odd) {
-  background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
-  top: 0;
-  box-shadow:
-    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep), 3px 3px 0 var(--vanilla-deep),
-    4px 4px 0 var(--vanilla-deep), 5px 5px 0 var(--vanilla-deep), 6px 6px 0 var(--vanilla-deep),
-    7px 7px 0 var(--vanilla-deep),
-    inset 0 2px 0 rgba(255, 255, 255, 0.7);
-}
-#pauseOverlay .pause-actions .scoop-tiles button:nth-child(even) {
-  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
-  position: relative;
-  top: -18px;
-  box-shadow:
-    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep), 3px 3px 0 var(--mint-deep),
-    4px 4px 0 var(--mint-deep), 5px 5px 0 var(--mint-deep), 6px 6px 0 var(--mint-deep),
-    7px 7px 0 var(--mint-deep),
-    inset 0 2px 0 rgba(255, 255, 255, 0.5);
-}
-#pauseOverlay .pause-actions .scoop-tiles button:nth-child(odd):active {
-  box-shadow:
-    1px 1px 0 var(--vanilla-deep), 2px 2px 0 var(--vanilla-deep),
-    0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.55);
-}
-#pauseOverlay .pause-actions .scoop-tiles button:nth-child(even):active {
-  box-shadow:
-    1px 1px 0 var(--mint-deep), 2px 2px 0 var(--mint-deep),
-    0 2px 5px rgba(40, 16, 4, 0.22), inset 0 2px 0 rgba(255, 255, 255, 0.4);
-}
-
-/* Resume = the logo's blue "Catch & Serve" ribbon: a wide blue trapezoid (wide top,
-   narrower bottom), with the same 3D side + var(--sign-outline) contour treatment as the tiles. */
-/* Resume = the logo's blue "Catch & Serve" ribbon. A trapezoid can't be made with skew
-   (skew leans both sides the SAME way → parallelogram; a trapezoid leans them opposite), so
-   it needs clip-path. But CSS applies effects paint → filter → CLIP, so clip-path runs LAST
-   and erases any box-shadow / drop-shadow that falls outside the polygon — which flattened
-   every attempt. Fix (same as the PAUSED banner): bake the shape (blue face + 3D side) as an
-   SVG with NO clip-path, add the var(--sign-outline) contour via drop-shadow on the <img> (nothing clips
-   it away), and float the label on top. */
-#pauseOverlay .resume-banner {
-  position: relative;
-  width: 280px;
-  max-width: 88%;
-  margin-top: -3px;    /* slight pull-up so only the contours kiss — not the tiles' 3D layer */
-  border: none;
-  background: none;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  transition: transform 0.08s ease;
-}
-#pauseOverlay .resume-shape {
-  display: block;
+  gap: 6px;
   width: 100%;
-  height: auto;
-  /* thicker var(--sign-outline) contour (3px) so it reads heavier and overlaps the tile row's outline */
-  filter:
-    drop-shadow(3px 0 0 var(--sign-outline)) drop-shadow(-3px 0 0 var(--sign-outline))
-    drop-shadow(0 3px 0 var(--sign-outline)) drop-shadow(0 -3px 0 var(--sign-outline))
-    drop-shadow(0 3px 0 var(--sign-outline));
+  margin: 2px 0 6px;
+  max-height: 42vh;
+  overflow-y: auto;
 }
-#pauseOverlay .resume-label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;                /* space between the play icon and the word */
-  padding-bottom: 6px;      /* ride above the narrowing bottom + 3D side */
-  color: var(--vanilla);    /* #fff3c0 */
-  line-height: 1;
-  text-shadow: 2px 2px 0 var(--sign-outline);
-  pointer-events: none;
-}
-#pauseOverlay .resume-play-ico {
-  font-family: sans-serif;  /* clean geometric ▶ triangle, takes the cream text colour */
-  font-size: 18px;
-  line-height: 1;
-}
-#pauseOverlay .resume-play-txt {
-  font-size: 24px;          /* back to Cousine — the brush script didn't read in caps here */
-  font-weight: 800;
-  letter-spacing: 1px;
-  line-height: 1;
-}
-#pauseOverlay .resume-banner:active { transform: translate(2px, 2px); }
-
-/* The "PAUSED" title card as a PURE-CSS quad (no SVG). Same wall as the ribbon — CSS clips
-   AFTER filtering, so a filter on a clip-path'd element gets erased. Fix: put the var(--sign-outline)
-   contour filter on a NON-clipped wrapper (.pb-shape), and underneath it stack two clip-path'd
-   trapezoids — the brown face (::after) over the deep-brown 3D side (::before, offset
-   down-right). The wrapper isn't clipped, so its filter survives and traces face + side. The
-   label floats on top, outside the filter, so it stays crisp.
-   NOTE: this drops the Freestyle-Script lettering that was baked into the SVG — the title is
-   now Cousine, matching the Resume label. */
-#pauseOverlay .pause-banner {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 92%;
-  max-width: 380px;
-  aspect-ratio: 2.5 / 1;
-  transform: translate(-50%, -70%);   /* center + hang most of it above the panel's top edge */
-  pointer-events: none;
-}
-#pauseOverlay .pb-shape {
-  position: absolute;
-  inset: 0;
-  /* On this NON-clipped layer (so the clip can't erase the filter): a SOLID deep-brown 3D
-     side stepped 7px down-right — each repeat adds 1px, FILLING the diagonal corner exactly
-     like the tiles' stacked box-shadow (a single offset would read as a flat slab) — then the
-     var(--sign-outline) contour wrapping the face + the extrusion. */
-  filter:
-    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
-    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
-    drop-shadow(1px 1px 0 var(--choco-deep)) drop-shadow(1px 1px 0 var(--choco-deep))
-    drop-shadow(1px 1px 0 var(--choco-deep))
-    drop-shadow(2px 0 0 var(--sign-outline)) drop-shadow(-2px 0 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline)) drop-shadow(0 -2px 0 var(--sign-outline))
-    drop-shadow(0 2px 0 var(--sign-outline));
-}
-/* Just the brown FACE — the 3D side is the stepped extrusion in the filter above. */
-#pauseOverlay .pb-shape::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--choco);   /* #7b4a2a */
-  /* irregular trapezoid traced from the mockup: top slopes down-right, narrower bottom */
-  clip-path: polygon(0 0, 100% 39%, 89% 100%, 17% 100%);
-}
-#pauseOverlay .pb-label {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: end center;          /* sit at the BOTTOM of the quad, not centered */
-  padding-bottom: 18px;             /* lift off the narrow, clipped bottom edge */
-  color: var(--vanilla);            /* #fff3c0 */
-  font-family: 'Yellowtail', cursive;   /* retro brush script — the handwritten title */
-  font-size: 63px;                  /* script caps read smaller per em, so size up */
-  font-weight: 400;                 /* single-weight script — avoid faux-bold */
-  letter-spacing: 1px;
-  line-height: 1;
-  text-shadow: 2px 2px 0 var(--sign-outline);
-}
-
-/* The pause-menu buttons reuse the home chiclet kit verbatim — see the shared
-   `#overlay .title-buttons, #pauseOverlay .scoop-tiles …` rules in title.css (one
-   row of icon-over-word tiles). Nothing button-specific lives here.
-
-   The "Week N: <name>" header is the pause modal's main subhead now (the
-   "Tap Resume…" line was removed) — give it more presence. */
-/* Content-region clearance for the pause panel: keep the challenge list clear of the
-   banner overhanging the top and the button tabs overhanging the bottom. (Side padding
-   comes from the reusable .modal-body base in cards.css.) */
-#pauseOverlay .modal-body {
-  padding-top: 72px;
-  padding-bottom: 110px;
-}
-
-/* The week / goal title now uses the shared .sign-subhead (signKit.css) — injected with that
-   class in screens.js (showPauseMenu). */
-
-/* Challenge rows as the sign kit's "tickets" — PAUSE ONLY (the night-sky / recap / journal
-   versions keep the neutral pill). Cream face + dark sign contour + squarer corners; completed
-   rows go mint. Dark ink on cream/mint keeps them readable. */
-#pauseOverlay .challenge-row {
-  background: linear-gradient(180deg, var(--btn-cream-top), var(--vanilla));
-  border: 2px solid var(--sign-outline);
-  border-radius: 4px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);   /* faint gloss, like the tiles */
-}
-#pauseOverlay .challenge-row.completed {
-  background: linear-gradient(180deg, var(--mint-hi), var(--mint));
-  border-color: var(--sign-outline);
-}
-#pauseOverlay .challenge-row.completed .challenge-title { color: var(--ink); }       /* readable on mint */
-#pauseOverlay .challenge-row.completed .challenge-count { color: var(--sign-outline); } /* dark check on mint */

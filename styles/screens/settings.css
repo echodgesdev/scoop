@@ -13,31 +13,12 @@
 
 #settingsOverlay.hidden { display: none; }
 
-/* Settings adopts the sign-panel kit (signKit.css): the panel's flex gap spaces the controls
-   uniformly, so zero the old per-row margins. Close uses .sign-btn; How-to + the danger Reset
-   keep their own (distinct) styles. The old `.settings-modal` rules below are now dead and can
-   be cleaned up once the migration is confirmed. */
-.settings-panel { gap: 12px; }
-.settings-panel .settings-row,
-.settings-panel .settings-howto-btn { margin: 0; }
-
-.settings-modal {
-  background: #fff3c0;
-  border: 4px solid #b85;
-  border-radius: 14px;
-  padding: 22px;
-  max-width: 380px;
-  width: 92%;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  color: var(--ink);
-}
-
-.settings-modal h2 {
-  margin: 0 0 12px 0;
-  text-align: center;
-}
+/* Settings on the console kit (consoleKit.css): the panel's flex gap spaces the controls
+   uniformly, so zero the old per-row margins. How-to + the danger Reset keep their own
+   (distinct) styles; Close is the shared .console-cta. */
+.settings-console { gap: 10px; }
+.settings-console .settings-row,
+.settings-console .settings-howto-btn { margin: 0; }
 
 .settings-row {
   margin: 12px 0;
@@ -141,5 +122,3 @@
   color: #8a4a4a;
   text-align: center;
 }
-
-/* Close button now uses the shared .sign-btn (signKit.css). */
