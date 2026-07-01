@@ -24,7 +24,7 @@
   border: none;
   background: none;          /* the face moves to ::before */
   color: var(--ink);
-  transform: scale(var(--ui-scale, 1));   /* scale the whole sign as one unit (responsive) */
+  transform: scale(calc(var(--ui-scale, 1) * 1.2));   /* scale as one unit (responsive), +20% */
 }
 /* Cream waffle face + hard vanilla-deep 3D extrusion + the #230c00 contour wrapping the WHOLE
    block (filter on this non-clipped layer, so the contour wraps the extrusion and isn't
@@ -66,8 +66,8 @@
   left: 50%;
   width: 90%;
   max-width: 340px;
-  aspect-ratio: 2.6 / 1;
-  transform: translate(-50%, -68%);   /* hang most of it above the panel's top edge */
+  aspect-ratio: 2.5 / 1;
+  transform: translate(-50%, -70%);   /* hang most of it above the panel's top edge */
   pointer-events: none;
 }
 /* Solid deep-brown 3D side stepped down-right (fills the diagonal, like the tiles) + the
@@ -95,10 +95,11 @@
   inset: 0;
   display: grid;
   place-items: end center;            /* the handwritten title rides the bottom of the quad */
-  padding-bottom: 12px;
+  padding-bottom: 18px;               /* match the pause title's seat so all titles align the same */
   color: var(--vanilla);
   font-family: 'Yellowtail', cursive; /* the brush script — em off the panel base, override per-modal */
-  font-size: 3.2em;
+  font-size: 3.4em;
+  letter-spacing: 1px;
   line-height: 1;
   text-shadow: 2px 2px 0 var(--sign-outline);
 }

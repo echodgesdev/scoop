@@ -35,7 +35,7 @@
   /* Scale the whole sign (panel + overhanging banner + tabs) as ONE unit to a steady fraction
      of the play column, so it doesn't read oversized on a narrow phone. --ui-scale is set from
      surface.js fit(); transform-origin is centre, so it stays centred in the overlay. */
-  transform: scale(var(--ui-scale, 1));
+  transform: scale(calc(var(--ui-scale, 1) * 1.2));
 }
 /* The panel rendered as a big tile: cream waffle face + a hard vanilla-deep 3D extrusion,
    with the var(--sign-outline) contour wrapping the WHOLE thing INCLUDING the extrusion — same recipe as
